@@ -79,7 +79,7 @@ import { createBiliCardSender, normalizeCardMode } from './bili-card.js';
 import { fetchVideoInfo } from './bili-api.js';
 import { moodObserve, moodLine, moodTick, moodDiaryTick, moodStatusText, moodPublic, moodUpdate } from './mood-lib.js'; // MOODV2_IMPORT2
 import { pickStudyVideo, studyStatusText, studyCfg, readStudyState, writeStudyState, hasWatched, addToFolder, favoriteByBvid } from './bili-study.js';
-import { appendStyleSample, readStyleSamples, styleStats, styleSamplesBlock, styleObserve, styleTick, styleCandidates, styleSetStatus } from './style-lib.js'; // STYLE_PATCH STYLE_GATE_PATCH
+import { readStyleSamples, styleStats, styleTick, styleCandidates } from './style-lib.js'; // STYLE_PATCH STYLE_GATE_PATCH
 import { loopsBlock, loopsMeta, addLoop, doneLoop, listLoops } from './loops-lib.js'; // LOOPS_PATCH
 import { parseDue, dueReminders, markReminded, learnPeople, notePerson, peopleBlock, noteAlive, lastEventAgo, alertState, setAlert, reportState, markReported, fmtReport } from './next-lib.js'; // NEXT_PATCH
 import { transcribeRecord, voiceTextOf } from './voice-lib.js'; // VOICE_PATCH // BILISTUDY_PATCH BILISTUDY_PATCH2
@@ -7856,32 +7856,6 @@ async function main() {
               log('[欠事] ' + (lcR.ok ? `记了一条（共 ${lcR.total}）` : '失败：' + lcR.error));
               return sendJson(lcR, lcR.ok ? 200 : 400);
             }
-            if (url.pathname === '/api/socialV2/style-candidate') { // STYLE_GATE_PATCH
-              const act = String(body?.action || 'list');
-              if (act === 'set') {
-                const r = styleSetStatus(String(body?.id || ''), String(body?.status || ''));
-                log('[学样] 人工' + (r.ok ? `：${body?.status} ${String(body?.id).slice(0, 12)}` : '失败：' + r.error));
-                return sendJson(r, r.ok ? 200 : 400);
-              }
-              return sendJson({ ok: true, ...styleCandidates() });
-            }
-            if (url.pathname === '/api/socialV2/style-note') {
-              if (!v2ToolEnabled('styleNote')) return sendJson({ ok: false, error: 'styleNote 已关闭' }, 403);
-              { // STYLE_STRICT_PATCH：只学目标的人，别把路人/自己记进来
-                const stl = styleLearnCfgNow();
-                if (stl.strictTarget && stl.targetQQ) {
-                  const okUin = String(body?.uin || '') === String(stl.targetQQ);
-                  const okName = /亚托莉/.test(String(body?.from || ''));
-                  if (!okUin && !okName) {
-                    log('[学样] 拒收：' + String(body?.from || '空') + '（不是目标 ' + stl.targetQQ + '）');
-                    return sendJson({ ok: false, error: '只学 QQ ' + stl.targetQQ + '（亚托莉）的说法，别人的不记' }, 400);
-                  }
-                }
-              }
-              const r = appendStyleSample(body || {});
-              log('[学样] ' + (r.ok ? `记了一条（共 ${r.total}）` : '失败：' + r.error));
-              return sendJson(r.ok ? { ok: true, total: r.total, duplicated: !!r.duplicated } : { ok: false, error: r.error }, r.ok ? 200 : 400);
-            }
             if (!v2ToolEnabled('readGroup')) return sendJson({ ok: false, error: 'readGroup 已关闭' }, 403);
             const gid = String(body?.group || '').replace(/\D/g, '');
             const cnt = Math.max(5, Math.min(40, Number(body?.count) || 20));
@@ -13541,14 +13515,7 @@ async function main() {
       // RECALL_RULE_PATCH：把「先查再答」写成硬规矩（约 60 token）
       const recallRule = '【用记忆的规矩】提到过去发生的事、约定/承诺、TA 的偏好或习惯时，先用 qq_recall_memory 查一下再回答；查不到就直说记不清，别凭感觉编。';
         const extBlocks = extPromptBlocks(cfg); // EXT_PATCH
-        // STYLE_INJECT_PATCH：学到的说法要真进提示词，否则只是收集
-        const stlCfg = styleLearnCfgNow();
-        const styleMax = Math.max(0, Number(stlCfg?.injectMaxChars ?? 520) || 520);
-        const stlBlock = stlCfg?.enabled && styleMax ? styleSamplesBlock(styleMax, Number(stlCfg?.injectMaxItems) || 6) : '';
-        const styleLine = stlBlock
-          ? ['【说话方式（从别人那儿学来的框架；是参考，不是台词：别整段照搬原话，更别学成对方的口气）】', stlBlock].join('\n')
-          : '';
-      const text = [selfText, recallRule, loops, people, ...extBlocks, styleLine, card, diary ? '【最近两天的日记（你自己写的）】\n' + diary : '']
+      const text = [selfText, recallRule, loops, people, ...extBlocks, card, diary ? '【最近两天的日记（你自己写的）】\n' + diary : '']
         .filter(Boolean).join('\n\n');
       memoryCardPromptCache = { key, text };
       return text;
@@ -16234,7 +16201,7 @@ async function main() {
       if (kind === 'group') { // STYLE_GATE_PATCH：观察群里谁在复用候选句式
         const rawG = String(event?.raw_message || '').trim();
         const uinG = String(event?.sender?.user_id || event?.user_id || '');
-        if (rawG && uinG) { styleObserve(id, uinG, rawG, cfg); extOnGroupMessage({ key: id, uin: uinG, text: rawG, cfg }); }
+        if (rawG && uinG) { extOnGroupMessage({ key: id, uin: uinG, text: rawG, cfg }); }
       }
       if (kind === 'private') {
         const t = String(event?.raw_message || event?.message?.text || '').trim();

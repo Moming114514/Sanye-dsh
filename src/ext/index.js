@@ -6,9 +6,10 @@ import techNotes from './tech-notes.js';
 import impressions from './impressions.js';
 import ownerOnly from './owner-only.js';
 import promises from './promises.js';
+import style from './style.js';
 
 // 注册顺序 = 提示词注入顺序（印象在前、技术笔记在后，与原内联顺序一致）
-const EXTENSIONS = [ownerOnly, promises, impressions, techNotes].filter(Boolean);
+const EXTENSIONS = [ownerOnly, promises, impressions, techNotes, style].filter(Boolean);
 
 export function extList() {
   return EXTENSIONS;
