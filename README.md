@@ -1,3 +1,17 @@
+> ## 👉 这是我的改造分支，不是 SurfCore 原版
+>
+> 我在 [SurfCore](https://github.com/Mieksido/surfcore)（MIT）之上加了：**分层人格 · 会话隔离的记忆 ·
+> 印象库 · 技术笔记 · 学说话 · 表情管理 · 成本面板 · 通道自愈**，并把 60 处内联补丁收敛成
+> 6 个钩子 + 29 个扩展模块。
+>
+> - 想看**我改了什么、为什么改** → [docs/MY-BUILD.md](docs/MY-BUILD.md)
+> - 想让**你的 DSH 直接学、或者抄走** → [docs/LEARN-FROM-ME.md](docs/LEARN-FROM-ME.md)（这份是写给 AI 看的）
+> - 想看**怎么升级/合并上游** → [docs/UPGRADE.md](docs/UPGRADE.md)
+>
+> 下面才是上游 SurfCore 的原始 README（安装、依赖、配置以它为准）。
+
+---
+
 # SurfCore — 给 DSH agent 一个真实的身份：QQ × B站 × 桌宠
 
 **中文** | [English](README.en.md)

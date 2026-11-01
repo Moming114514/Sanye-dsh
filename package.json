@@ -3,7 +3,7 @@
   "version": "0.8.1",
   "private": true,
   "license": "MIT",
-  "description": "SurfCore — QQ ↔ DeepSeek Harness bridge + QQ/B站 merged plugin: one repo, one settings window, QQ + Bilibili + QQ presets.",
+  "description": "sanye-dsh — 在 SurfCore 之上做的 QQ 伙伴改造：分层人格 / 会话隔离记忆 / 印象库 / 技术笔记 / 成本面板 / 通道自愈",
   "type": "module",
   "engines": {
     "node": ">=22.13.0"
