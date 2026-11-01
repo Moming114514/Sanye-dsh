@@ -13,7 +13,21 @@ import { spawn } from 'node:child_process';
 
 const ROOT = process.cwd();
 const NODE = process.execPath;
-const KEYS = ['private:1000000000', 'group:1000000002', 'group:1000000001'];
+// 会话 key 属于个人隐私，不进仓库：
+//   1) 运行时优先读 state/snap-keys.json（.gitignore 已忽略）
+//   2) 其次读环境变量 SURFCORE_SNAP_KEYS（逗号分隔）
+//   3) 都没有就用占位符，保证公开仓库里跑起来也不报错
+function snapKeys() {
+  try {
+    const j = JSON.parse(fs.readFileSync(path.join(ROOT, 'state/snap-keys.json'), 'utf8'));
+    if (Array.isArray(j.keys) && j.keys.length) return j.keys;
+  } catch {}
+  const env = String(process.env.SURFCORE_SNAP_KEYS || '').trim();
+  if (env) return env.split(',').map((s) => s.trim()).filter(Boolean);
+  return ['private:1000000000', 'group:1000000001', 'group:1000000002'];
+}
+const KEYS = snapKeys();
+const KMAP = keyIndexMap(KEYS);
 const ROUTES = ['/api/status', '/api/socialV2/states', '/api/socialV2/mood', '/api/socialV2/style-list', '/api/socialV2/tech-notes'];
 const BASE_DIR = path.join(ROOT, 'scripts/snap-base');
 const BASE_FILE = path.join(BASE_DIR, 'structure.json');
@@ -73,6 +87,17 @@ function toolsList() {
 }
 
 // 只留结构信息：字节数 + 小节标题（【…】 与 ## 标题），不含正文
+
+// 把真实会话 key 归一成私有基准里的占位名（private:#1 / group:#1 ...）
+function normKey(k, idx) {
+  return k.startsWith('private:') ? `private:#${idx.priv}` : `group:#${idx.grp}`;
+}
+function keyIndexMap(keys) {
+  let priv = 0; let grp = 0; const m = {};
+  for (const k of keys) m[k] = k.startsWith('private:') ? { priv: ++priv, grp: 0 } : { priv: 0, grp: ++grp };
+  return m;
+}
+
 function structureOf(hint) {
   const titles = [];
   for (const line of String(hint || '').split('\n')) {
@@ -119,7 +144,7 @@ if (!skipApi) {
       const res = await fetch(`http://127.0.0.1:3100/api/socialV2/prompt?key=${encodeURIComponent(key)}&token=${encodeURIComponent(token)}`, { signal: AbortSignal.timeout(8000) });
       body = await res.json();
     } catch { down = true; break; }
-    live.prompts[key] = structureOf(body?.role?.hint ?? '');
+    live.prompts[normKey(key, KMAP[key])] = structureOf(body?.role?.hint ?? '');
   }
   if (!down) {
     for (const p of ROUTES) {
@@ -143,7 +168,7 @@ if (!skipApi) {
       const base = JSON.parse(fs.readFileSync(BASE_FILE, 'utf8'));
       const diffs = [];
       for (const key of KEYS) {
-        const a = base.prompts?.[key], b = live.prompts[key];
+        const nk = normKey(key, KMAP[key]); const a = base.prompts?.[nk], b = live.prompts[nk];
         if (!a) { diffs.push(`${key} 基准缺失`); continue; }
         if (a.bytes !== b.bytes) diffs.push(`${key} 字节 ${a.bytes}→${b.bytes}`);
         // SOFT_TITLES：这些小节随记忆数据增减，属正常漂移，不算硬失败

@@ -7,7 +7,7 @@ export function styleCfg(cfg) {
   const c = cfg?.socialV2?.styleLearn ?? {};
   return {
     enabled: c.enabled !== false,
-    targetQQ: String(c.targetQQ || '2000000000'),
+    targetQQ: String(c.targetQQ || ''),
     strictTarget: c.strictTarget !== false,
     injectMaxChars: Math.max(0, Number(c.injectMaxChars ?? 520) || 520),
     injectMaxItems: Math.max(1, Number(c.injectMaxItems) || 6),
@@ -45,7 +45,7 @@ export default {
     if (!/学(一下)?(亚托莉|她)|看(看|一下)(亚托莉|她)|去群里学|学说法|学她说话/.test(plain)) return false;
     const gid = c.groups[0];
     if (!gid) return false;
-    const task = '【学说法·手动】去烤研群（群 ' + gid + '）看看：调 qq_read_group_recent，参数 count=60、uin=' + String(cfg.socialV2?.styleLearn?.targetQQ || '2000000000') + ' —— **只把她一个人的消息拉回来**，别人的不用看（只用这一个工具，别用 qq_get_recent / qq_get_unread / qq_get_prompt，跨群一定报凭证错误）。'
+    const task = '【学说法·手动】去烤研群（群 ' + gid + '）看看：调 qq_read_group_recent，参数 count=60、uin=' + String(cfg.socialV2?.styleLearn?.targetQQ || '') + ' —— **只把她一个人的消息拉回来**，别人的不用看（只用这一个工具，别用 qq_get_recent / qq_get_unread / qq_get_prompt，跨群一定报凭证错误）。'
       + '**只学 QQ ' + c.targetQQ + '（群昵称以「亚托莉」开头）这一个人的说话方式**，群里其他人的话只当上下文，不许学。按 QQ 号认人最准；找不到她就只记通用框架，别硬认人。'
       + '只提炼「说话框架」：怎么起句、怎么接话、怎么求人、怎么拒绝、怎么吐槽但不伤人；不要抄口头禅和梗，也别整段模仿。'
       + '记 ' + c.perRound + ' 条就够，每条都要写框架层面的「好在哪」（例：先用一句软话把事说清，再给结论）。脏话、攻击、阴阳怪气、贬低别人一律不学。'

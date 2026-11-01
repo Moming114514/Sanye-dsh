@@ -1,7 +1,7 @@
 {
  "at": "2026-11-01T12:43:35.866Z",
  "prompts": {
-  "private:1000000000": {
+  "private:#1": {
    "bytes": 9722,
    "sections": 39,
    "titles": [
@@ -46,7 +46,7 @@
     "## 2026-10-31"
    ]
   },
-  "group:1000000002": {
+  "group:#1": {
    "bytes": 7475,
    "sections": 32,
    "titles": [
@@ -84,7 +84,7 @@
     "## 2026-10-31"
    ]
   },
-  "group:1000000001": {
+  "group:#2": {
    "bytes": 7967,
    "sections": 32,
    "titles": [

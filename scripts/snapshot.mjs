@@ -11,10 +11,23 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 
-const ROOT = '/home/dsh/apps/surfcore';
+const ROOT = process.env.SURFCORE_ROOT || path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const BASE = '/tmp/snap-base';
 const LIVE = '/tmp/snap-live';
-const KEYS = ['private:1000000000', 'group:1000000002', 'group:1000000001'];
+// 会话 key 属于个人隐私，不进仓库：
+//   1) 运行时优先读 state/snap-keys.json（.gitignore 已忽略）
+//   2) 其次读环境变量 SURFCORE_SNAP_KEYS（逗号分隔）
+//   3) 都没有就用占位符，保证公开仓库里跑起来也不报错
+function snapKeys() {
+  try {
+    const j = JSON.parse(fs.readFileSync(path.join(ROOT, 'state/snap-keys.json'), 'utf8'));
+    if (Array.isArray(j.keys) && j.keys.length) return j.keys;
+  } catch {}
+  const env = String(process.env.SURFCORE_SNAP_KEYS || '').trim();
+  if (env) return env.split(',').map((s) => s.trim()).filter(Boolean);
+  return ['private:1000000000', 'group:1000000001', 'group:1000000002'];
+}
+const KEYS = snapKeys();
 
 const token = JSON.parse(fs.readFileSync(path.join(ROOT, 'config.json'), 'utf8')).consoleToken;
 

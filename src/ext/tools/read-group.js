@@ -9,7 +9,7 @@ export default {
       shape: {
         group: z.string().describe('群号'),
         count: z.number().optional().describe('拉多少条，默认 20，最多 60'),
-        uin: z.string().optional().describe('只看这个 QQ 号说的话（例如学说法时填 2000000000）。不填就是所有人'),
+        uin: z.string().optional().describe('只看这个 QQ 号说的话（例如学说法时填被学习的那个 QQ）。不填就是所有人'),
       },
       async handler({ group, count, uin }) {
         const r = await agentApi('/api/socialV2/group-recent', { method: 'POST', body: JSON.stringify({ group, count, uin }) });

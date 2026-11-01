@@ -30,7 +30,7 @@ export function createStyleLearn({ getCfg, log, deliverPrompt, stateDir, isPeakN
       minute: Number.isFinite(c.minute) ? c.minute : 30,
       groups,
       rounds,
-      targetQQ: String(c.targetQQ || '2000000000'),
+      targetQQ: String(c.targetQQ || ''),
       strictTarget: c.strictTarget !== false,
       perRound: Math.max(1, Math.min(4, Number(c.perRound) || 2)),
     };
