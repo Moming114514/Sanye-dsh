@@ -1711,7 +1711,7 @@ function visibleFor(card, platform, cfg) {
 
 function sectionize(card, { platform = 'all', now = Date.now(), config = {} } = {}) {
   const cfg = normalizeMemoryCardConfig(config);
-  const visible = visibleFor(card, platform, cfg);
+  const visible = visibleFor(card, platform, cfg).filter((item) => !item.displayOnly); // DISPLAYONLY_PATCH：只展示的记忆不进提示词
   const firstMet = [];
   const anchors = [];
   const initial = [];

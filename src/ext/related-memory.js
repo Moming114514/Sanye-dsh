@@ -32,7 +32,7 @@ function index(paths) {
     const key = `${st.mtimeMs}:${st.size}`;
     if (cache.key === key) return cache;
     const card = JSON.parse(fs.readFileSync(file, 'utf8'));
-    const records = (card.records || []).filter((r) => r && !r.forgottenAt && (r.text || r.title));
+    const records = (card.records || []).filter((r) => r && !r.forgottenAt && !r.displayOnly && (r.text || r.title)); // 只展示的不参与召回
     const df = new Map();
     for (const r of records) {
       const set = new Set(relmemGrams(`${r.title || ''} ${r.text || ''}`));
@@ -85,10 +85,44 @@ export function relatedMemoryBlock(text, { cfg, paths } = {}) {
   }
   if (!scored.length) return '';
   scored.sort((a, b) => b.score - a.score);
+
+  // ASSOC_PATCH：先按这句话挑出种子，再顺着种子把自己的「邻居」捞回来——
+  // 同一场对话里前后几小时、或者同一个 tag 的记忆，往往才是她真正会想起的那件事。
+  const expand = Math.max(0, Math.min(3, Number(rc.expand ?? 2)));
+  const seeds = scored.slice(0, maxItems);
+  const pickedIds = new Set(seeds.map((x) => x.r.id));
+  const tagSet = (r) => new Set([...(Array.isArray(r.tags) ? r.tags : []), ...(r.tag ? [r.tag] : [])]);
+  const tsOf = (r) => Date.parse(r.createdAt || r.lastSeenAt || '') || 0;
+  const extras = [];
+  if (expand > 0) {
+    for (const seed of seeds) {
+      if (extras.length >= expand) break;
+      const sts = tsOf(seed.r);
+      for (const r of idx.records) {
+        if (extras.length >= expand) break;
+        if (pickedIds.has(r.id)) continue;
+        let near = false;
+        // 关联 = 同一场对话里、和他这段话前后 15 分钟内记下的另一件事（通常是同一次交流的两面）
+        if (seed.r.conversationKey && r.conversationKey === seed.r.conversationKey) {
+          const d = Math.abs(tsOf(r) - sts);
+          if (d > 0 && d <= 15 * 60 * 1000) near = true;
+        }
+        if (!near) continue;
+        extras.push({ r, score: seed.score * 0.55 });
+        pickedIds.add(r.id);
+      }
+    }
+  }
   const lines = [];
   let used = 0;
-  for (const { r } of scored.slice(0, maxItems)) {
+  for (const { r } of seeds) {
     const line = '- ' + clean(r.text || r.title || '').slice(0, 90);
+    if (used + line.length > maxChars) break;
+    lines.push(line);
+    used += line.length;
+  }
+  for (const { r } of extras) {
+    const line = '- （顺着这条想起的）' + clean(r.text || r.title || '').slice(0, 84);
     if (used + line.length > maxChars) break;
     lines.push(line);
     used += line.length;
