@@ -62,6 +62,7 @@ import {
 import { fuzzyRecallFiles } from './recall-vec.js'; // RECALL_FUZZY_PATCH
 import { extDispatchRoute, extPromptBlocks, extStateKey, extWakeGate, extAfterSend, extOnGroupMessage } from './ext/index.js'; // EXT_PATCH
 import { relatedMemoryBlock, relatedMemorySuffix } from './ext/related-memory.js'; // RELATEDMEM_EXT
+import { stickerTodoLine } from './ext/stickers.js'; // STICKER_EXT
 import { analyzePromise } from './ext/promises.js'; // PROMISE_EXT
 import {
   activeMemoryPaths, activePersonaFile, activePlatformStateDir, characterPaths, readCurrentCharacter,
@@ -7843,20 +7844,6 @@ async function main() {
             const body = await readBody();
             // EXT_PATCH：扩展路由统一在这里分发（技术笔记等），命中即由扩展自行响应
             if (extDispatchRoute(url.pathname, { body, cfg, log, sendJson })) return;
-            if (url.pathname === '/api/socialV2/person') { // NEXT_PATCH
-              const pr = notePerson({ qq: body?.qq, alias: body?.alias, note: body?.note });
-              log('[人物] ' + (pr.ok ? '记了 ' + pr.qq : '失败：' + pr.error));
-              return sendJson(pr, pr.ok ? 200 : 400);
-            }
-            if (url.pathname === '/api/socialV2/loop') { // LOOPS_PATCH
-              const lcAction = String(body?.action || 'add');
-              if (lcAction === 'list') return sendJson({ ok: true, items: listLoops(cfg) });
-              if (lcAction === 'done') return sendJson(doneLoop({ id: body?.id, text: body?.text, raw: cfg }));
-              const lcDue = parseDue(body?.due || body?.dueText || ''); // NEXT_PATCH
-              const lcR = addLoop({ text: body?.text, by: body?.by, due: lcDue, raw: cfg });
-              log('[欠事] ' + (lcR.ok ? `记了一条（共 ${lcR.total}）` : '失败：' + lcR.error));
-              return sendJson(lcR, lcR.ok ? 200 : 400);
-            }
             if (!v2ToolEnabled('readGroup')) return sendJson({ ok: false, error: 'readGroup 已关闭' }, 403);
             const gid = String(body?.group || '').replace(/\D/g, '');
             const cnt = Math.max(5, Math.min(40, Number(body?.count) || 20));
@@ -15117,11 +15104,8 @@ async function main() {
       ...(Array.isArray(st.unread) ? st.unread : []).filter((m) => m && !m.isSelf).slice(-4)
     ]);
     const stickerMatchLine = wakeStickerMatch ? `${wakeStickerMatch.hint}\n\n` : '';
-    // STICKER_TODO_PATCH：库里有没写描述的表情时，提醒她自己看图补上（她才是看图的人）。
-    const stickerTodo = stickerEntries.filter((e) => e && !e.content && (!e.emotion || e.emotion === 'neutral')).slice(0, 8);
-    const stickerTodoLine = stickerTodo.length
-      ? `【表情待补】表情库里有 ${stickerTodo.length} 张还没写描述（${stickerTodo.map((e) => '#' + String(e.no).padStart(2, '0')).join(' ')}）。手头闲的时候用 qq_get_sticker_image 看一眼、再用 qq_sticker_note 补一句「画面 + 情绪」，补完才能挑得准；一直不补就等于库里全是盲盒。\n\n`
-      : '';
+    // STICKER_TODO_EXT：提示行由 ext/stickers.js 生成（M2）
+    const stickerTodoBlock = stickerTodoLine(stickerEntries);
     const wc = st.wakeConfig || {};
     const wcTr = wc.triggers || {};
     const wcMode = wc.mode === 'active' ? '活跃' : '潜水';
@@ -15159,7 +15143,7 @@ async function main() {
     const base = roleLine + personaV2Line + identityLine + provenanceLine + adminLine
       + tokenLine + antiAiLine + proactiveLine + closureLine + stickerLine + replyLine + preSleepLine
       + biliLine + memoryCardLine + initialPromptLine
-      + stickerTodoLine + walletLine + tokenGuardLine
+      + stickerTodoBlock + walletLine + tokenGuardLine
       + statusLine + wakeLine + memoryLine + participationLine + fishGuardLine + stickerMatchLine;
     lastWakePromptMeta = {
       role: roleLine.length,
