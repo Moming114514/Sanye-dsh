@@ -17,9 +17,10 @@ import style from './style.js';
 import loops from './loops.js';
 import stickers from './stickers.js';
 import mute from './mute.js'; // 静音名单
+import learnmode from './learnmode.js'; // 学习模式（只看不聊）
 
 // 注册顺序 = 提示词注入顺序（印象在前、技术笔记在后，与原内联顺序一致）
-const EXTENSIONS = [ownerOnly, mute, promises, impressions, techNotes, style, loops, stickers].filter(Boolean);
+const EXTENSIONS = [ownerOnly, mute, learnmode, promises, impressions, techNotes, style, loops, stickers].filter(Boolean);
 
 export function extList() {
   return EXTENSIONS;

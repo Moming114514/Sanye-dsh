@@ -40,9 +40,13 @@ function similarity(a, b) {
   return inter / (A.size + B.size - inter);
 }
 
+// 群助手的自动回复：不是人说的话，学了会把她的语气带成客服
+const BOT_LINE_RE = /(正在解析|解析完成|没有可发送的内容|不支持|请稍后|命令不对|未知命令|指令错误|查无此|请联系管理员|出错了|下载失败|媒体不可访问|版本更新|更新日志|输入「|发送「|已开启|已关闭|重启成功|正在处理)/;
+
 export function classifySample(text) {
   const t = String(text || '').trim();
   const n = norm(t);
+  if (BOT_LINE_RE.test(t)) return { kind: 'junk', reason: '机器人的自动输出（解析/报错/命令提示）' }; // BOT_LINE_RE
   if (NOISE_RE.test(t)) return { kind: 'junk', reason: '链接/@/表情/数字噪声' };
   if (n.length < 8) return { kind: 'junk', reason: '太短，只是语气词' };
   if (n.length > 80) return { kind: 'quote', reason: '太长，像整段复述' };
