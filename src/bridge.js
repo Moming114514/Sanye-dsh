@@ -2812,10 +2812,20 @@ async function main() {
       const ccfg = sc.collect ?? {};
       if (sc.enabled === false || ccfg.enabled === false) return;
       if (!media || (media.kind !== 'sticker' && media.kind !== 'image')) return;
-      const id = String(media.emojiId || media.resId || '').trim();
-      if (id.length < 8) return;            // 普通小黄脸（face）不存，只收表情包/市场表情
+      // 表情包不一定是 mface：他从表情面板拖进聊天框的，网络上常常是 image 段（sub_type=1 或 .gif），
+      // 而且没有 emoji_id。这种也要收，用文件/链接做稳定指纹，否则「发个表情给她」永远进不了库。
+      const looksSticker = media.kind === 'sticker'
+        || String(media.subType || '') === '1'
+        || /\.(gif|apng|webp)$/i.test(String(media.file || media.url || ''));
+      if (!looksSticker) return;            // 普通照片不收
+      let id = String(media.emojiId || media.resId || '').trim();
+      if (id.length < 8) {
+        const seed = String(media.file || '') + '|' + String(media.url || '').split('?')[0];
+        if (!seed.replace('|', '').trim()) return;
+        id = 'img-' + crypto.createHash('md5').update(seed).digest('hex').slice(0, 20);
+      }
       if (!media.url && !media.file) return;
-      if (stickerEntries.some((e) => e && e.id === id)) return;
+      if (stickerEntries.some((e) => e && (e.id === id || (media.file && e.file === media.file)))) return;
       const maxItems = Math.max(1, Number(sc.maxItems) || 50);
       if (stickerEntries.length >= maxItems) return;
       const now = Date.now();
@@ -2825,7 +2835,7 @@ async function main() {
       if (kept.filter((e) => now - Number(e.collectedAt) < 60_000).length >= perMin) return;
       if (kept.filter((e) => now - Number(e.collectedAt) < 3_600_000).length >= perHour) return;
       stickerEntries.push({
-        id, resId: id, url: String(media.url || ''), desc: '', localNote: '',
+        id, resId: id, url: String(media.url || ''), file: String(media.file || ''), desc: '', localNote: '',
         emotion: 'neutral', emotionAlt: [], content: '', keywords: [], tags: [],
         usage: '', source: 'collected', collectedAt: now,
         createdAt: new Date(now).toISOString(), updatedAt: new Date(now).toISOString()
