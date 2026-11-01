@@ -63,6 +63,8 @@ import { fuzzyRecallFiles } from './recall-vec.js'; // RECALL_FUZZY_PATCH
 import { extDispatchRoute, extPromptBlocks, extStateKey, extWakeGate, extAfterSend, extOnGroupMessage } from './ext/index.js'; // EXT_PATCH
 import { relatedMemoryBlock, relatedMemorySuffix } from './ext/related-memory.js'; // RELATEDMEM_EXT
 import { stickerTodoLine } from './ext/stickers.js'; // STICKER_EXT
+import { MEMV2_CARD_MAX, MEMV2_SELF_MAX, MEMV2_DIARY_MAX } from './ext/memory-card.js'; // MEMCARD_EXT
+import { isSilent, markSilent, consumeSilent, clearSilent } from './ext/blackbox.js'; // BLACKBOX_EXT
 import { analyzePromise } from './ext/promises.js'; // PROMISE_EXT
 import {
   activeMemoryPaths, activePersonaFile, activePlatformStateDir, characterPaths, readCurrentCharacter,
@@ -644,8 +646,6 @@ function presetStatus(name) {
 // 社交模式“静默标记”：模型输出该标记时，桥接不把内容发到 QQ。
 // 用于让 AI 在“不想接话/潜水”时有合法沉默出口，而不是写“（内心戏）”被当成消息发出去。
 const SILENT_MARKER = '[SILENT]';
-// STYLE_PATCH13: 黑箱模式——某些内部任务（如学说法）不希望她的回复发到 QQ
-const suppressOutboundOnce = new Map(); // STYLE_PATCH14: key -> 过期时间戳
 function isSilentMarker(text) {
   return /^\s*\[SILENT\]\s*$/i.test(String(text ?? '').trim());
 }
@@ -9272,8 +9272,8 @@ async function main() {
           const replyToMessageId = body.replyToMessageId;
           const atUserId = body.atUserId ?? null;
           const key = isPrivate ? `private:${targetId}` : `group:${targetId}`;
-          // STYLE_PATCH14: 黑箱任务期间丢弃发送工具发出的消息
-          if ((suppressOutboundOnce.get(key) || 0) > Date.now()) {
+          // 黑箱任务期间丢弃发送工具发出的消息（ext/blackbox.js）
+          if (isSilent(key)) {
             log('[黑箱] 丢弃一条发送 (' + key + ')');
             sendJson({ ok: true, suppressed: true });
             return;
@@ -12862,7 +12862,7 @@ async function main() {
 
   // 实际的 DSH prompt 投递（不再直接对外暴露，统一走 promptQueues 串行队列）。
   async function deliverPromptNow(key, promptText, opts = {}) {
-    if (opts && (opts.silentOutbound || opts.reason === 'style-learn')) suppressOutboundOnce.set(key, Date.now() + 15 * 60 * 1000); // STYLE_PATCH13
+    if (opts && (opts.silentOutbound || opts.reason === 'style-learn')) markSilent(key); // 黑箱：15 分钟内不发
     if (!isSessionAllowedInCurrentMode(key)) throw new Error(`当前模式不允许会话 ${key}`);
     // Recheck queued wakes at dispatch time: no model call while paused/disabled
     // and no reserved2 prompt leaking into an ordinary chat after a mode switch.
@@ -12995,8 +12995,7 @@ async function main() {
         entry = { queue: [], running: false };
         promptQueues.set(key, entry);
       }
-      // STYLE_PATCH13
-      if (opts && (opts.silentOutbound || opts.reason === 'style-learn')) suppressOutboundOnce.set(key, Date.now() + 15 * 60 * 1000);
+      if (opts && (opts.silentOutbound || opts.reason === 'style-learn')) markSilent(key);
       entry.queue.push({ promptText, opts, resolve, reject });
       processPromptQueue(key);
     });
@@ -13311,10 +13310,7 @@ async function main() {
   const MEMV2_DIR = path.dirname(MEMORY_CARD_PATHS.promptQq);
   const MEMV2_SELF = path.join(MEMV2_DIR, 'self.md');
   const MEMV2_DIARY = path.join(MEMV2_DIR, 'diary.md');
-  // MEMCARD_ALIGN_PATCH????? injectMaxChars.qq = 2200???? priority ????????
-  // ????? 1800 ????????????????????"???????????"?????
-  // ??? 2400?? memory-card.js ????????
-  const MEMV2_CARD_MAX = 2800;
+  // 记忆卡预算见 ext/memory-card.js（MEMCARD_ALIGN → ext，M2 第七步）
   const MEMV2_SELF_MAX = 700;
   const MEMV2_DIARY_MAX = 400;
 
@@ -16123,7 +16119,7 @@ async function main() {
         }
       }
     } catch {}
-    try { suppressOutboundOnce.delete(kind + ':' + id); } catch {} // STYLE_PATCH14
+    clearSilent(kind + ':' + id);
     const key = convKey(kind, id);
     // 群画像：成员数缓存用于小群/大群分层；失败不影响消息处理。
     if (kind === 'group') void ensureGroupMeta(id);
@@ -17543,9 +17539,8 @@ async function main() {
                   }
                   continue;
                 }
-                // STYLE_PATCH13: 黑箱任务不发回复
-                if ((suppressOutboundOnce.get(key) || 0) > Date.now()) { // STYLE_PATCH14
-                  suppressOutboundOnce.delete(key);
+                // 黑箱任务不发回复（ext/blackbox.js）
+                if (consumeSilent(key)) {
                   log(`[黑箱] 本轮回复不发送 (${key})`);
                   continue;
                 }
