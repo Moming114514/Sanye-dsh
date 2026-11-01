@@ -1,5 +1,6 @@
 // 学说法：只学目标的人怎么说话（框架），进提示词当参考
 // 从 bridge.js 的 STYLE_INJECT_PATCH / STYLE_GATE_PATCH / STYLE_STRICT_PATCH 迁出（M2 第四步）
+import { readStyleSamples, styleStats } from '../style-lib.js';
 import { appendStyleSample, styleSamplesBlock, styleObserve, styleCandidates, styleSetStatus } from '../style-lib.js';
 
 export function styleCfg(cfg) {
@@ -60,6 +61,13 @@ export default {
   },
 
   routes: [
+    {
+      path: '/api/socialV2/style-list',
+      method: 'GET',
+      handle({ sendJson }) {
+        return sendJson({ ok: true, samples: readStyleSamples(30), stats: styleStats(), ...styleCandidates() });
+      },
+    },
     {
       path: '/api/socialV2/style-candidate',
       handle({ body, log, sendJson }) {

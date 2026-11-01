@@ -85,7 +85,8 @@ import { createBiliCardSender, normalizeCardMode } from './bili-card.js';
 import { fetchVideoInfo } from './bili-api.js';
 import { moodObserve, moodLine, moodTick, moodDiaryTick, moodStatusText, moodPublic, moodUpdate } from './mood-lib.js'; // MOODV2_IMPORT2
 import { pickStudyVideo, studyStatusText, studyCfg, readStudyState, writeStudyState, hasWatched, addToFolder, favoriteByBvid } from './bili-study.js';
-import { readStyleSamples, styleStats, styleTick, styleCandidates } from './style-lib.js'; // STYLE_PATCH STYLE_GATE_PATCH
+
+import { createStyleLearn } from './ext/style-learn.js'; // STYLE_LEARN_EXT
 import { loopsBlock, loopsMeta, addLoop, doneLoop, listLoops } from './loops-lib.js'; // LOOPS_PATCH
 import { parseDue, dueReminders, markReminded, learnPeople, notePerson, peopleBlock, noteAlive, lastEventAgo, alertState, setAlert, reportState, markReported, fmtReport } from './next-lib.js'; // NEXT_PATCH
 import { transcribeRecord, voiceTextOf } from './voice-lib.js'; // VOICE_PATCH // BILISTUDY_PATCH BILISTUDY_PATCH2
@@ -7840,8 +7841,9 @@ async function main() {
             const consoleOk = String(req.headers['x-console-token'] || '') === String(cfg.consoleToken || '');
             const localOk = (req.socket?.remoteAddress === '127.0.0.1' || req.socket?.remoteAddress === '::1' || req.socket?.remoteAddress === '::ffff:127.0.0.1'); // STYLE_PATCH3
             if (!isLiveAgentToken(token) && !consoleOk && !localOk) return sendJson({ ok: false, error: 'agent token 无效' }, 403);
-            if (url.pathname === '/api/socialV2/style-list') { // STYLE_GATE_PATCH
-              return sendJson({ ok: true, samples: readStyleSamples(30), stats: styleStats(), ...styleCandidates() });
+            // EXT_PATCH：扩展路由先分发（style-list / 技术笔记 / 印象库等各自负责）
+            if (url.pathname === '/api/socialV2/style-list') {
+              if (extDispatchRoute(url.pathname, { body: {}, cfg, log, sendJson })) return;
             }
             const body = await readBody();
             // EXT_PATCH：扩展路由统一在这里分发（技术笔记等），命中即由扩展自行响应
@@ -13656,59 +13658,18 @@ async function main() {
   }, 10 * 60 * 1000);
   log('[学习] 已启动：每 10 分钟看一眼要不要学新视频');
 
-  // STYLE_PATCH: 每天固定时间让她去群里「学说法」（只记句式，不改人格）
-  function styleLearnCfgNow() {
-    const c = cfg.socialV2?.styleLearn ?? {};
-    const groups = Array.isArray(c.groups) && c.groups.length
-      ? c.groups.map(String)
-      : (Array.isArray(cfg.allow?.groups) ? cfg.allow.groups.map(String) : []);
-    const rounds = Array.isArray(c.rounds) && c.rounds.length
-      ? c.rounds.map((r) => [Number(r?.[0]) || 0, Number(r?.[1]) || 0])
-      : [[Number.isFinite(c.hour) ? c.hour : 20, Number.isFinite(c.minute) ? c.minute : 30]];
-    return {
-      enabled: c.enabled !== false,
-      hour: Number.isFinite(c.hour) ? c.hour : 20,
-      minute: Number.isFinite(c.minute) ? c.minute : 30,
-      groups,
-      rounds, // STYLELEARN2_CFG
-      targetQQ: String(c.targetQQ || '2000000000'),
-      strictTarget: c.strictTarget !== false, // STYLE_STRICT_PATCH：只认目标 QQ / 昵称含「亚托莉」
-      perRound: Math.max(1, Math.min(4, Number(c.perRound) || 2)),
-    };
-  }
-  async function styleLearnTick() {
-    try {
-      const c = styleLearnCfgNow();
-      if (!c.enabled || !c.groups.length) return;
-      const now = new Date();
-      const day = now.toISOString().slice(0, 10);
-      const stFile = path.join(STATE_DIR, 'style-learn.json');
-      let st = {};
-      try { st = JSON.parse(fs.readFileSync(stFile, 'utf8')); } catch {}
-      // STYLE_CATCHUP：只要今天该轮的时间已过、且还没做，就补跑（重启/错过 10 分钟窗口都不丢）
-      let round = -1;
-      { const minsNow = now.getHours() * 60 + now.getMinutes();
-        (c.rounds || []).forEach((r, i) => { const at = Number(r?.[0]) * 60 + Number(r?.[1]); if (Number.isFinite(at) && minsNow >= at) round = i; }); }
-      if (round < 0) return;
-      const doneKey = day + '#' + round;
-      if (st?.done && st.done[doneKey]) return;
-      if (isPeakNow()) { log('[学样] 跳过（高峰时段）：' + doneKey); return; }
-      if (tokenGuardDowngrade().on) { log('[学样] 跳过（省钱模式）：' + doneKey); return; }
-      if (!cfg.ownerQQ) return;
-      const gid = c.groups[Math.floor(Math.random() * c.groups.length)];
-      const doneMap = Object.assign({}, st && st.done ? st.done : {}, { [doneKey]: true }); // STYLELEARN2_STATE
-      fs.writeFileSync(stFile, JSON.stringify({ day, done: doneMap, lastRound: round, group: gid, at: new Date().toISOString() }));
-      let task = '【学说法】去群里看看（群 ' + gid + '）：先用 qq_read_group_recent 拉最近 25 条（就用这一个工具；不要用 qq_get_recent / qq_get_unread / qq_get_prompt，那几个只能看当前会话，跨群一定报凭证错误，不是工具坏了）。重点看一个人：**QQ 2000000000**，群昵称以「亚托莉」三个字开头（后面还可能有别的字）。按 QQ 号认最准；找不到他就只记通用框架，别硬认人。只提炼「说话框架」：怎么起句、怎么接话、怎么求人、怎么拒绝、怎么吐槽但不伤人；**不要抄口头禅和梗**，也别整段模仿——她的说话方式以她自己为主，别人只是参考。记 1~2 条就够，写「好在哪」时要写框架层面的原因（例：先用一句软话把事说清，再给结论）。她得是温柔、善良、单纯的：脏话、攻击、阴阳怪气、贬低别人一律不学。 // STYLE_PATCH10'
-        + '记完就不用改人格卡，也别在群里发言，**更不要私聊汇报**（黑箱模式）：记完就结束这一轮，不要写回话内容。';
-      task = '【学说法】去烤研群（群 ' + gid + '）看看：先用 qq_read_group_recent 拉最近 40 条（只用这一个工具，别用 qq_get_recent / qq_get_unread / qq_get_prompt，跨群一定报凭证错误）。**只学 QQ ' + c.targetQQ + '（群昵称以「亚托莉」开头）这一个人的说话方式**，群里其他人的话只当上下文，不许学。按 QQ 号认人最准；找不到他就只记通用框架，别硬认人。只提炼「说话框架」：怎么起句、怎么接话、怎么求人、怎么拒绝、怎么吐槽但不伤人；**不要抄口头禅和梗**，也别整段模仿。记 ' + c.perRound + ' 条，每条都要写框架层面的「好在哪」（例：先用一句软话把事说清，再给结论）。脏话、攻击、阴阳怪气、贬低别人一律不学。记完不改人格卡、不在群里发言、不私聊汇报。'; // STYLELEARN2_TASK
-      deliverPrompt('private:' + cfg.ownerQQ, task, { reason: 'style-learn', silentOutbound: true });
-      log('[学样] 已排定今天的学习任务：' + gid);
-    } catch (e) {
-      log('[学样] 定时任务出错：' + String(e?.message || e));
-    }
-  }
-  try { setInterval(() => { void styleLearnTick(); }, 5 * 60 * 1000); } catch {}
-  try { setInterval(() => { styleTick(cfg); }, 30 * 60 * 1000); } catch {} // STYLE_GATE_PATCH：候选过期丢弃
+  // STYLE_PATCH → src/ext/style-learn.js（M2 第十三步：定时学习 + 候选过期统一在扩展里）
+  const styleLearn = createStyleLearn({
+    getCfg: () => cfg,
+    log,
+    deliverPrompt,
+    stateDir: STATE_DIR,
+    isPeakNow,
+    tokenGuardDowngrade,
+  });
+  const styleLearnCfgNow = () => styleLearn.styleLearnCfgNow();
+  try { setInterval(() => { void styleLearn.tick(); }, 5 * 60 * 1000); } catch {}
+  try { setInterval(() => { styleLearn.tickCandidates(); }, 30 * 60 * 1000); } catch {}
 
   // MOOD_DIARY_TICK：把当天心情的主色调写进日记（一天一条，零模型开销）
   async function moodDiaryTick() {
