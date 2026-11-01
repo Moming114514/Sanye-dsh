@@ -63,6 +63,7 @@ import { fuzzyRecallFiles } from './recall-vec.js'; // RECALL_FUZZY_PATCH
 import { extDispatchRoute, extPromptBlocks, extStateKey, extWakeGate, extAfterSend, extOnGroupMessage, extOnPrivateMessage } from './ext/index.js'; // EXT_PATCH
 import createQzoneWatch from './ext/qzone-watch.js'; // QZONE_WATCH_EXT
 import { fetchQzoneFeed, commentQzone, sendQzone, deleteQzone, qzoneEnabled as qzoneEnabledOf } from './ext/qzone.js'; // QZONE_EXT
+import { pickLastMedia, stickerFrames } from './ext/sticker-frames.js'; // VIEW_STICKER_EXT
 import { createReminders } from './ext/reminders.js'; // REMINDERS_EXT
 import { relatedMemoryBlock, relatedMemorySuffix } from './ext/related-memory.js'; // RELATEDMEM_EXT
 import { stickerTodoLine } from './ext/stickers.js'; // STICKER_EXT
@@ -7733,16 +7734,7 @@ async function main() {
               if (dparts.length !== 2 || (dparts[0] !== 'group' && dparts[0] !== 'private')) { sendJson({ ok: false, error: 'key 必须是 group:群号 或 private:QQ号' }, 400); return; }
               const dh = await fetchOneBotHistory(dparts[0], Number(dparts[1]), 20);
               const dmsgs = Array.isArray(dh) ? dh : (Array.isArray(dh?.messages) ? dh.messages : []);
-              for (const msg of [...dmsgs].reverse()) {
-                for (const seg of [...(msg?.message ?? [])].reverse()) {
-                  if (seg?.type === 'image' || seg?.type === 'mface') {
-                    const d = seg.data ?? {};
-                    dt = { kind: seg.type === 'mface' ? 'sticker' : 'image', file: String(d.file ?? ''), url: String(d.url ?? ''), subType: String(d.sub_type ?? ''), summary: String(d.summary ?? ''), emojiId: String(d.emoji_id ?? '') };
-                    break;
-                  }
-                }
-                if (dt) break;
-              }
+              dt = pickLastMedia(dmsgs); // VIEW_STICKER_EXT
               if (!dt) { sendJson({ ok: false, error: 'no media in last 20' }, 404); return; }
             }
             const dc = findCachedMedia(dk);
@@ -7759,51 +7751,22 @@ async function main() {
           const vtoken = String(req.headers['x-agent-token'] ?? vbody.token ?? '').trim();
           if (!vtoken || !isLiveAgentToken(vtoken)) { sendJson({ ok: false, error: 'agent token 无效' }, 403); return; }
           if (socialV2.paused) { sendJson({ ok: false, error: 'AI 已暂停，当前不允许执行该操作' }, 403); return; }
-          const vkey = String(vbody.key ?? '').trim();
-          const vm = /^(group|private):(\d+)$/.exec(vkey);
-          if (!vm) { sendJson({ ok: false, error: 'key 必须是 group:群号 或 private:QQ号' }, 400); return; }
+          // VIEW_STICKER_PATCH → src/ext/sticker-frames.js（M2 第十五步）
           try {
-            const vhist = await fetchOneBotHistory(vm[1], Number(vm[2]), Number(vbody.count) > 0 ? Math.min(Number(vbody.count), 50) : 20);
-            const vmsgs = Array.isArray(vhist) ? vhist : (Array.isArray(vhist?.messages) ? vhist.messages : []);
-            let target = null;
-            for (const msg of [...vmsgs].reverse()) {
-              for (const seg of [...(msg?.message ?? [])].reverse()) {
-                if (seg?.type === 'image' || seg?.type === 'mface') {
-                  const d = seg.data ?? {};
-                  target = { kind: seg.type === 'mface' ? 'sticker' : 'image', file: String(d.file ?? ''), url: String(d.url ?? ''), subType: String(d.sub_type ?? d.subType ?? ''), summary: String(d.summary ?? ''), emojiId: String(d.emoji_id ?? d.emojiId ?? '') };
-                  break;
-                }
-              }
-              if (target) break;
-            }
-            // VIEW_STICKER_GXH: gxh.vip 直链会 404，改从历史里找同一张图的可下载链接
-            if (String(target.url || '').includes('gxh.vip')) {
-              const wantFile = String(target.file || '').split('/').pop();
-              const wantEmoji = String(target.emojiId || '');
-              let fixed = false;
-              for (const msg of [...vmsgs].reverse()) {
-                for (const seg of msg?.message ?? []) {
-                  if (seg?.type !== 'image' && seg?.type !== 'mface') continue;
-                  const d = seg.data ?? {};
-                  const u = String(d.url ?? '');
-                  if (!u.startsWith('http') || u.includes('gxh.vip')) continue;
-                  const f = String(d.file ?? '').split('/').pop();
-                  const eid = String(d.emoji_id ?? d.emojiId ?? '');
-                  if ((wantFile && f === wantFile) || (wantEmoji && eid === wantEmoji)) { target.url = u; fixed = true; log('[看图] gxh 直链失效，改用历史里的可下载链接'); break; }
-                }
-                if (fixed) break;
-              }
-            }
-            const cached = findCachedMedia(vkey);
-            const sheet = await stickerFrameSheet(target, cached?.file ?? '');
-            log(`[看图] 已抽 ${sheet.frames} 帧${sheet.animated ? '（动图）' : ''} → ${sheet.path}`);
-            sendJson({ ok: true, key: vkey, ...sheet, summary: target.summary || '' });
+            const out = await stickerFrames({
+              key: String(vbody.key ?? '').trim(),
+              count: Number(vbody.count) > 0 ? Math.min(Number(vbody.count), 50) : 20,
+              findCached: findCachedMedia,
+              frameSheet: stickerFrameSheet,
+              fetchHistory: fetchOneBotHistory,
+              log,
+            });
+            sendJson(out.payload, out.code);
           } catch (e) {
             sendJson({ ok: false, error: `抽帧失败：${e?.message || e}` }, 502);
           }
           return;
         }
-
         // QZONE_FEED_PATCH（2026-10-30）：读说说 / 在说说下评论。
         // 点赞接口实测走不通：like_v6 / emotion_cgi_like_v6 多种参数组合一律 HTTP 500（评论区同域同 cookie 正常），
         // 所以这里只做「看列表」和「评论」，没有点赞。
