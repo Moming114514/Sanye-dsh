@@ -89,6 +89,28 @@
 
 ---
 
+## 文档索引
+
+| 想看什么 | 去哪 |
+|---|---|
+| 我到底改了什么（给人看） | [`docs/MY-BUILD.md`](docs/MY-BUILD.md) |
+| 让 AI 抄我的实现（给模型看） | [`docs/LEARN-FROM-ME.md`](docs/LEARN-FROM-ME.md) |
+| **日常运维：出事 5 分钟定位** | [`docs/OPERATIONS.md`](docs/OPERATIONS.md) |
+| 升级上游怎么合、冲突怎么取舍 | [`docs/UPGRADE.md`](docs/UPGRADE.md) |
+| SnowLuma / NapCat / 其它 OneBot 差异 | [`docs/CHANNEL-COMPAT.md`](docs/CHANNEL-COMPAT.md) |
+| V1 定版时的体检记录（可复现基线） | [`docs/V1-BASELINE.md`](docs/V1-BASELINE.md) |
+| 我踩过的坑（含上游的） | [`docs/PITFALLS.md`](docs/PITFALLS.md) |
+
+## 已验证环境
+
+| 项目 | 状态 |
+|---|---|
+| 服务器 | Debian 12 / 2 核 2G / Node 22.23.4 |
+| QQ 通道 | **NapCat（Docker）长期运行，本仓库所有功能都在这上面验证过** |
+| SnowLuma | 代码路径与 NapCat 相同（都是 OneBot v11），**未逐一实测**；缺扩展 API 的功能会自动降级，见 `docs/CHANNEL-COMPAT.md` |
+| 面板 | Chrome / Edge 最近版本；默认只监听 `127.0.0.1`，用 SSH 隧道访问 |
+| 上游基线 | SurfCore v0.8.1（`Mieksido/surfcore`） |
+
 ## 通道兼容（SnowLuma / NapCat / 其它 OneBot）
 
 桥接本身就是 `@snowluma/sdk` + OneBot v11，**换通道不用改代码**，只需把 `snowluma.wsUrl/httpUrl` 指向你的实现。哪些功能在哪个通道可用、需要注意什么：见 [`docs/CHANNEL-COMPAT.md`](docs/CHANNEL-COMPAT.md)。
