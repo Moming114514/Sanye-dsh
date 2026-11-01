@@ -1,7 +1,13 @@
-// src/ext/index.js
-// EXT_PATCH（M2）：扩展装配点。bridge.js 只保留 4 个钩子——
-//   1) 装配（import 本文件）2) 路由分发 extDispatchRoute 3) 提示词块 extPromptBlocks 4) 状态键 extStateKey
-// 唤醒闸门与发送后回调的钩子随后续迁移接入。新增功能 = ext/ 下新建模块 + EXTENSIONS 加一行。
+// src/ext/index.js —— 扩展装配点（M2）
+//
+// bridge.js 只保留接线，功能都住在这个目录里。可用钩子：
+//   1) 路由     extDispatchRoute(pathname, ctx)      扩展自己的接口
+//   2) 提示词   extPromptBlocks(cfg)                 注入段落，顺序 = 注册顺序
+//   3) 唤醒闸门 extWakeGate(ctx)                     返回 false 则本次不唤醒（省钱）
+//   4) 发送后   extAfterSend(ctx)                    回复发出后回调
+//   5) 群消息   extOnGroupMessage(ctx)               群消息入口
+//   另有 extStateKey()：扩展读了文件就必须实现 stateKey()，否则提示词缓存会读到旧内容。
+// 新增功能见同目录 README.md。
 import techNotes from './tech-notes.js';
 import impressions from './impressions.js';
 import ownerOnly from './owner-only.js';
