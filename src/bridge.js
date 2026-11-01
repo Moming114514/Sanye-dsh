@@ -61,6 +61,7 @@ import {
   appendMemoryInboxEvent, looksNoteworthyMessage, resolveMemoryCardPaths, loadMemoryCard, saveMemoryCardOutputs, touchMemories } from './memory-card.js';
 import { fuzzyRecallFiles } from './recall-vec.js'; // RECALL_FUZZY_PATCH
 import { extDispatchRoute, extPromptBlocks, extStateKey, extWakeGate, extAfterSend, extOnGroupMessage } from './ext/index.js'; // EXT_PATCH
+import { relatedMemoryBlock, relatedMemorySuffix } from './ext/related-memory.js'; // RELATEDMEM_EXT
 import { analyzePromise } from './ext/promises.js'; // PROMISE_EXT
 import {
   activeMemoryPaths, activePersonaFile, activePlatformStateDir, characterPaths, readCurrentCharacter,
@@ -4687,7 +4688,7 @@ async function main() {
           try {
             // RELATEDMEM_PATCH：?related=1 时把“这句话会挑出的记忆”一起送进去，方便验证
             const relTest = String(url.searchParams.get('related') || '') === '1';
-            const relBlock = relTest ? relatedMemoryBlock(text0) : '';
+            const relBlock = relTest ? relatedMemoryBlock(text0, { cfg, paths: MEMORY_CARD_PATHS }) : '';
             await deliverPrompt(key0, relBlock ? `${text0}\n\n${relBlock}` : text0);
             sendJson({ ok: true, key: key0, relatedChars: relBlock.length, relatedBlock: relBlock });
           } catch (e) {
@@ -4707,7 +4708,7 @@ async function main() {
           const want = String(url.searchParams.get('token') || '');
           if (!want || want !== String(cfg.consoleToken || '')) { sendJson({ ok: false, error: '令牌无效' }, 403); return; }
           const q = String(url.searchParams.get('text') || '');
-          const block = relatedMemoryBlock(q);
+          const block = relatedMemoryBlock(q, { cfg, paths: MEMORY_CARD_PATHS });
           sendJson({ ok: true, text: q, chars: block.length, block });
           return;
         }
@@ -13390,105 +13391,6 @@ async function main() {
   }
 
 
-  // ── RELATEDMEM_PATCH：按“这一句”挑最相关的几条记忆，临时注入本轮（不进常驻提示词）──
-  const relmemCache = { key: '', records: [], df: new Map(), total: 0 };
-  const RELMEM_STOP = new Set(['一个', '什么', '我们', '你们', '他们', '这个', '那个', '现在', '就是', '还是', '可以', '没有', '知道', '觉得', '时候', '今天', '明天', '真的', '不是', '自己', '因为', '所以', '但是', '如果', '这样', '那样', '一点', '有点', '已经', '东西', '事情', '问题', '然后', '还有', '这里', '那里', '怎么', '这么', '那么', '一起', '一样', '不是', '不会', '不能']);
-  function relmemGrams(s) {
-    const text = String(s || '').toLowerCase().replace(/[\s\p{P}\p{S}]+/gu, ' ').trim();
-    const out = [];
-    for (const chunk of text.split(' ')) {
-      if (!chunk) continue;
-      if (/^[a-z0-9_.+-]+$/.test(chunk)) { if (chunk.length >= 2) out.push(chunk); continue; }
-      const chars = Array.from(chunk);
-      for (let i = 0; i < chars.length - 1; i += 1) {
-        const g = chars[i] + chars[i + 1];
-        if (!RELMEM_STOP.has(g)) out.push(g);
-      }
-    }
-    return out;
-  }
-  function relmemIndex() {
-    try {
-      const st = fs.statSync(MEMORY_CARD_PATHS.json);
-      const key = `${st.mtimeMs}:${st.size}`;
-      if (relmemCache.key === key) return relmemCache;
-      const card = JSON.parse(fs.readFileSync(MEMORY_CARD_PATHS.json, 'utf8'));
-      const recs = (card.records || []).filter((r) => r && !r.forgottenAt && (r.text || r.title));
-      const df = new Map();
-      for (const r of recs) {
-        const set = new Set(relmemGrams(`${r.title || ''} ${r.text || ''}`));
-        for (const g of set) df.set(g, (df.get(g) || 0) + 1);
-      }
-      relmemCache.key = key;
-      relmemCache.records = recs;
-      relmemCache.df = df;
-      relmemCache.total = recs.length;
-      return relmemCache;
-    } catch {
-      return { key: '', records: [], df: new Map(), total: 0 };
-    }
-  }
-  function relmemClean(s) {
-    return String(s || '').replace(/\[图片\]/g, '').replace(/\[表情\]/g, '').replace(/\s+/g, ' ').trim();
-  }
-  function relatedMemoryBlock(text) {
-    const rc = cfg.socialV2?.relatedMemories ?? {};
-    if (rc.enabled === false) return '';
-    const q = String(text ?? '').trim();
-    if (q.length < 2 || q.startsWith('/')) return '';
-    const maxItems = Math.max(1, Math.min(6, Number(rc.maxItems) || 3));
-    const maxChars = Math.max(120, Math.min(900, Number(rc.injectMaxChars) || 300));
-    const minHits = Math.max(1, Math.min(4, Number(rc.minHits) || 2));
-    const idx = relmemIndex();
-    if (!idx.records.length) return '';
-    const qg = [...new Set(relmemGrams(q))];
-    const needHits = Math.min(minHits, qg.length);
-    if (!qg.length) return '';
-    const n = Math.max(1, idx.total);
-    const scored = [];
-    for (const r of idx.records) {
-      const hay = new Set(relmemGrams(`${r.title || ''} ${r.text || ''}`));
-      let score = 0;
-      let hit = 0;
-      for (const g of qg) {
-        if (!hay.has(g)) continue;
-        hit += 1;
-        score += Math.log(1 + n / (idx.df.get(g) || 1));
-      }
-      if (hit < needHits) continue;
-      score += (Number(r.importance) || 0) / 250;
-      if (r.pinned) score += 0.3;
-      const last = Date.parse(r.lastSeenAt || r.createdAt || '') || 0;
-      if (last && Date.now() - last < 14 * 86400000) score += 0.15;
-      scored.push({ r, score });
-    }
-    if (!scored.length) return '';
-    scored.sort((a, b) => b.score - a.score);
-    const lines = [];
-    let used = 0;
-    for (const { r } of scored.slice(0, maxItems)) {
-      const line = '- ' + relmemClean(r.text || r.title || '').slice(0, 90);
-      if (used + line.length > maxChars) break;
-      lines.push(line);
-      used += line.length;
-    }
-    if (!lines.length) return '';
-    return `【和这句话有关的记忆（你自己想起来的旧事，只当背景：和当前话题无关就当没想起来，不要硬提）】\n${lines.join('\n')}`;
-  }
-  function relatedMemorySuffix(key, text) {
-    try {
-      // 只在私聊注入：群聊里不能把「和主人」的旧事塞给所有人看
-      if (!String(key || '').startsWith('private:')) return '';
-      const block = relatedMemoryBlock(text);
-      if (!block) return '';
-      if (cfg.socialV2?.relatedMemories?.log !== false) log(`[相关记忆] ${key} 注入 ${block.split('\n').length - 1} 条 for「${String(text).slice(0, 30)}」`);
-      return '\n\n' + block;
-    } catch (e) {
-      log('[相关记忆] 计算失败:', e?.message ?? e);
-      return '';
-    }
-  }
-
   function memoryCardPromptBlock() {
     try {
       const stat = fs.statSync(MEMORY_CARD_PATHS.promptQq);
@@ -16857,7 +16759,7 @@ async function main() {
 
     // 角色扮演提示注入（仅注入给 agent，不影响群友之间的正常对话语义）
     // RELATEDMEM_PATCH：按这一句挑 2–4 条最相关的旧记忆，临时挂在 roleHint 后面
-    const roleHint = currentRoleHint(key) + relatedMemorySuffix(key, textContent);
+    const roleHint = currentRoleHint(key) + relatedMemorySuffix({ key, text: textContent, cfg, paths: MEMORY_CARD_PATHS, log });
 
     // 最近聊天上下文：先取「当前消息之前」的窗口，再把当前消息记进窗口。
     const recentBlock = currentMode === 'chat' ? buildRecentChatBlock(key) : '';
