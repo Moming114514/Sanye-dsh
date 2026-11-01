@@ -59,6 +59,7 @@ import {
 import { createBiliMemory } from './bili-memory.js';
 import {
   appendMemoryInboxEvent, looksNoteworthyMessage, resolveMemoryCardPaths, loadMemoryCard, saveMemoryCardOutputs, touchMemories } from './memory-card.js';
+import { scopedMemoryText } from './ext/memory-scope.js'; // MEMSCOPE_PATCH
 import { fuzzyRecallFiles } from './recall-vec.js'; // RECALL_FUZZY_PATCH
 import { extDispatchRoute, extPromptBlocks, extStateKey, extWakeGate, extAfterSend, extOnGroupMessage, extOnPrivateMessage } from './ext/index.js'; // EXT_PATCH
 import createQzoneWatch from './ext/qzone-watch.js'; // QZONE_WATCH_EXT
@@ -6239,7 +6240,7 @@ async function main() {
               const personaMode = url.searchParams.get('mode') === 'full' ? 'full' : (key.startsWith('group:') ? 'tone' : 'full');
               return { name: roleState.role ?? null, mode: personaMode, hint: currentMode === 'reserved2' ? currentRoleHintV2(key, personaMode) : currentRoleHint(key, personaMode) };
             })(),
-            memoryCard: memoryCardPromptBlock(),
+            memoryCard: memoryCardPromptBlock(key), // MEMSCOPE_PATCH
             recommended: cfg.socialV2?.provideRecommendations === false ? null : {
               wake: cfg.socialV2?.wake ?? {},
               send: cfg.socialV2?.send ?? {},
@@ -13143,7 +13144,7 @@ async function main() {
   }
 
 
-  function memoryCardPromptBlock() {
+  function memoryCardPromptBlock(sessionKey = '') { // MEMSCOPE_PATCH
     try {
       const stat = fs.statSync(MEMORY_CARD_PATHS.promptQq);
       let s1 = { mtimeMs: 0, size: 0 };
@@ -13152,8 +13153,9 @@ async function main() {
       try { s2 = fs.statSync(MEMV2_DIARY); } catch {}
       let imprStat = 'x';
       const extStat = extStateKey(); // EXT_PATCH
-      const key = `${stat.mtimeMs}:${stat.size}|${s1.mtimeMs}:${s1.size}|${s2.mtimeMs}:${s2.size}|${loopsMeta()}|${extStat}`; // LOOPS_PATCH IMPR_PATCH EXT_PATCH
-      if (memoryCardPromptCache.key === key) return memoryCardPromptCache.text;
+      const scopeStat = (() => { try { const j = fs.statSync(MEMORY_CARD_PATHS.json); return `${j.mtimeMs}:${j.size}`; } catch { return 'x'; } })();
+      const cacheKey = `${sessionKey}|${scopeStat}|${stat.mtimeMs}:${stat.size}|${s1.mtimeMs}:${s1.size}|${s2.mtimeMs}:${s2.size}|${loopsMeta()}|${extStat}`; // LOOPS_PATCH IMPR_PATCH EXT_PATCH MEMSCOPE_PATCH
+      if (memoryCardPromptCache.key === cacheKey) return memoryCardPromptCache.text;
       const selfText = memv2Capped(MEMV2_SELF, MEMV2_SELF_MAX);
       // OWNER_RELABEL_PATCH：记忆卡里统一叫「他」——主人/管理员/他三种叫法同一个人，别让她混着用
       const relabelOwner = (t) => String(t || '')
@@ -13162,7 +13164,20 @@ async function main() {
         .replace(/和主人（管理员）/g, '和他')
         .replace(/（和主人）/g, '（和他）')
         .replace(/## 和主人/g, '## 和他');
-      const card = relabelOwner(memv2Capped(MEMORY_CARD_PATHS.promptQq, MEMV2_CARD_MAX));
+      // MEMSCOPE_PATCH：按会话渲染（群只给本群记忆，私聊只给本人记忆）
+      let cardRaw = '';
+      try {
+        const scoped = scopedMemoryText({
+          paths: MEMORY_CARD_PATHS,
+          key: sessionKey,
+          config: cfg.memoryCard,
+          maxChars: MEMV2_CARD_MAX,
+          ownerQQ: String(cfg?.socialV2?.ownerQQ ?? cfg?.self?.qq ?? cfg?.socialV2?.access?.private?.[0] ?? ''),
+        });
+        cardRaw = scoped.text;
+      } catch {}
+      if (!cardRaw) cardRaw = memv2Capped(MEMORY_CARD_PATHS.promptQq, MEMV2_CARD_MAX);
+      const card = relabelOwner(cardRaw);
       const diary = memv2DiaryTail(MEMV2_DIARY_MAX);
       const loops = loopsBlock(cfg); // LOOPS_PATCH
       const people = peopleBlock(cfg); // NEXT_PATCH
@@ -13171,7 +13186,7 @@ async function main() {
         const extBlocks = extPromptBlocks(cfg); // EXT_PATCH
       const text = [selfText, recallRule, loops, people, ...extBlocks, card, diary ? '【最近两天的日记（你自己写的）】\n' + diary : '']
         .filter(Boolean).join('\n\n');
-      memoryCardPromptCache = { key, text };
+      memoryCardPromptCache = { key: cacheKey, text };
       return text;
     } catch {
       return '';
@@ -13205,7 +13220,7 @@ async function main() {
     // 管理员规则放在人格卡之后、记忆之前：优先级高于人格卡，又不会被长记忆挤掉。
     const adminBlock = adminPromptLine(false);
     // 记忆卡：自己的长期记忆（角色卡是人设，记忆卡是经历）。插件已按 QQ 预算裁剪。
-    const memoryBlock = memoryCardPromptBlock();
+    const memoryBlock = memoryCardPromptBlock(key); // MEMSCOPE_PATCH
     return [base, adminBlock, biliBrief, memoryBlock].filter(Boolean).join('\n\n');
   }
   function currentRoleHint(key = '', personaMode = 'full') {

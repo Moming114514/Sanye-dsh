@@ -146,8 +146,12 @@ if (!skipApi) {
         const a = base.prompts?.[key], b = live.prompts[key];
         if (!a) { diffs.push(`${key} 基准缺失`); continue; }
         if (a.bytes !== b.bytes) diffs.push(`${key} 字节 ${a.bytes}→${b.bytes}`);
-        const gone = (a.titles || []).filter((t) => !(b.titles || []).includes(t));
-        const added = (b.titles || []).filter((t) => !(a.titles || []).includes(t));
+        // SOFT_TITLES：这些小节随记忆数据增减，属正常漂移，不算硬失败
+        const SOFT_TITLES = ['## 正在模糊的事', '## 最近记得的'];
+        const aTitles = (a.titles || []).filter((t) => !SOFT_TITLES.includes(t));
+        const bTitles = (b.titles || []).filter((t) => !SOFT_TITLES.includes(t));
+        const gone = aTitles.filter((t) => !bTitles.includes(t));
+        const added = bTitles.filter((t) => !aTitles.includes(t));
         if (gone.length) diffs.push(`${key} 少了小节 ${gone.join(',')}`);
         if (added.length) diffs.push(`${key} 多了小节 ${added.join(',')}`);
       }
