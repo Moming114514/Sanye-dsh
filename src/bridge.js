@@ -60,7 +60,6 @@ import { createBiliMemory } from './bili-memory.js';
 import {
   appendMemoryInboxEvent, looksNoteworthyMessage, resolveMemoryCardPaths, loadMemoryCard, saveMemoryCardOutputs, touchMemories } from './memory-card.js';
 import { fuzzyRecallFiles } from './recall-vec.js'; // RECALL_FUZZY_PATCH
-import { impressionsBlock, impressionsData, addImpression, forgetImpression, impressionsPath } from './impressions.js'; // IMPR_PATCH
 import { extDispatchRoute, extPromptBlocks, extStateKey } from './ext/index.js'; // EXT_PATCH
 import {
   activeMemoryPaths, activePersonaFile, activePlatformStateDir, characterPaths, readCurrentCharacter,
@@ -7855,7 +7854,7 @@ async function main() {
           }
           return;
         }
-        if (url.pathname === '/api/socialV2/style-note' || url.pathname === '/api/socialV2/style-list' || url.pathname === '/api/socialV2/style-candidate' /* STYLE_GATE_PATCH */ || url.pathname === '/api/socialV2/group-recent' || url.pathname === '/api/socialV2/loop' || url.pathname === '/api/socialV2/person' || url.pathname === '/api/socialV2/impression' /* IMPR_PATCH */ || url.pathname === '/api/socialV2/tech-notes' /* TECHNOTES_PATCH */) { // STYLE_PATCH LOOPS_PATCH NEXT_PATCH
+        if (url.pathname === '/api/socialV2/style-note' || url.pathname === '/api/socialV2/style-list' || url.pathname === '/api/socialV2/style-candidate' /* STYLE_GATE_PATCH */ || url.pathname === '/api/socialV2/group-recent' || url.pathname === '/api/socialV2/loop' || url.pathname === '/api/socialV2/person' || url.pathname === '/api/socialV2/impression' /* IMPR_EXT */ || url.pathname === '/api/socialV2/tech-notes' /* TECHNOTES_PATCH */) { // STYLE_PATCH LOOPS_PATCH NEXT_PATCH
           try {
             const token = String(req.headers['x-agent-token'] || '');
             const consoleOk = String(req.headers['x-console-token'] || '') === String(cfg.consoleToken || '');
@@ -7880,18 +7879,6 @@ async function main() {
               const lcR = addLoop({ text: body?.text, by: body?.by, due: lcDue, raw: cfg });
               log('[欠事] ' + (lcR.ok ? `记了一条（共 ${lcR.total}）` : '失败：' + lcR.error));
               return sendJson(lcR, lcR.ok ? 200 : 400);
-            }
-            if (url.pathname === '/api/socialV2/impression') { // IMPR_PATCH
-              const imAction = String(body?.action || 'list');
-              if (imAction === 'list') return sendJson({ ok: true, ...impressionsData() });
-              if (imAction === 'forget') {
-                const imD = forgetImpression(body?.id);
-                log('[印象] ' + (imD.ok ? `删了一条（剩 ${imD.total}）` : '失败：' + imD.error));
-                return sendJson(imD, imD.ok ? 200 : 400);
-              }
-              const imR = addImpression({ text: body?.text, about: body?.about, confidence: body?.confidence });
-              log('[印象] ' + (imR.ok ? `记了一条（共 ${imR.total}）` : '失败：' + imR.error));
-              return sendJson(imR, imR.ok ? 200 : 400);
             }
             if (url.pathname === '/api/socialV2/style-candidate') { // STYLE_GATE_PATCH
               const act = String(body?.action || 'list');
@@ -13590,9 +13577,8 @@ async function main() {
       try { s1 = fs.statSync(MEMV2_SELF); } catch {}
       try { s2 = fs.statSync(MEMV2_DIARY); } catch {}
       let imprStat = 'x';
-      try { imprStat = String(fs.statSync(impressionsPath()).mtimeMs); } catch {} // IMPR_PATCH
       const extStat = extStateKey(); // EXT_PATCH
-      const key = `${stat.mtimeMs}:${stat.size}|${s1.mtimeMs}:${s1.size}|${s2.mtimeMs}:${s2.size}|${loopsMeta()}|${imprStat}|${extStat}`; // LOOPS_PATCH IMPR_PATCH EXT_PATCH
+      const key = `${stat.mtimeMs}:${stat.size}|${s1.mtimeMs}:${s1.size}|${s2.mtimeMs}:${s2.size}|${loopsMeta()}|${extStat}`; // LOOPS_PATCH IMPR_PATCH EXT_PATCH
       if (memoryCardPromptCache.key === key) return memoryCardPromptCache.text;
       const selfText = memv2Capped(MEMV2_SELF, MEMV2_SELF_MAX);
       // OWNER_RELABEL_PATCH：记忆卡里统一叫「他」——主人/管理员/他三种叫法同一个人，别让她混着用
@@ -13608,7 +13594,6 @@ async function main() {
       const people = peopleBlock(cfg); // NEXT_PATCH
       // RECALL_RULE_PATCH：把「先查再答」写成硬规矩（约 60 token）
       const recallRule = '【用记忆的规矩】提到过去发生的事、约定/承诺、TA 的偏好或习惯时，先用 qq_recall_memory 查一下再回答；查不到就直说记不清，别凭感觉编。';
-      const imprs = impressionsBlock(cfg.socialV2?.impressions); // IMPR_PATCH
         const extBlocks = extPromptBlocks(cfg); // EXT_PATCH
         // STYLE_INJECT_PATCH：学到的说法要真进提示词，否则只是收集
         const stlCfg = styleLearnCfgNow();
@@ -13617,7 +13602,7 @@ async function main() {
         const styleLine = stlBlock
           ? ['【说话方式（从别人那儿学来的框架；是参考，不是台词：别整段照搬原话，更别学成对方的口气）】', stlBlock].join('\n')
           : '';
-      const text = [selfText, recallRule, loops, people, imprs, ...extBlocks, styleLine, card, diary ? '【最近两天的日记（你自己写的）】\n' + diary : '']
+      const text = [selfText, recallRule, loops, people, ...extBlocks, styleLine, card, diary ? '【最近两天的日记（你自己写的）】\n' + diary : '']
         .filter(Boolean).join('\n\n');
       memoryCardPromptCache = { key, text };
       return text;

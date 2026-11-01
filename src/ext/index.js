@@ -3,8 +3,10 @@
 //   1) 装配（import 本文件）2) 路由分发 extDispatchRoute 3) 提示词块 extPromptBlocks 4) 状态键 extStateKey
 // 唤醒闸门与发送后回调的钩子随后续迁移接入。新增功能 = ext/ 下新建模块 + EXTENSIONS 加一行。
 import techNotes from './tech-notes.js';
+import impressions from './impressions.js';
 
-const EXTENSIONS = [techNotes].filter(Boolean);
+// 注册顺序 = 提示词注入顺序（印象在前、技术笔记在后，与原内联顺序一致）
+const EXTENSIONS = [impressions, techNotes].filter(Boolean);
 
 export function extList() {
   return EXTENSIONS;
