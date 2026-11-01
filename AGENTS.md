@@ -120,3 +120,11 @@
   ⚠️ **DSH 一升级就会覆盖 `app.asar`，补丁消失** → 升级后第一件事 `npm run guard:check`。
 - 旧工作区清理逻辑已从「`fs.rmSync` 硬删除」改成「rename 到 `~/.dsh/_quarantine/`」，可回滚。
 - 详细踩坑见 [`docs/PITFALLS.md`](docs/PITFALLS.md)；风险台账见 [`docs/RISK_REGISTER.md`](docs/RISK_REGISTER.md)。
+
+## 改动记录规矩（2026-11-02 起）
+
+1. **每次改代码/配置/面板，都要写一条记录**：
+   - 人类可读：`docs/CHANGES.md`（改了什么 / 为什么 / 影响面 / 怎么回滚）
+   - 服务器细节：`state/CHANGELOG-bridge.md`（含日志片段、pid、时间）
+2. 只改文档的提交可以不写第二处，但 `docs/CHANGES.md` 要有。
+3. 接手的人先读：`docs/CHANGES.md` → `docs/LEARN-FROM-ME.md` → `docs/OPERATIONS.md`。
