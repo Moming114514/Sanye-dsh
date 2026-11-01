@@ -1638,7 +1638,16 @@ async function segmentsToText(segments, options = {}) {
       }
       // 市场表情（mface）在部分网关实现里出现：有 summary 就用它，别让模型只看到 "[mface]"。
       case 'mface': { const n = String(d.summary ?? d?.raw?.faceName ?? '').trim(); out.push(n ? `[表情:${n}]` : '[表情]'); break; }
-      case 'image': out.push('[图片]'); break;
+      case 'image': {
+        // 表情包在网络上常常也是 image 段：sub_type=1 是表情，.gif/.apng/.webp 可能只是动图。
+        // 分清楚，她才不会把别人的照片当表情，也不会把自己的表情包当照片。
+        const st = String(d.sub_type ?? d.subType ?? '');
+        const name = String(d.file ?? d.url ?? '');
+        if (st === '1') out.push('[表情包]');
+        else if (/\.(gif|apng|webp)$/i.test(name)) out.push('[动图]');
+        else out.push('[图片]');
+        break;
+      }
       case 'record': { // VOICE_PATCH
         const vt = voiceTextOf(d?.file);
         out.push(vt ? '[语音转写]' + vt : '[语音]');
@@ -2806,11 +2815,25 @@ async function main() {
   // 收藏聊天里的一张表情（add_custom_face），并按 AI 看到的含义写简短备注（modify_custom_face）。
   // STICKER_AUTOADD_PATCH：聊天里收到的表情自动记进本地库（只进本地库，不入 QQ 收藏）。
   // 目的：让「表情待补」提示有东西可提示；真正的看图补描述仍由 AI 自己用工具完成。
-  function autoKeepStickerFromMedia(media) {
+  function autoKeepStickerFromMedia(media, fromUin = '') {
     try {
       const sc = cfg.socialV2?.sticker ?? {};
       const ccfg = sc.collect ?? {};
       if (sc.enabled === false || ccfg.enabled === false) return;
+      // 谁能塞表情进她的库：默认只有他本人；'whitelist' 时再加上私聊白名单；也可以给 allowUins 名单。
+      // 群里陌生人随手发的图不应该变成她的表情。
+      const ownerUin = String(cfg?.self?.ownerQQ ?? cfg?.ownerQQ ?? '').trim();
+      const from = String(ccfg.from ?? 'owner');
+      const allowExtra = new Set(
+        (Array.isArray(ccfg.allowUins) ? ccfg.allowUins : []).map((x) => String(x)))
+      const senderUin = String(fromUin || '').trim();
+      let allowed = !!senderUin && senderUin === ownerUin;
+      if (!allowed && senderUin && allowExtra.has(senderUin)) allowed = true;
+      if (!allowed && senderUin && from === 'whitelist') {
+        const pv = (cfg.socialV2?.access?.private ?? cfg.socialV2?.privateWhitelist ?? []);
+        allowed = Array.isArray(pv) && pv.map((x) => String(x)).includes(senderUin);
+      }
+      if (!allowed) return;
       if (!media || (media.kind !== 'sticker' && media.kind !== 'image')) return;
       // 表情包不一定是 mface：他从表情面板拖进聊天框的，网络上常常是 image 段（sub_type=1 或 .gif），
       // 而且没有 emoji_id。这种也要收，用文件/链接做稳定指纹，否则「发个表情给她」永远进不了库。
@@ -15649,7 +15672,8 @@ async function main() {
 
     const plainContent = await segmentsToText(event.message ?? [], { resolveAtName, includeReply: false });
     const mediaList = extractMediaFromSegments(event.message ?? []);
-    for (const m of mediaList) autoKeepStickerFromMedia(m); // STICKER_AUTOADD_PATCH
+    const mediaSenderUin = String(event?.sender?.user_id ?? event?.user_id ?? '').trim();
+    for (const m of mediaList) autoKeepStickerFromMedia(m, mediaSenderUin); // STICKER_AUTOADD_PATCH
     const messageRef = String(event.message_id ?? event.msg_id ?? event.message_seq ?? '');
     const seqRef = event.message_seq != null ? String(event.message_seq) : '';
     const refsToStore = [...new Set([messageRef, seqRef].filter(Boolean))];
