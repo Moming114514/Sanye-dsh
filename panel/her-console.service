@@ -1,0 +1,16 @@
+[Unit]
+Description=her-console (SurfCore panel)
+After=network.target
+
+[Service]
+Type=simple
+User=dsh
+WorkingDirectory=/opt/her-console
+ExecStart=/usr/bin/node /opt/her-console/server.mjs
+Restart=always
+RestartSec=3
+Environment=HER_CONSOLE_ROOT=/opt/her-console
+Environment=SURFCORE_DIR=/home/dsh/apps/surfcore
+
+[Install]
+WantedBy=multi-user.target
