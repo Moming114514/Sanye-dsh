@@ -64,6 +64,7 @@ import { extDispatchRoute, extPromptBlocks, extStateKey, extWakeGate, extAfterSe
 import createQzoneWatch from './ext/qzone-watch.js'; // QZONE_WATCH_EXT
 import { fetchQzoneFeed, commentQzone, sendQzone, deleteQzone, qzoneEnabled as qzoneEnabledOf } from './ext/qzone.js'; // QZONE_EXT
 import { pickLastMedia, stickerFrames } from './ext/sticker-frames.js'; // VIEW_STICKER_EXT
+import { createProfile } from './ext/profile.js'; // PROFILE_EXT
 import { createReminders } from './ext/reminders.js'; // REMINDERS_EXT
 import { relatedMemoryBlock, relatedMemorySuffix } from './ext/related-memory.js'; // RELATEDMEM_EXT
 import { stickerTodoLine } from './ext/stickers.js'; // STICKER_EXT
@@ -14070,46 +14071,9 @@ async function main() {
   }
 
   // ── 好友申请 / 资料 / 头像（PROFILE_PATCH，2026-10-30）────────────────────
-  const FRIEND_REQ_FILE = path.join(STATE_DIR, 'friend-requests.json');
-  const AVATAR_PEND_FILE = path.join(STATE_DIR, 'avatar-pending.json');
-
-  function readFriendReqs() {
-    try {
-      const o = JSON.parse(fs.readFileSync(FRIEND_REQ_FILE, 'utf8'));
-      return Array.isArray(o) ? o : [];
-    } catch {
-      return [];
-    }
-  }
-
-  function writeFriendReqs(list) {
-    try {
-      fs.writeFileSync(FRIEND_REQ_FILE, JSON.stringify(list.slice(-50), null, 2) + '\n', 'utf8');
-    } catch (error) {
-      log('[好友] 写申请列表失败：' + (error?.message ?? error));
-    }
-  }
-
-  function readAvatarPend() {
-    try {
-      const o = JSON.parse(fs.readFileSync(AVATAR_PEND_FILE, 'utf8'));
-      return o && typeof o === 'object' ? o : null;
-    } catch {
-      return null;
-    }
-  }
-
-  function writeAvatarPend(obj) {
-    try {
-      if (!obj) {
-        fs.rmSync(AVATAR_PEND_FILE, { force: true });
-        return;
-      }
-      fs.writeFileSync(AVATAR_PEND_FILE, JSON.stringify(obj, null, 2) + '\n', 'utf8');
-    } catch (error) {
-      log('[头像] 写待确认状态失败：' + (error?.message ?? error));
-    }
-  }
+  // PROFILE_PATCH → src/ext/profile.js（M2 第十六步）：好友申请/头像待确认的存取与通知
+  const profile = createProfile({ getCfg: () => cfg, log, stateDir: STATE_DIR, sendToQQ });
+  const { readFriendReqs, writeFriendReqs, readAvatarPend, writeAvatarPend, describeFriendReq, notifyFriendBatched } = profile;
 
   // 把 base64 / URL 落成「容器内可读」的绝对路径（NapCat 只认它能 stat 到的文件）
   async function resolveAvatarFile(src) {
@@ -14124,68 +14088,6 @@ async function main() {
       return stickerTempPath(fetched.buffer, mimeFromUrl(s));
     }
     return s;
-  }
-
-  function describeFriendReq(r) {
-    const who = r.nickname ? `${r.nickname}(${r.userId})` : String(r.userId);
-    const note = r.comment ? `，附言：${r.comment}` : '';
-    return `${who}${note}`;
-  }
-
-  // FRIEND_BATCH_PATCH：好友申请太多时别一条一条轰炸主人。
-  // 规则：冷却期内只发一条（默认 10 分钟），一天最多 8 条；待处理超过 3 条时只发汇总。
-  const FRIEND_NOTIFY_FILE = path.join(STATE_DIR, 'friend-notify.json');
-  function friendNotifyCfg() {
-    const f = cfg.socialV2?.friends ?? {};
-    return {
-      cooldownMs: Math.max(60000, Number(f.notifyCooldownMs) || 10 * 60 * 1000),
-      maxPerDay: Math.max(1, Math.min(50, Number(f.notifyMaxPerDay) || 8))
-    };
-  }
-  function readFriendNotify() {
-    try {
-      const o = JSON.parse(fs.readFileSync(FRIEND_NOTIFY_FILE, 'utf8'));
-      return o && typeof o === 'object' ? o : {};
-    } catch {
-      return {};
-    }
-  }
-  function writeFriendNotify(o) {
-    try {
-      fs.writeFileSync(FRIEND_NOTIFY_FILE, JSON.stringify(o, null, 2) + '\n', 'utf8');
-    } catch (error) {
-      log('[好友] 写通知状态失败：' + (error?.message ?? error));
-    }
-  }
-  function notifyFriendBatched(latest) {
-    const { cooldownMs, maxPerDay } = friendNotifyCfg();
-    const today = ymdOf(Date.now());
-    const st = readFriendNotify();
-    const sent = st.date === today ? Number(st.sent) || 0 : 0;
-    const lastAt = Number(st.lastAt) || 0;
-    const pending = readFriendReqs();
-    const now = Date.now();
-    if (sent >= maxPerDay) {
-      log(`[好友] 今天已通知 ${sent} 次，不再打扰主人（待处理 ${pending.length} 条）`);
-      return;
-    }
-    if (now - lastAt < cooldownMs) {
-      log(`[好友] 冷却中（还剩 ${Math.round((cooldownMs - (now - lastAt)) / 1000)}s），待处理 ${pending.length} 条，先不打扰`);
-      return;
-    }
-    let ownQQ = '';
-    try { ownQQ = String(cfg.ownerQQ ?? ''); } catch { ownQQ = ''; }
-    if (!ownQQ) return;
-    let msg;
-    if (pending.length <= 3) {
-      const lines = pending.map((r) => '· ' + describeFriendReq(r)).join('\n');
-      msg = `【好友申请】\n${lines}\n同意发 /同意好友 QQ号，拒绝发 /拒绝好友 QQ号。`;
-    } else {
-      msg = `【好友申请】现在有 ${pending.length} 个人想加她，我不一条条问了。\n发 /好友 看整个列表，一次处理完；不想管就放着，会一直留着。`;
-    }
-    void sendToQQ(`private:${ownQQ}`, msg);
-    writeFriendNotify({ date: today, sent: sent + 1, lastAt: now });
-    log(`[好友] 已通知主人（第 ${sent + 1} 次/今日，待处理 ${pending.length} 条）`);
   }
 
   async function askOwnerPeakPermission(key, event, textContent) {
