@@ -60,7 +60,7 @@ import { createBiliMemory } from './bili-memory.js';
 import {
   appendMemoryInboxEvent, looksNoteworthyMessage, resolveMemoryCardPaths, loadMemoryCard, saveMemoryCardOutputs, touchMemories } from './memory-card.js';
 import { fuzzyRecallFiles } from './recall-vec.js'; // RECALL_FUZZY_PATCH
-import { extDispatchRoute, extPromptBlocks, extStateKey, extWakeGate, extAfterSend, extOnGroupMessage } from './ext/index.js'; // EXT_PATCH
+import { extDispatchRoute, extPromptBlocks, extStateKey, extWakeGate, extAfterSend, extOnGroupMessage, extOnPrivateMessage } from './ext/index.js'; // EXT_PATCH
 import createQzoneWatch from './ext/qzone-watch.js'; // QZONE_WATCH_EXT
 import { createReminders } from './ext/reminders.js'; // REMINDERS_EXT
 import { relatedMemoryBlock, relatedMemorySuffix } from './ext/related-memory.js'; // RELATEDMEM_EXT
@@ -15912,17 +15912,9 @@ async function main() {
         if (rawG && uinG) { extOnGroupMessage({ key: id, uin: uinG, text: rawG, cfg }); }
       }
       if (kind === 'private') {
+        // STYLE_TRIGGER_PATCH → ext/style.js 的 onPrivateMessage（M2 第十二步）
         const t = String(event?.raw_message || event?.message?.text || '').trim();
-        const plain = t.replace(/\s+/g, '');
-        if (plain && plain.length <= 20 && /学(一下)?(亚托莉|她)|看(看|一下)(亚托莉|她)|去群里学|学说法|学她说话/.test(plain)) {
-          const gid = String((styleLearnCfgNow().groups || [])[0] || '').replace(/\D/g, '');
-          if (gid) {
-            const task = '【学说法·手动】去群里看看（群 ' + gid + '）：先用 qq_read_group_recent 拉最近 40 条（只用这一个工具，别用 qq_get_recent / qq_get_unread / qq_get_prompt，跨群一定报凭证错误）。**只学 QQ ' + styleLearnCfgNow().targetQQ + '（群昵称以「亚托莉」开头）这一个人的说话方式**，找不到他就直说「这轮她没说话」，什么都别记。只提炼「说话框架」：怎么起句、怎么接话、怎么求人、怎么拒绝、怎么吐槽但不伤人；不要抄口头禅和梗。记 1~2 条，每条写清框架层面的「好在哪」。记完回我一句学到了什么就行，别在群里发言。';
-            deliverPrompt('private:' + id, task, { reason: 'style-learn-manual-chat' });
-            log('[学样] 主人私聊触发：' + gid);
-            return;
-          }
-        }
+        if (extOnPrivateMessage({ id, text: t, cfg, log, deliverPrompt })) return;
       }
     } catch (e) { log('[学样] 触发失败：' + (e?.message || e)); }
     // NEXT_PATCH：记存活间隔 + 学群里的人

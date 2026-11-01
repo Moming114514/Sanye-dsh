@@ -6,6 +6,7 @@
 //   3) 唤醒闸门 extWakeGate(ctx)                     返回 false 则本次不唤醒（省钱）
 //   4) 发送后   extAfterSend(ctx)                    回复发出后回调
 //   5) 群消息   extOnGroupMessage(ctx)               群消息入口
+//   6) 私聊消息 extOnPrivateMessage(ctx)             私聊指令入口（返回 true 表示已处理）
 //   另有 extStateKey()：扩展读了文件就必须实现 stateKey()，否则提示词缓存会读到旧内容。
 // 新增功能见同目录 README.md。
 import techNotes from './tech-notes.js';
@@ -73,6 +74,19 @@ export function extOnGroupMessage(ctx) {
       console.error(`[ext:${ext.id}] onGroupMessage 失败：${String(error?.message || error)}`);
     }
   }
+}
+
+/** 私聊消息入口：主人在私聊里下的「去做某件事」的指令（如学说法手动触发）。 */
+export function extOnPrivateMessage(ctx) {
+  for (const ext of EXTENSIONS) {
+    if (typeof ext.onPrivateMessage !== 'function') continue;
+    try {
+      if (ext.onPrivateMessage(ctx) === true) return true;
+    } catch (error) {
+      console.error(`[ext:${ext.id}] onPrivateMessage 失败：${String(error?.message || error)}`);
+    }
+  }
+  return false;
 }
 
 /** 唤醒闸门：任一扩展返回 { allow:false } 即拦下（不给模型烧 token）。 */

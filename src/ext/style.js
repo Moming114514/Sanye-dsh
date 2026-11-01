@@ -10,6 +10,8 @@ export function styleCfg(cfg) {
     strictTarget: c.strictTarget !== false,
     injectMaxChars: Math.max(0, Number(c.injectMaxChars ?? 520) || 520),
     injectMaxItems: Math.max(1, Number(c.injectMaxItems) || 6),
+    groups: Array.isArray(c.groups) && c.groups.length ? c.groups.map((g) => String(g).replace(/\D/g, '')) : ['1000000001'],
+    perRound: Math.max(1, Number(c.perRound) || 2),
   };
 }
 
@@ -31,6 +33,30 @@ export default {
     if (!String(key || '').startsWith('group:')) return;
     if (!uin || !text) return;
     styleObserve(key, uin, text, cfg);
+  },
+
+  // 私聊入口：主人说「学亚托莉 / 看看她刚说的 / 去群里学说话」→ 直接派一次手动学习任务
+  onPrivateMessage({ id, text, cfg, log, deliverPrompt }) {
+    const c = styleCfg(cfg);
+    if (!c.enabled || !c.groups.length) return false;
+    const plain = String(text || '').replace(/\s+/g, '');
+    if (!plain || plain.length > 20) return false;
+    if (!/学(一下)?(亚托莉|她)|看(看|一下)(亚托莉|她)|去群里学|学说法|学她说话/.test(plain)) return false;
+    const gid = c.groups[0];
+    if (!gid) return false;
+    const task = '【学说法·手动】去烤研群（群 ' + gid + '）看看：先用 qq_read_group_recent 拉最近 40 条（只用这一个工具，别用 qq_get_recent / qq_get_unread / qq_get_prompt，跨群一定报凭证错误）。'
+      + '**只学 QQ ' + c.targetQQ + '（群昵称以「亚托莉」开头）这一个人的说话方式**，群里其他人的话只当上下文，不许学。按 QQ 号认人最准；找不到她就只记通用框架，别硬认人。'
+      + '只提炼「说话框架」：怎么起句、怎么接话、怎么求人、怎么拒绝、怎么吐槽但不伤人；不要抄口头禅和梗，也别整段模仿。'
+      + '记 ' + c.perRound + ' 条就够，每条都要写框架层面的「好在哪」（例：先用一句软话把事说清，再给结论）。脏话、攻击、阴阳怪气、贬低别人一律不学。'
+      + '记完不改人格卡、不在群里发言、不私聊汇报（黑箱模式），记完就结束这一轮。';
+    try {
+      deliverPrompt('private:' + id, task, { reason: 'style-learn-manual-chat' });
+      log('[学样] 主人私聊触发：' + gid);
+      return true;
+    } catch (error) {
+      log('[学样] 手动触发失败：' + String(error?.message || error));
+      return false;
+    }
   },
 
   routes: [
