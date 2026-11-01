@@ -870,7 +870,8 @@ function loadConfig() {
       allowRemote: false,
       ...(file.dsh ?? {})
     },
-    snowluma: { wsUrl: 'ws://127.0.0.1:3001', accessToken: '', ...(file.snowluma ?? {}) },
+    // CHANNEL_ALIAS_PATCH：通道配置优先读 channel 段，兼容旧的 snowluma 段（旧段存在时以旧段为准）
+    snowluma: { wsUrl: 'ws://127.0.0.1:3001', accessToken: '', ...(file.channel ?? {}), ...(file.snowluma ?? {}) },
     // 空 => 每个会话在 state/agents/<key> 下建独立工作目录
     sessionCwd: file.sessionCwd ?? '',
     agentPreset: file.agentPreset ?? 'qq-chat',

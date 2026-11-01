@@ -29,7 +29,10 @@ function loadConfig() {
   try {
     let text = fs.readFileSync(path.join(ROOT, 'config.json'), 'utf8');
     if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
-    return JSON.parse(text);
+    const obj = JSON.parse(text);
+    // CHANNEL_ALIAS_PATCH：没有 snowluma 段时，用 channel 段顶上
+    if (obj && typeof obj === 'object' && !obj.snowluma && obj.channel) obj.snowluma = obj.channel;
+    return obj;
   } catch {
     return {};
   }
