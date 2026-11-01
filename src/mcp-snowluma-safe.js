@@ -7,6 +7,7 @@
 //   allow.groups / allow.private，否则拒绝 —— agent 只能往被允许的地方发消息。
 // - 所有调用走 OneBot HTTP API（httpUrl + accessToken）。
 import fs from 'node:fs';
+import { registerExtTools } from './ext/tools/index.js'; // EXT_TOOLS
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -492,129 +493,7 @@ server.tool(
     }
   }
 );
-  // ── 欠着的事（LOOPS_PATCH）──
-  if (cfg.socialV2?.tools?.loops !== false) {
-    server.tool(
-      'qq_loop',
-      '记「欠着的事」：答应过的事、他说了明天/回头/记得/等我之类的事、还没做完的事。他要你到点提醒，就带上 due（比如「明天9:00」）。做完就把它划掉。只记状态，不记人设、不记事实。每次最多一条，短一点。',
-      {
-        action: z.enum(['add', 'done', 'list']).optional().describe('add 记一条（默认），done 划掉，list 看清单'),
-        text: z.string().optional().describe('事情本身（add / done 时给），一句话，20 字以内最好'),
-        id: z.string().optional().describe('list 返回的 id，用 id 划掉更准'),
-        due: z.string().optional().describe('要到点提醒的时间，例如 明天9:00 / 今晚20:00 / +2h / 10-31 20:00；不给就只是记着'),
-      },
-      async ({ action, text, id, due }) => {
-        const r = await agentApi('/api/socialV2/loop', { method: 'POST', body: JSON.stringify({ action: action || 'add', text, id, due, by: 'self' }) });
-        const items = Array.isArray(r?.items) ? r.items : [];
-        if (action === 'list' || items.length) {
-          const lines = items.length ? items.map((it) => `- ${it.text}`).join('\n') : '（空的）';
-          return { content: [{ type: 'text', text: `${r?.ok ? '好' : '没成：' + (r?.error || '未知')}\n现在欠着的事：\n${lines}` }] };
-        }
-        return { content: [{ type: 'text', text: r?.ok ? '记好了' : `没记上：${r?.error || '未知错误'}` }] };
-      }
-    );
-  }
-  // ── 人物表（NEXT_PATCH）──
-  // ── 印象库（IMPR_PATCH）──
-  if (cfg.socialV2?.tools?.impressions !== false) {
-    server.tool(
-      'qq_impression',
-      '记「我对他的看法」——不是事实清单，是你自己攒下来的感觉（比如「他嘴上说没事的时候多半在硬撑」）。记忆卡记发生了什么事，这里记你怎么看这个人。看法可以改、可以删，别写成评价表，也别一次记一堆。',
-      {
-        action: z.enum(['add', 'list', 'forget']).optional().describe('add 记一条（默认），list 看看现在有什么，forget 删一条'),
-        text: z.string().optional().describe('一句话，30 字以内，说一个具体的感觉（add 时给）'),
-        about: z.enum(['he', 'world', 'me']).optional().describe('说的是谁：he=他（默认），world=外面的事，me=我自己'),
-        confidence: z.enum(['guess', 'sure']).optional().describe('guess=还不确定（默认），sure=很确定了'),
-        id: z.string().optional().describe('list 返回的 id，要删时给'),
-      },
-      async ({ action, text, about, confidence, id }) => {
-        const r = await agentApi('/api/socialV2/impression', { method: 'POST', body: JSON.stringify({ action: action || 'add', text, about, confidence, id }) });
-        const items = Array.isArray(r?.items) ? r.items : [];
-        if (action === 'list' || items.length) {
-          const lines = items.length ? items.map((it) => `- ${it.text}（${it.about === 'he' ? '他' : it.about === 'me' ? '我自己' : '外面的事'}）`).join('\n') : '（还没有）';
-          return { content: [{ type: 'text', text: `${r?.ok ? '好' : '没成：' + (r?.error || '未知')}\n我现在的看法：\n${lines}` }] };
-        }
-        return { content: [{ type: 'text', text: r?.ok ? '记下了，这个看法先存着' : `没记上：${r?.error || '未知错误'}` }] };
-      }
-    );
-  }
-  // ── 技术笔记（TECHNOTES_PATCH）：她看的技术视频/文章，抽出能用的东西，给人升级时查 ──
-  if (cfg.socialV2?.tools?.techNotes !== false) {
-    server.tool(
-      'note_tech',
-      '把刚看的技术视频/文章记下来——这是给主人升级用的资料库，不是闲聊记忆。记标题、3~5 个要点、里面提到的能用工具/项目/命令、链接。只看了一部分就写看了的部分，别编没看到的内容。同一个视频再记会合并。',
-      {
-        title: z.string().describe('标题（原视频/文章标题，可精简）'),
-        url: z.string().optional().describe('链接（有 BV 号会自动认出来）'),
-        bv: z.string().optional().describe('B 站 BV 号，可省'),
-        up: z.string().optional().describe('UP 主 / 作者 / 来源，可省'),
-        summary: z.string().optional().describe('一两句话：这内容讲什么（100 字以内）'),
-        points: z.array(z.string()).optional().describe('要点，3~5 条，每条一句话、能被用来做决定'),
-        tools: z.array(z.string()).optional().describe('能用的东西：插件/项目/命令/链接/参数名，没有就不给'),
-        tags: z.array(z.string()).optional().describe('标签：比如 dsh / 记忆 / 提示词 / 部署'),
-      },
-      async ({ title, url, bv, up, summary, points, tools, tags }) => {
-        try {
-          const r = await agentApi('/api/socialV2/tech-notes', {
-            method: 'POST',
-            body: JSON.stringify({ action: 'add', title, url, bv, up, summary, points, tools, tags }),
-            timeoutMs: 30000
-          });
-          return { content: [{ type: 'text', text: r?.ok ? `记好了（${r.updated ? '合并进已有那条' : '新的一条'}，共 ${r.total} 条）` : `没记上：${r?.error || '未知错误'}` }] };
-        } catch (error) {
-          return { content: [{ type: 'text', text: `记技术笔记失败：${error?.message ?? error}` }], isError: true };
-        }
-      }
-    );
-  }
-  if (cfg.socialV2?.tools?.people !== false) {
-    server.tool(
-      'qq_person_note',
-      '记一下群里某个人：QQ 号、你平时怎么称呼他、他跟主人什么关系（如果他说过）。只记称呼和关系，不要记隐私，不要评价人。',
-      {
-        qq: z.string().describe('对方 QQ 号'),
-        alias: z.string().optional().describe('你怎么称呼他，比如「墨鱼」「狐狐」'),
-        note: z.string().optional().describe('一句关系备注，比如「主人的朋友」「常来问技术问题的」'),
-      },
-      async ({ qq, alias, note }) => {
-        const r = await agentApi('/api/socialV2/person', { method: 'POST', body: JSON.stringify({ qq, alias, note }) });
-        return { content: [{ type: 'text', text: r?.ok ? '记好了' : '没记上：' + (r?.error || '未知错误') }] };
-      }
-    );
-  }
-  // ── 表达样本库（STYLE_PATCH）──
-  if (cfg.socialV2?.tools?.styleNote !== false) {
-    server.tool(
-      'qq_style_note',
-      '记一条「表达样本」：别人说得好的一句话，只记句式和语气，用来学说话方式。不要照搬别人的角色设定。每次最多记 2 条。',
-      {
-        text: z.string().describe('原话（可略微精简，别改意思）'),
-        from: z.string().optional().describe('谁说的（昵称，可省）'),
-        why: z.string().optional().describe('好在哪（一句话，比如：接得快、不端着）'),
-        uin: z.string().optional().describe('说话人的 QQ 号，能填就填（用来确认是不是该学的那个人）'),
-      },
-      async ({ text, from, why, uin }) => {
-        // STYLE_PATCH7: fetch 不认对象 body（会变成 [object Object] → 桥接报「请求体必须是合法 JSON」）
-        const r = await agentApi('/api/socialV2/style-note', { method: 'POST', body: JSON.stringify({ text, from, why, uin, source: 'qq' }) });
-        return { content: [{ type: 'text', text: r?.ok ? `记住了（共 ${r.total} 条）` : `没记住：${r?.error || '未知错误'}` }] };
-      }
-    );
-  }
-  if (cfg.socialV2?.tools?.readGroup !== false) {
-    server.tool(
-      'qq_read_group_recent',
-      '拉某个群最近的消息（文本化）。用来看看群里在聊什么、别人怎么说话。别把群里的私事带到别的会话。',
-      {
-        group: z.string().describe('群号'),
-        count: z.number().optional().describe('拉多少条，默认 20，最多 40'),
-      },
-      async ({ group, count }) => {
-        const r = await agentApi('/api/socialV2/group-recent', { method: 'POST', body: JSON.stringify({ group, count }) }); // STYLE_PATCH7
-        if (!r?.ok) return { content: [{ type: 'text', text: `读群失败：${r?.error || '未知错误'}` }] };
-        return { content: [{ type: 'text', text: r.lines?.length ? r.lines.join('\n') : '（没读到消息）' }] };
-      }
-    );
-  }
+  registerExtTools({ server, z, agentApi, cfg }); // EXT_TOOLS：我们加的工具都在 src/ext/tools/
 // ── 资料 / 头像 / 好友申请（PROFILE_PATCH，2026-10-30）────────────────────────
 server.tool(
   'qq_set_profile',
