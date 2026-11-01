@@ -1871,9 +1871,14 @@ function pageSafe() {
   if (!state.access) loadAccess().catch(() => {}).finally(rerender); // 频率卡要按白名单群列出来
   if (!state.style) { /* 复用已有加载器无所谓 */ }
   const load = async () => {
-    const [gr, safe] = await Promise.all([api('/api/gr').catch(() => null), api('/api/safe').catch(() => null)]);
+    const [gr, safe, econ] = await Promise.all([
+      api('/api/gr').catch(() => null),
+      api('/api/safe').catch(() => null),
+      api('/api/econ').catch(() => null),
+    ]);
     state.gr = gr || { levels: {}, rates: [] };
     state.safe = safe || { cfg: {}, modes: {}, alerts: [], sessions: [] };
+    state.econ = econ || { mode: 'auto', modes: {}, groups: [], autoOn: false };
     rerender();
   };
   if (!state.gr || !state.safe) {
@@ -1884,6 +1889,16 @@ function pageSafe() {
   const gr = state.gr, safe = state.safe, cfg = safe.cfg || {}, modes = safe.modes || {};
   const groups = (state.access?.groups || []);
 
+  const econ = state.econ || { mode: 'auto', modes: {}, groups: [], autoOn: false };
+  const ecoMap = Object.fromEntries((econ.groups || []).map((x) => [x.gid, x.on]));
+  const setEco = async (body) => {
+    try {
+      const r = await api('/api/econ', { method: 'POST', body });
+      state.econ = r || state.econ;
+      rerender();
+      toast('省钱设置已更新（立刻生效）');
+    } catch (e) { toast('没改成：' + e.message, 3800); }
+  };
   const setLevel = async (gid, level) => {
     try {
       const r = await api('/api/gr', { method: 'POST', body: { action: 'set', group: gid, level } });
@@ -1893,6 +1908,23 @@ function pageSafe() {
     } catch (e) { toast('没改成：' + e.message, 3800); }
   };
   const rateOf = (gid) => (gr.rates || []).find((x) => x.gid === gid);
+
+  // 省钱模式（少说话）
+  wrap.append(h('div', { class: 'card', style: 'margin-bottom:12px' },
+    h('h3', {}, '省钱模式（少说话）'),
+    h('div', { class: 'muted', style: 'font-size:12.5px;margin-bottom:10px' },
+      '开着的时候，她在群里只回「@ 她」和你的手动指令；主动搭话、超时追问、历史补看全部跳过，私聊不受影响。'
+      + '整体设一档，也能单独给某个群开/关。立刻生效，不用重启。'),
+    h('div', { class: 'rg-seg' }, ...Object.entries(econ.modes || {}).map(([k, v]) =>
+      h('button', {
+        class: 'btn' + (econ.mode === k ? '' : ' ghost'),
+        title: v.hint,
+        onclick: () => setEco({ action: 'set', mode: k }),
+      }, v.label))),
+    h('div', { class: 'rg-hint', style: 'margin-top:6px' }, (econ.modes || {})[econ.mode]?.hint || ''),
+    h('div', { class: 'muted', style: 'font-size:12px;margin-top:4px' },
+      '按花费自动降级：' + (econ.autoOn ? '已触发（花到降级线）' : '未触发')),
+  ));
 
   // 群频率
   const rows = groups.length ? groups : [...new Set((gr.rates || []).map((x) => x.gid))];
@@ -1915,6 +1947,12 @@ function pageSafe() {
           }, v.label))),
         h('div', { class: 'rg-hint' }, lvDef.hint || ''),
         h('div', { class: 'rg-count' }, r ? ('今天 ' + r.count + '/' + r.maxPerDay + ' 次') : '今天 0 次'),
+        h('button', {
+          class: 'btn' + (ecoMap[gid] ? '' : ' ghost'),
+          style: 'margin-left:8px',
+          title: ecoMap[gid] ? '这个群按省钱模式（只回 @）' : '这个群不省钱',
+          onclick: () => setEco({ action: 'group', gid, on: ecoMap[gid] ? null : true }),
+        }, ecoMap[gid] ? '省钱中' : '省钱'),
       );
     })),
   ));
@@ -2011,7 +2049,7 @@ function pageAccess() {
         })
       : [h('span', { class: 'muted' }, '（空）')]),
     h('div', { class: 'toolbar' },
-      h('input', { type: 'text', placeholder: kind === 'group' ? '群号，例如 1000000000' : 'QQ 号', id: 'acc-' + kind }),
+      h('input', { type: 'text', placeholder: kind === 'group' ? '群号，例如 1025377431' : 'QQ 号', id: 'acc-' + kind }),
       h('button', { class: 'btn', onclick: () => accessDo(kind, $('#acc-' + kind).value, 'add') }, '加进去'),
     ),
   );

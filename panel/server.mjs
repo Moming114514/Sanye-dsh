@@ -667,6 +667,16 @@ const server = http.createServer(async (req, res) => {
       const r = await api('/api/socialV2/grouprate', 'POST', { action: 'list' });
       return send(res, 200, r || { ok: false });
     }
+    if (p === '/api/econ') { // 省钱模式（少说话，可按群）
+      if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
+      if (req.method === 'POST') {
+        const body = await readBody(req);
+        const r = await api('/api/socialV2/economy', 'POST', body);
+        return send(res, r?.ok ? 200 : 400, r || { ok: false });
+      }
+      const r = await api('/api/socialV2/economy', 'POST', { action: 'list' });
+      return send(res, 200, r || { ok: false });
+    }
     if (p === '/api/safe') { // 敏感话题守门
       if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
       if (req.method === 'POST') {

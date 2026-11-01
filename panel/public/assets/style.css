@@ -140,3 +140,7 @@ input:focus,select:focus{border-color:var(--accent)}
 .card { overflow-x: auto; }
 .nowrap-tbl th, .nowrap-tbl td { white-space: nowrap; }
 .nowrap-tbl td .mono { white-space: nowrap; }
+
+/* ECONOMY_PATCH：频率行多一个「省钱」按钮列 */
+.rg-row{grid-template-columns:118px auto minmax(110px,1fr) 96px 88px}
+@media (max-width:820px){.rg-row{grid-template-columns:1fr}}
