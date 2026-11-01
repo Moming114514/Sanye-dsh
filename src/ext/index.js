@@ -16,9 +16,10 @@ import promises from './promises.js';
 import style from './style.js';
 import loops from './loops.js';
 import stickers from './stickers.js';
+import mute from './mute.js'; // 静音名单
 
 // 注册顺序 = 提示词注入顺序（印象在前、技术笔记在后，与原内联顺序一致）
-const EXTENSIONS = [ownerOnly, promises, impressions, techNotes, style, loops, stickers].filter(Boolean);
+const EXTENSIONS = [ownerOnly, mute, promises, impressions, techNotes, style, loops, stickers].filter(Boolean);
 
 export function extList() {
   return EXTENSIONS;

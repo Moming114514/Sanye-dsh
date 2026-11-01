@@ -7791,7 +7791,7 @@ async function main() {
           }
           return;
         }
-        if (url.pathname === '/api/socialV2/style-note' || url.pathname === '/api/socialV2/style-list' || url.pathname === '/api/socialV2/style-candidate' /* STYLE_GATE_PATCH */ || url.pathname === '/api/socialV2/group-recent' || url.pathname === '/api/socialV2/loop' || url.pathname === '/api/socialV2/person' || url.pathname === '/api/socialV2/impression' /* IMPR_EXT */ || url.pathname === '/api/socialV2/tech-notes' /* TECHNOTES_PATCH */) { // STYLE_PATCH LOOPS_PATCH NEXT_PATCH
+        if (url.pathname === '/api/socialV2/style-note' || url.pathname === '/api/socialV2/style-list' || url.pathname === '/api/socialV2/style-candidate' /* STYLE_GATE_PATCH */ || url.pathname === '/api/socialV2/group-recent' || url.pathname === '/api/socialV2/loop' || url.pathname === '/api/socialV2/person' || url.pathname === '/api/socialV2/impression' /* IMPR_EXT */ || url.pathname === '/api/socialV2/tech-notes' /* TECHNOTES_PATCH */ || url.pathname === '/api/socialV2/mute' /* MUTE_PATCH */) { // STYLE_PATCH LOOPS_PATCH NEXT_PATCH
           try {
             const token = String(req.headers['x-agent-token'] || '');
             const consoleOk = String(req.headers['x-console-token'] || '') === String(cfg.consoleToken || '');
@@ -17495,6 +17495,12 @@ async function main() {
     log(`SnowLuma 首次连接未成功（将在后台自动重连并尝试自愈 WS token）: ${error?.message ?? error}`);
   });
   log('桥接已启动。按 Ctrl+C 退出。');
+  // CFGSNAP_PATCH：记录本次启动实际加载的配置，面板据此提示「有改动待重启生效」
+  try {
+    fs.writeFileSync(path.join(STATE_DIR, 'config-loaded.json'), JSON.stringify({ at: new Date().toISOString(), raw: fs.readFileSync(path.join(ROOT, 'config.json'), 'utf8') }, null, 1)); // CFGSNAP_RAW
+  } catch (error) {
+    log('写 config-loaded.json 失败:', error?.message ?? error);
+  }
   // 预热表情库：启动时同步一次 QQ 收藏表情，失败不阻塞（AI 首次调用工具时还会再试）。
   if (cfg.socialV2?.sticker?.enabled !== false) {
     syncStickerLibrary(true).catch((error) => log('启动预热表情库失败:', error?.message ?? error));
