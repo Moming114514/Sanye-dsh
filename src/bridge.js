@@ -62,6 +62,7 @@ import {
 import { fuzzyRecallFiles } from './recall-vec.js'; // RECALL_FUZZY_PATCH
 import { extDispatchRoute, extPromptBlocks, extStateKey, extWakeGate, extAfterSend, extOnGroupMessage } from './ext/index.js'; // EXT_PATCH
 import createQzoneWatch from './ext/qzone-watch.js'; // QZONE_WATCH_EXT
+import { createReminders } from './ext/reminders.js'; // REMINDERS_EXT
 import { relatedMemoryBlock, relatedMemorySuffix } from './ext/related-memory.js'; // RELATEDMEM_EXT
 import { stickerTodoLine } from './ext/stickers.js'; // STICKER_EXT
 import { MEMV2_CARD_MAX, MEMV2_SELF_MAX, MEMV2_DIARY_MAX } from './ext/memory-card.js'; // MEMCARD_EXT
@@ -13737,77 +13738,25 @@ async function main() {
   const MOOD_CN_SIMPLE = { calm: '平静', happy: '开心', curious: '好奇', focused: '专注', excited: '兴奋', tired: '有点累', annoyed: '烦躁', down: '低落', fear: '不安', disgust: '反感', surprise: '意外', hurt: '受伤', sulk: '闷闷的', proud: '得意', gloomy: '沉', anxious: '焦虑', numb: '没感觉', lonely: '孤单', flutter: '心动', love: '喜欢', jealous: '吃味', shame: '羞', guilt: '内疚', awkward: '尴尬', sympathy: '心疼', disappointed: '失望', nostalgia: '怀念', coy: '想撒娇', conflict: '别扭', burnout: '撑不住', cracked: '有点崩' };
   try { setInterval(() => { void moodDiaryTick(); }, 5 * 60 * 1000); } catch {}
 
-  // ── NEXT_PATCH：提醒 / 告警 / 日报 ──
-  async function reminderTick() {
-    try {
-      if (cfg.socialV2?.reminders?.enabled === false) return;
-      const due = dueReminders();
-      if (!due.length) return;
-      const owner = cfg.ownerQQ;
-      if (!owner) return;
-      const take = due.slice(0, 3);
-      for (const it of take) {
-        await sendToQQ('private:' + owner, '⏰ 提醒你：' + it.text);
-        log('[提醒] 已发出：' + it.text);
-      }
-      markReminded(take.map((x) => x.id));
-    } catch {}
-  }
-
-  async function alertTick() {
-    try {
-      const c = cfg.socialV2?.alerts ?? {};
-      if (c.enabled === false) return;
-      const gapMs = (Number(c.gapMin) || 25) * 60000;
-      const ago = lastEventAgo();
-      if (ago < 0 || ago < gapMs) return;
-      const st = alertState();
-      if (st.alertedAt && Date.now() - st.alertedAt < (Number(c.cooldownMin) || 60) * 60000) return;
-      const owner = cfg.ownerQQ;
-      if (!owner) return;
-      // QUIET_PATCH：链路真断才提醒；夜里和主动重启时不打扰
-      if (snowlumaHealth?.connected === true || isQuietHour() || tookRestartMark()) {
-        log('[告警] 静默跳过（连接正常/夜间/主动重启），事件中断 ' + Math.round(ago / 60000) + ' 分钟');
-        setAlert({ alertedAt: Date.now() });
-        return;
-      }
-      await sendToQQ('private:' + owner, '我这边已经 ' + Math.round(ago / 60000) + ' 分钟没收到消息了，可能断了，我在自己恢复。');
-      setAlert({ alertedAt: Date.now() });
-      log('[告警] 事件中断 ' + Math.round(ago / 60000) + ' 分钟');
-    } catch {}
-  }
-
-  async function reportTick() {
-    try {
-      const rc = cfg.socialV2?.report ?? {};
-      if (rc.enabled === false) return;
-      const now = new Date();
-      const target = (Number(rc.hour ?? 23)) * 60 + Number(rc.minute ?? 30);
-      if (now.getHours() * 60 + now.getMinutes() < target) return;
-      const day = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
-      if (reportState().day === day) return;
-      const owner = cfg.ownerQQ;
-      if (!owner) return;
-      const info = tokenGuardDowngrade();
-      let study = '';
-      try {
-        const st = readStudyState();
-        if (st && st.count) study = String(st.count) + ' 条' + (st.lastBvid ? '（' + st.lastBvid + '）' : '');
-      } catch {}
-      const text = fmtReport({ day, cost: Number(info.cost || 0), cap: info.cap, study });
-      await sendToQQ('private:' + owner, text);
-      markReported(day);
-      log('[日报] 已发送');
-    } catch {}
-  }
+  // ── NEXT_PATCH：提醒 / 告警 / 日报（已迁入 src/ext/reminders.js）──
+  const reminders = createReminders({
+    getCfg: () => cfg,
+    log,
+    sendToQQ: (...a) => sendToQQ(...a),
+    readStudyState,
+    isConnected: () => snowlumaHealth?.connected === true,
+    isQuietHour,
+    tookRestartMark,
+    tokenGuardDowngrade,
+  }); // REMINDERS_EXT
 
   function startProactiveScheduler() {
     if (cfg.chat?.proactive?.enabled === false) return;
     setInterval(() => { checkProactiveAt().catch(() => {}); }, 5 * 60 * 1000);
     setInterval(() => { void qzoneWatch.tick(); }, 60 * 1000); // QZONE_WATCH_EXT
-    setInterval(() => { void reminderTick(); }, 60 * 1000); // NEXT_PATCH
-    setInterval(() => { void alertTick(); }, 60 * 1000); // NEXT_PATCH
-    setInterval(() => { void reportTick(); }, 5 * 60 * 1000); // NEXT_PATCH
+    setInterval(() => { void reminders.reminderTick(); }, 60 * 1000); // NEXT_PATCH REMINDERS_EXT
+    setInterval(() => { void reminders.alertTick(); }, 60 * 1000); // NEXT_PATCH REMINDERS_EXT
+    setInterval(() => { void reminders.reportTick(); }, 5 * 60 * 1000); // NEXT_PATCH REMINDERS_EXT
     setInterval(() => { try { moodTick(); moodDiaryTick(); } catch {} }, 5 * 60 * 1000); // MOODV2_TICK
     log(`[搭话] 已启动：每群每小时最多一次主动 @（至少 ${cfg.chat?.proactive?.minMessages ?? 10} 条上下文）`);
   }

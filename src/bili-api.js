@@ -38,7 +38,8 @@ export function loadBiliAccount({ home = os.homedir() } = {}) {
   const p = resolveBiliPaths(home);
   const config = readJson(p.config, {}) ?? {};
   const cred = readJson(p.credentials, {}) ?? {};
-  const mid = String(config?.self?.mid ?? '').trim();
+  // MID_FALLBACK_PATCH：config 里没写 self.mid 时用登录凭据的 DedeUserID，避免动态同步直接失败
+  const mid = String(config?.self?.mid ?? cred?.dedeuserid ?? cred?.DedeUserID ?? '').trim();
   const name = String(config?.self?.name ?? '').trim();
   const cookie = [
     cred.sessdata ? `SESSDATA=${cred.sessdata}` : '',
