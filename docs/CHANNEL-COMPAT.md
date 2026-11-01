@@ -33,3 +33,18 @@
 - `snowluma.httpUrl` 指向了 **WS 端口**：报 `HTTP 426`，错误信息里会提示你改回 HTTP 端口。
 - SnowLuma 默认带 `launcherPath`（Windows 的 `launcher.bat`），NapCat 部署请把它删掉或 `allowLaunch: false`，否则桥接会尝试去启动一个不存在的程序。
 - 换通道后第一次启动会重新发现端点（`followDiscoveredEndpoint: true`），如果还连旧地址，把 `state/` 里的端点缓存删掉再启动。
+
+### 配置节叫 `channel` 还是 `snowluma`？
+
+两者都能用，**`snowluma` 段落仍然吃**（老的配置不用改）。新配置建议写 `channel`：
+
+```json
+"channel": {
+  "wsUrl": "ws://127.0.0.1:3001",
+  "httpUrl": "http://127.0.0.1:3000",
+  "accessToken": "你的 OneBot token"
+}
+```
+
+规则：**两段同时存在时，`snowluma` 段优先**（这样你写到一半也不会被带跑）；只在没有 `snowluma` 段时，`channel` 才会被当成它。
+`launcherPath` / `allowLaunch` 这类是 SnowLuma 桌面端专属，用 NapCat 时删掉。
