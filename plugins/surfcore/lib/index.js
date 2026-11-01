@@ -1379,6 +1379,84 @@ ${body}`;
   }
 
   // ── 模式 / ownerQQ ─────────────────────────────────────────────────────
+  // WAKEUI_PATCH 每个会话的接话概率：读写都走桥接控制台接口
+  async function handleWakeConfig(req, res) {
+    const headers = { 'x-console-token': consoleToken() };
+    const base = consoleBase();
+    try {
+      if (req.method === 'GET') {
+        const r = await fetch(`${base}/api/socialV2/states`, { headers });
+        const data = await r.json().catch(() => ({}));
+        const list = (data?.conversations ?? []).map((c) => ({
+          key: c.key,
+          probability: Number(c?.wakeConfig?.triggers?.probability ?? 0),
+          anyMessage: c?.wakeConfig?.triggers?.anyMessage === true,
+          mode: c?.wakeConfig?.mode ?? '',
+          unread: Number(c?.unreadCount ?? 0),
+          lastWakeAt: c?.wakeConfig?.lastWakeAt ?? null,
+          wakeCount: Number(c?.wakeConfig?.wakeCount ?? 0),
+          // WAKEUI_PATCH2 触发条件快照
+          triggers: {
+            atMention: c?.wakeConfig?.triggers?.atMention === true,
+            nameMention: c?.wakeConfig?.triggers?.nameMention === true,
+            question: c?.wakeConfig?.triggers?.question === true,
+            poke: c?.wakeConfig?.triggers?.poke === true,
+            keywords: Array.isArray(c?.wakeConfig?.triggers?.keywords) ? c.wakeConfig.triggers.keywords.length : 0,
+          },
+        }));
+        json(res, 200, { ok: true, conversations: list });
+        return;
+      }
+      const body = JSON.parse((await readBody(req)) || '{}');
+      const key = String(body.key ?? '').trim();
+      if (!key) { json(res, 400, { ok: false, error: 'key 不能为空' }); return; }
+      // WAKEUI_PATCH2 支持 probability + triggers（只认 @ 等）
+      const triggers = body.triggers && typeof body.triggers === 'object' ? { ...body.triggers } : {};
+      if (body.probability !== undefined) {
+        const p = Number(body.probability);
+        if (!Number.isFinite(p)) { json(res, 400, { ok: false, error: 'probability 必须是 0~1 的数字' }); return; }
+        triggers.probability = Math.min(1, Math.max(0, p));
+      }
+      if (!Object.keys(triggers).length) { json(res, 400, { ok: false, error: '没有要改的项' }); return; }
+      const config = { triggers };
+      if (body.mode === 'active' || body.mode === 'diving') config.mode = body.mode;
+      const r = await fetch(`${base}/api/socialV2/wake-config`, {
+        method: 'POST',
+        headers: { ...headers, 'content-type': 'application/json' },
+        body: JSON.stringify({ key, config }),
+      });
+      const data = await r.json().catch(() => ({}));
+      json(res, r.status, data);
+    } catch (e) {
+      json(res, 502, { ok: false, error: `接话概率接口失败：${e?.message || e}` });
+    }
+  }
+
+  // MOODV2_PROXY 心情面板代理
+  async function handleMoodApi(req, res) {
+    try {
+      const base = consoleBase();
+      const headers = { 'x-console-token': consoleToken() };
+      if (req.method === 'GET') {
+        const r = await fetch(`${base}/api/socialV2/mood`, { method: 'GET', headers });
+        const data = await r.json().catch(() => ({}));
+        json(res, r.status, data);
+        return;
+      }
+      const raw = (await readBody(req)) || '{}';
+      const body = JSON.parse(raw);
+      const r = await fetch(`${base}/api/socialV2/mood`, {
+        method: 'POST',
+        headers: { ...headers, 'content-type': 'application/json' },
+        body: JSON.stringify(body || {}),
+      });
+      const data = await r.json().catch(() => ({}));
+      json(res, r.status, data);
+    } catch (e) {
+      json(res, 502, { ok: false, error: `心情接口失败：${e?.message || e}` });
+    }
+  }
+
   async function handleMode(req, res) {
     if (req.method === 'GET') {
       let dshSetting = null;
@@ -3295,6 +3373,46 @@ if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { ${writeOut('$
   }
 
   // ── 路由：API 前缀 ──────────────────────────────────────────────────────
+  // BOOST_API —— 今日额外额度（只今天有效，跨天自动失效）
+  async function handleBoost(req, res) {
+    const file = path.join(STATE_DIR, 'token-boost.json');
+    const day = new Date().toLocaleDateString('sv-SE');
+    const readCur = () => {
+      try {
+        const j = JSON.parse(fs.readFileSync(file, 'utf8')) || {};
+        return j.day === day && Number.isFinite(Number(j.extra)) ? Number(j.extra) : 0;
+      } catch { return 0; }
+    };
+    const writeIt = (extra) => {
+      try {
+        fs.mkdirSync(STATE_DIR, { recursive: true });
+        fs.writeFileSync(file, JSON.stringify({ day, extra, at: new Date().toISOString() }, null, 2) + '\n', 'utf8');
+        return true;
+      } catch (error) {
+        json(res, 500, { ok: false, error: String(error && error.message ? error.message : error) });
+        return false;
+      }
+    };
+    const cur = readCur();
+    if (req.method === 'POST') {
+      let body = {};
+      try { body = JSON.parse(await readBody(req) || '{}'); } catch { json(res, 400, { ok: false, error: '请求体不是合法 JSON' }); return; }
+      if (body && body.reset) {
+        if (writeIt(0)) json(res, 200, { ok: true, day, extra: 0 });
+        return;
+      }
+      const n = Number(body && body.cny);
+      if (!Number.isFinite(n) || n <= 0 || n > 500) {
+        json(res, 400, { ok: false, error: '金额要在 0.5 ~ 500 之间' });
+        return;
+      }
+      const extra = Math.round((cur + n) * 100) / 100;
+      if (writeIt(extra)) json(res, 200, { ok: true, day, extra });
+      return;
+    }
+    json(res, 200, { ok: true, day, extra: cur });
+  }
+
   route('prefix', API_PREFIX, async (req, res) => {
     const url = new URL(req.url, 'http://127.0.0.1');
     const pathname = url.pathname;
@@ -3318,6 +3436,8 @@ if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { ${writeOut('$
     if (pathname === `${API_PREFIX}/align`) { await handleAlign(req, res); return; }
     if (pathname === `${API_PREFIX}/mode`) { await handleMode(req, res); return; }
     if (pathname === `${API_PREFIX}/extensions`) { await handleExtensions(req, res); return; }
+    if (pathname === `${API_PREFIX}/wake-config`) { await handleWakeConfig(req, res); return; } // WAKEUI_PATCH
+    if (pathname === `${API_PREFIX}/mood`) { await handleMoodApi(req, res); return; } // MOODV2_PROXY_ROUTE
     if (pathname === `${API_PREFIX}/platforms`) { await handlePlatforms(req, res); return; }
     if (pathname === `${API_PREFIX}/compat/scan`) {
       try {
@@ -3376,6 +3496,7 @@ if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { ${writeOut('$
     if (pathname.startsWith(`${API_PREFIX}/pet`)) { await handlePet(req, res, url); return; }
 
     if (pathname === `${API_PREFIX}/token-budget`) { await handleTokenBudget(req, res, url); return; }
+    if (pathname === `${API_PREFIX}/boost`) { await handleBoost(req, res, url); return; } // BOOST_API
     if (pathname === `${API_PREFIX}/updates`) { await handleUpdates(req, res); return; }
     if (pathname.startsWith(`${API_PREFIX}/bili/`)) { await handleBili(req, res, url); return; }
     if (pathname === `${API_PREFIX}/logs`) { handleLogs(res, url); return; }

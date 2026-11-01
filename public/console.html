@@ -2202,6 +2202,18 @@ button:active:not(:disabled) {
       </div>
 
       </div></details>
+<details class="settings-group"><summary>花费与降级</summary><div class="settings-content">
+      <div class="meta" style="margin-bottom:8px">当日花费到额度的一定比例后，群里自动变成「只回 @」（私聊不受影响），并私聊通知你一次。</div>
+      <div class="row">
+        <label style="flex:1">每日花费额度（元，0=不限）</label><input type="number" id="v2GuardDailyCost" step="0.5" min="0" style="width:90px">
+        <label style="flex:1">花到几成就降级（%）</label><input type="number" id="v2GuardDownRatio" min="10" max="100" step="5" style="width:80px">
+      </div>
+      <div class="row">
+        <label style="flex:1">群每天唤醒上限</label><input type="number" id="v2GuardMaxWakes" min="0" style="width:80px">
+        <label style="flex:1">私聊每天唤醒上限</label><input type="number" id="v2GuardPrivateMax" min="0" style="width:80px">
+        <label style="flex:1">同会话最小间隔（秒）</label><input type="number" id="v2GuardMinGapSec" min="0" style="width:80px">
+      </div>
+      </div></details>
 <details class="settings-group"><summary>发送限制</summary><div class="settings-content">
       <div class="meta" style="margin-bottom:8px">二代不再按空格自动拆条；AI 要分多条必须显式传数组或用 qq_send_burst。</div>
       <div class="row">
@@ -3396,6 +3408,12 @@ async function loadV2Config() {
     document.getElementById('v2MaxWakeConfigReminders').value = w.maxWakeConfigReminders ?? 2;
     document.getElementById('v2PreSleepWaitEnabled').checked = w.preSleepWaitEnabled !== false;
     document.getElementById('v2PreSleepWaitMin').value = Number.isFinite(Number(w.preSleepWaitMs)) ? Math.round(Number(w.preSleepWaitMs) / 60000) : 5;
+    const tg0 = c.tokenGuard || {};
+    document.getElementById('v2GuardDailyCost').value = tg0.maxDailyCostCNY ?? 8;
+    document.getElementById('v2GuardDownRatio').value = Math.round((tg0.downgradeAtRatio ?? 0.5) * 100);
+    document.getElementById('v2GuardMaxWakes').value = tg0.maxWakesPerDay ?? 20;
+    document.getElementById('v2GuardPrivateMax').value = tg0.privateMaxWakesPerDay ?? 10;
+    document.getElementById('v2GuardMinGapSec').value = Math.round((tg0.minWakeGapMs ?? 120000) / 1000);
     const s = c.send || {};
     document.getElementById('v2BurstEnabled').checked = s.burstEnabled !== false;
     document.getElementById('v2BurstMax').value = s.burstMaxMessages ?? 8;
@@ -3484,6 +3502,13 @@ async function saveV2Config() {
       batchWindowMs: Math.round(Number(document.getElementById('v2BatchWindowMs').value) || 8000),
       noActionLimit: Math.round(Number(document.getElementById('v2NoActionLimit').value) || 3),
       maxWakeConfigReminders: Math.round(Number(document.getElementById('v2MaxWakeConfigReminders').value) || 2)
+    },
+    tokenGuard: {
+      maxDailyCostCNY: Number(document.getElementById('v2GuardDailyCost').value) || 0,
+      downgradeAtRatio: Math.min(1, Math.max(0.1, (Number(document.getElementById('v2GuardDownRatio').value) || 50) / 100)),
+      maxWakesPerDay: Math.round(Number(document.getElementById('v2GuardMaxWakes').value) || 0),
+      privateMaxWakesPerDay: Math.round(Number(document.getElementById('v2GuardPrivateMax').value) || 0),
+      minWakeGapMs: Math.round(Number(document.getElementById('v2GuardMinGapSec').value) || 0) * 1000,
     },
     send: {
       burstEnabled: document.getElementById('v2BurstEnabled').checked,

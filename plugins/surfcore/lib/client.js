@@ -1041,7 +1041,7 @@ F("sessionCwd", "会话工作目录", "留空用 surfcore 根目录", "text", { 
         F("fishGuard.bypassDirectAddress", "被直接叫到时放行", "默认开；只回一句，不主动展开", "switch"),
         F("fishGuard.blockSends", "保护期内硬拦发送", "默认开；防止 AI 趁冷却偷偷发", "switch"),
       ]},
-      { group: "Token 防爆破", note: "和鱼群守则同时生效：鱼群守则先拦，再按这里限制唤醒次数/单次发送条数；每日花费/额度已迁移到「Token 额度」页（按自然日，QQ/B站/总额分开管）", fields: [
+      { group: "Token 防爆破", note: "和鱼群守则同时生效：鱼群守则先拦，再按这里限制唤醒次数/单次发送条数；每日花费额度与降级比例在「Token 额度」页的『省钱模式』卡片里调", fields: [
         F("socialV2.tokenGuard.enabled", "启用 Token 防爆破", "默认开；关掉 = 只按旧限频", "switch"),
         F("socialV2.tokenGuard.maxWakesPerDay", "单会话每天最多醒", "默认 20；群聊；超过后不再唤醒", "number", { min: 0, max: 200 }),
         F("socialV2.tokenGuard.privateMaxWakesPerDay", "私聊每天最多醒", "默认 10；私聊爆破先卡这里", "number", { min: 0, max: 200 }),
@@ -2628,6 +2628,157 @@ F("toolsPath", "bili.mjs 路径", "留空 = 用合体插件自带的 tools/", "t
     }
 
     // ── QQ 标签页 ───────────────────────────────────────────────────────────
+    // MOODV2_CARD 今天的感觉（星图 + 手调）
+    function MoodCard({ toast }) {
+      const [d, setD] = useState(null);
+      const [busy, setBusy] = useState(false);
+      const [draft, setDraft] = useState({});
+      const load = useCallback(async () => {
+        try {
+          const r = await api("/mood");
+          if (r && r.ok) { setD(r); }
+        } catch (e) {}
+      }, []);
+      useEffect(() => {
+        load();
+        const t = setInterval(load, 30000);
+        return () => clearInterval(t);
+      }, [load]);
+      if (!d) {
+        return h("div", { className: "qbw-card", style: { marginBottom: "10px" } },
+          h("h4", null, "今天的感觉（心情）"),
+          h("div", { style: { opacity: 0.7, fontSize: 12 } }, "读取中…"));
+      }
+      const prefs = d.prefs || {};
+      const vals = Object.assign({}, d.values || {}, draft.values || {});
+      const moods = d.moods || [];
+      const cur = moods.find((m) => m.id === d.current);
+      const sinceH = Math.max(1, Math.round((Date.now() - (d.since || Date.now())) / 3600000));
+      const untilMin = Math.max(1, Math.round(((d.nextTickAt || 0) - Date.now()) / 60000));
+      const blendText = (d.blend || []).map((id) => (moods.find((m) => m.id === id) || {}).zh).filter(Boolean).join("、");
+      const top = moods.slice().sort((a, b) => (vals[b.id] || 0) - (vals[a.id] || 0)).slice(0, 6);
+      const setVal = (id, v) => setDraft((o) => Object.assign({}, o, { values: Object.assign({}, o.values || {}, { [id]: Math.max(0, Math.min(100, v)) }) }));
+      const save = async () => {
+        setBusy(true);
+        try {
+          const body = {
+            enabled: draft.enabled === undefined ? prefs.enabled !== false : draft.enabled,
+            margin: draft.margin === undefined ? prefs.margin : draft.margin,
+            blendGap: draft.blendGap === undefined ? prefs.blendGap : draft.blendGap,
+            blendMax: draft.blendMax === undefined ? prefs.blendMax : draft.blendMax,
+            values: draft.values || {},
+          };
+          const r = await api("/mood", { method: "POST", body });
+          if (r && r.ok) { setD(r); setDraft({}); toast && toast("心情已保存"); }
+          else toast && toast("保存失败：" + ((r && r.error) || "未知错误"));
+        } catch (e) { toast && toast("保存失败：" + e.message); }
+        setBusy(false);
+      };
+      const reset = async () => {
+        setBusy(true);
+        try {
+          const r = await api("/mood", { method: "POST", body: { resetToBaseline: true } });
+          if (r && r.ok) { setD(r); setDraft({}); toast && toast("已回到基线"); }
+        } catch (e) {}
+        setBusy(false);
+      };
+      const dots = moods.map((m, i) => {
+        const v = vals[m.id] || 0;
+        const ang = (i / moods.length) * Math.PI * 2 - Math.PI / 2;
+        const rad = 16 + v * 1.02;
+        const x = 130 + Math.cos(ang) * rad;
+        const y = 130 + Math.sin(ang) * rad;
+        const isCur = m.id === d.current;
+        return h("div", {
+          key: m.id,
+          title: m.zh + " " + Math.round(v),
+          onClick: () => setVal(m.id, v + 5),
+          style: {
+            position: "absolute", left: (x - 4) + "px", top: (y - 4) + "px", width: "8px", height: "8px", borderRadius: "50%",
+            background: isCur ? "#ffd166" : "hsl(" + Math.round(270 - v * 2.2) + ",75%,62%)",
+            boxShadow: isCur ? "0 0 10px #ffd166" : "0 0 4px rgba(150,120,255,0.55)",
+            cursor: "pointer",
+          },
+        });
+      });
+      return h("div", { className: "qbw-card", style: { marginBottom: "10px" } },
+        h("h4", null, "今天的感觉（心情）"),
+        h("div", { style: { fontSize: 12, opacity: 0.8, marginBottom: "6px" } },
+          "现在：" + ((cur && cur.zh) || d.current || "平静") + (blendText ? "（掺着 " + blendText + "）" : "") +
+          " · 已经 " + sinceH + " 小时 · 约 " + untilMin + " 分钟后自己会变"),
+        h("div", { style: { position: "relative", width: "260px", height: "260px", margin: "6px auto" } },
+          h("div", { style: { position: "absolute", left: 0, top: 0, width: "260px", height: "260px", border: "1px solid rgba(255,255,255,0.10)", borderRadius: "50%" } }),
+          h("div", { style: { position: "absolute", left: 0, top: 0, width: "260px", height: "260px", border: "1px dashed rgba(255,255,255,0.06)", borderRadius: "50%", transform: "scale(0.66)" } }),
+          dots,
+          h("div", { style: { position: "absolute", left: "96px", top: "118px", width: "68px", textAlign: "center", fontSize: "12px", opacity: 0.9 } },
+            (cur && cur.zh) || "平静")),
+        h("div", { style: { fontSize: 11, opacity: 0.55, textAlign: "center", marginBottom: "8px" } }, "点一下圆点 = 该情绪 +5；越靠外分越高"),
+        h("div", { style: { display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "10px" } },
+          top.map((m) => h("div", { key: m.id, style: { display: "flex", alignItems: "center", gap: "4px", fontSize: 12 } },
+            h("span", { style: { width: "52px", opacity: 0.85 } }, m.zh),
+            h(Btn, { kind: "qbw-btn2", onClick: () => setVal(m.id, (vals[m.id] || 0) - 5) }, "-"),
+            h("span", { style: { width: "34px", textAlign: "center" } }, String(Math.round(vals[m.id] || 0))),
+            h(Btn, { kind: "qbw-btn2", onClick: () => setVal(m.id, (vals[m.id] || 0) + 5) }, "+")))),
+        h("div", { style: { display: "flex", flexWrap: "wrap", gap: "10px", alignItems: "center", fontSize: 12 } },
+          h("label", null, "开关 ",
+            h("input", { type: "checkbox", checked: draft.enabled === undefined ? prefs.enabled !== false : draft.enabled, onChange: (e) => setDraft((o) => Object.assign({}, o, { enabled: e.target.checked })) })),
+          h("label", null, "门槛 ",
+            h("input", { type: "number", value: draft.margin === undefined ? prefs.margin : draft.margin, onChange: (e) => setDraft((o) => Object.assign({}, o, { margin: Number(e.target.value) })), style: { width: "56px" } })),
+          h("label", null, "混合间距 ",
+            h("input", { type: "number", value: draft.blendGap === undefined ? prefs.blendGap : draft.blendGap, onChange: (e) => setDraft((o) => Object.assign({}, o, { blendGap: Number(e.target.value) })), style: { width: "56px" } })),
+          h("label", null, "最多混合 ",
+            h("input", { type: "number", value: draft.blendMax === undefined ? prefs.blendMax : draft.blendMax, onChange: (e) => setDraft((o) => Object.assign({}, o, { blendMax: Number(e.target.value) })), style: { width: "56px" } }))),
+        h("div", { className: "qbw-actions", style: { marginTop: "10px", display: "flex", gap: "8px" } },
+          h(Btn, { kind: "qbw-btn", onClick: save, disabled: busy }, busy ? "保存中…" : "保存"),
+          h(Btn, { kind: "qbw-btn2", onClick: reset, disabled: busy }, "回到基线"),
+          h(Btn, { kind: "qbw-btn2", onClick: load, disabled: busy }, "刷新")),
+        h("div", { style: { fontSize: 11, opacity: 0.55, marginTop: "8px" } },
+          "每轮只多约 40 token；飘移每 3~6 小时一次，情绪会自己回到基线附近。"));
+    }
+
+    // WAKEUI_PATCH 接话概率编辑器（每个会话一行）
+    function WakeConfigCard({ toast }) {
+      const [rows, setRows] = useState(null);
+      const [busy, setBusy] = useState("");
+      const load = async () => {
+        try { const r = await api("/wake-config"); setRows(Array.isArray(r.conversations) ? r.conversations : []); }
+        catch (e) { setRows([]); toast(`✗ ${e.message}`); }
+      };
+      useEffect(() => { load(); }, []);
+      const save = async (key, opts = {}) => {
+        const el = document.getElementById(`wake-input-${key.replace(/[^0-9a-zA-Z]/g, "_")}`);
+        const v = Number(el?.value ?? 0);
+        if (!Number.isFinite(v) || v < 0 || v > 1) { toast("✗ 请输入 0~1 之间的数（例如 0.3）"); return; }
+        const body = { key };
+        if (opts.atOnly) {
+          body.probability = 0;
+          body.triggers = { atMention: true, nameMention: false, question: false, poke: false, anyMessage: false, keywords: [] };
+        } else body.probability = v;
+        setBusy(key);
+        try {
+          const r = await api("/wake-config", { method: "POST", body });
+          toast(r.ok ? `✓ ${key} 已更新` : `✗ ${r.error ?? "保存失败"}`);
+          await load();
+        } catch (e) { toast(`✗ ${e.message}`); } finally { setBusy(""); }
+      };
+      const label = (k) => k.startsWith("group:") ? `群 ${k.slice(6)}` : k.startsWith("private:") ? `私聊 ${k.slice(8)}` : k;
+      return h("div", { className: "qbw-card", style: { marginBottom: "10px" } },
+        h("h4", null, "接话概率（每个会话单独调）"),
+        h("p", null, "群里每收到一条消息，除了被 @、点名、命中关键词、是提问之外，再按这个概率随手搭一句。设 0 = 只在被叫到时说话；设 1 = 每条都接。改完下一轮生效，不用重启。"),
+        h("p", { className: "qbw-hint" }, "同样扣钱：概率越高越费 token；谷价日可以调高，工作日白天建议调低。点「只认 @」= 该会话只在被 @（或引用她）时说话，其它一律不理。"),
+        rows === null ? h("p", { className: "qbw-hint" }, "读取中…") : rows.length === 0 ? h("p", { className: "qbw-hint" }, "还没有会话记录；等群里有人说句话再刷新。") : rows.map((r) =>
+          h("div", { key: r.key, style: { display: "flex", gap: "8px", alignItems: "center", margin: "6px 0", flexWrap: "wrap" } },
+            h("span", { style: { minWidth: "140px" } }, label(r.key)),
+            h("input", { className: "qbw-input", id: `wake-input-${r.key.replace(/[^0-9a-zA-Z]/g, "_")}`, type: "number", min: "0", max: "1", step: "0.01", defaultValue: String(r.probability ?? 0), style: { width: "80px" } }),
+            h(Btn, { kind: "qbw-btn2", disabled: busy === r.key, onClick: () => save(r.key) }, busy === r.key ? "保存中…" : "保存"),
+            h(Btn, { kind: "qbw-btn2", disabled: busy === r.key, onClick: () => save(r.key, { atOnly: true }) }, "只认 @"),
+            h("span", { className: "qbw-hint" }, (r.triggers && r.triggers.atMention && !r.triggers.nameMention && !r.triggers.question ? "【只认@】" : "")),
+            h("span", { className: "qbw-hint" }, `${r.anyMessage ? "每条都接 · " : ""}今天醒过 ${r.wakeCount} 次 · 未读 ${r.unread}`))),
+        h("div", { className: "qbw-actions", style: { borderTop: "none", marginTop: "6px", paddingTop: "0" } },
+          h(Btn, { kind: "qbw-btn2", onClick: () => load() }, "刷新")),
+      );
+    }
+
     // ── 群分层：小群保留积极唤醒，大群/高活跃群收紧 ───────────────────────
     function ToolProfileArea({ cfg, set, onSave, busy }) {
       return h(AreaModalCard, { title: "工具面", note: "full / balanced / compact；切 balanced 才会隐藏旧读工具，改用快照", onSave, busy },
@@ -2763,6 +2914,8 @@ F("socialV2.voice.ffmpegPath", "ffmpeg 路径", "留空走 PATH", "text", { wide
           overview,
         }),
         h(AdminCard, { admin, onChange: setAdmin, qqPrivate: cfg?.allow?.private ?? [], qqAllowAll: cfg?.allowAllWhenEmpty === true, toast }),
+        h(MoodCard, { toast }), // MOODV2_RENDER
+        h(WakeConfigCard, { toast }),
         h(WhitelistCard, {
           allow: cfg?.allow ?? {},
           allowAll: cfg?.allowAllWhenEmpty === true,
@@ -5561,7 +5714,7 @@ F("socialV2.voice.ffmpegPath", "ffmpeg 路径", "留空走 PATH", "text", { wide
         extra ? h("div", { className: "qbw-budget-extra" }, extra) : null);
     }
 
-    function TokenTab({ budget, limits, onChange, disabled, alertedToday, onSave, busy, toast }) {
+    function TokenTab({ budget, limits, onChange, disabled, alertedToday, onSave, busy, toast, qq, set, saveCfg }) {
       useStyleOnce();
       if (!budget || !limits) {
         return h("div", { className: "qbw-hint" }, "正在读取额度与今日用量…");
@@ -5577,6 +5730,21 @@ F("socialV2.voice.ffmpegPath", "ffmpeg 路径", "留空走 PATH", "text", { wide
       };
       const totalRatio = Math.max(ratios.total?.cny ?? 0, ratios.total?.tokens ?? 0);
       const alertedText = alertedToday?.at ? fmtTime(new Date(alertedToday.at).toISOString()) : "";
+      /* BOOST_UI —— 今日额外额度（只今天有效） */
+      const [boostInfo, setBoostInfo] = useState(null);
+      const [boostDraft, setBoostDraft] = useState("");
+      useEffect(() => {
+        let live = true;
+        api("/boost").then((r) => { if (live) setBoostInfo(r); }).catch(() => {});
+        return () => { live = false; };
+      }, []);
+      const boostExtra = Number(boostInfo?.extra || 0);
+      /* QBW_GUARD_CARD —— 省钱模式（自动降级） */
+      const tg = (qq && qq.socialV2 && qq.socialV2.tokenGuard) ? qq.socialV2.tokenGuard : {};
+      const guardCap = Number(tg.maxDailyCostCNY) > 0 ? Number(tg.maxDailyCostCNY) : null;
+      const guardRatio = Number(tg.downgradeAtRatio) > 0 ? Number(tg.downgradeAtRatio) : 0.5;
+      const todayCost = Number(usage.total?.cost) || 0;
+      const guardOn = guardCap != null ? todayCost >= guardCap * guardRatio : false;
       return h("div", null,
         h("div", { className: "qbw-budget-summary" },
           h("div", null,
@@ -5676,6 +5844,63 @@ F("socialV2.voice.ffmpegPath", "ffmpeg 路径", "留空走 PATH", "text", { wide
               h("div", { className: "qbw-hint", style: { marginTop: "6px" } },
                 "总限额是额外天花板：QQ / B站 的分项额度仍然各自生效，两者谁先到就按谁停。"))}),
         ),
+        h("div", { className: "qbw-card", style: { marginTop: "12px" } },
+          h("div", { className: "qbw-budget-head" },
+            h("div", null,
+              h("h4", null, "省钱模式（自动降级）"),
+              h("p", null, "当天的 QQ + B站 + 其他花费到达「额度 × 比例」时，群里只在被 @ 或引用时才回；私聊照常。额度 100% 时由上面的硬额度直接停。")),
+            h("div", { className: "qbw-budget-today" },
+              h("span", null, "今日已花"),
+              h("b", null, fmtMoney(todayCost)),
+              h("span", null, guardCap != null ? `降级线 ${fmtMoney(guardCap * guardRatio)}` : "没填额度 = 不降级"))),
+          h("div", { className: "qbw-budget-lines" },
+            h("div", { className: "qbw-budget-line" },
+              h("label", { className: "qbw-budget-field" },
+                h("span", null, "每天花费额度（元，0 = 不启用）"),
+                h("input", { className: "qbw-input", type: "number", min: 0, step: 1, value: tg.maxDailyCostCNY ?? "", disabled,
+                  onChange: (e) => set && set("socialV2.tokenGuard.maxDailyCostCNY", e.target.value === "" ? 0 : Number(e.target.value)) })),
+              h("label", { className: "qbw-budget-field" },
+                h("span", null, "花到几成降级（0.5 = 50%）"),
+                h("input", { className: "qbw-input", type: "number", min: 0, max: 1, step: 0.05, value: tg.downgradeAtRatio ?? 0.5, disabled,
+                  onChange: (e) => set && set("socialV2.tokenGuard.downgradeAtRatio", Number(e.target.value)) }),
+                h("small", null, "到点后群里只回 @ / 引用；想临时放开就在 QQ 里发 /谷价")),
+            h("div", { className: "qbw-budget-line" }, /* QBW_GUARD_CARD2 */
+              h("label", { className: "qbw-budget-field" },
+                h("span", null, "降级时在群里说一句"),
+                h("input", { className: "qbw-switch", type: "checkbox", checked: tg.downgradeGroupNotice !== false, disabled,
+                  onChange: (e) => set && set("socialV2.tokenGuard.downgradeGroupNotice", e.target.checked) }),
+                h("small", null, "关掉 = 只在私聊里通知你")),
+              h("label", { className: "qbw-budget-field" },
+                h("span", null, "群里那句话（留空用默认）"),
+                h("input", { className: "qbw-input", value: tg.downgradeGroupNoticeText ?? "", placeholder: "今天开销有点高，我先省着点说话啦，有事 @ 我就行。", disabled,
+                  onChange: (e) => set && set("socialV2.tokenGuard.downgradeGroupNoticeText", e.target.value) }))),
+            h("div", { className: "qbw-budget-line" }, /* BOOST_UI */
+              h("label", { className: "qbw-budget-field" },
+                h("span", null, "今天额外加额度（元，只今天有效）"),
+                h("input", { className: "qbw-input", type: "number", min: 0.5, step: 1, value: boostDraft, placeholder: "比如 3", disabled,
+                  onChange: (e) => setBoostDraft(e.target.value) }),
+                h("small", null, "今日额外：¥" + boostExtra.toFixed(2) + "；加完立刻生效，第二天自动清零")),
+              h("div", { className: "qbw-budget-field" },
+                h("span", null, " "),
+                h(Btn, { disabled: !!disabled, onClick: async () => {
+                  const n = Number(boostDraft);
+                  if (!(n > 0)) { toast && toast("先填个金额，比如 3"); return; }
+                  try {
+                    const r = await api("/boost", { method: "POST", body: { cny: n } });
+                    setBoostInfo(r); setBoostDraft("");
+                    toast && toast("已加 ¥" + n + " 额度");
+                  } catch (e) { toast && toast(String((e && e.message) || e)); }
+                } }, "加额度"),
+                h(Btn, { disabled: !!disabled, onClick: async () => {
+                  try {
+                    const r = await api("/boost", { method: "POST", body: { reset: true } });
+                    setBoostInfo(r); toast && toast("今日额外额度已清零");
+                  } catch (e) { toast && toast(String((e && e.message) || e)); }
+                } }, "清零"))),
+            h("div", { className: "qbw-hint" }, guardOn ? "● 今天已经降到省钱模式了" : "○ 今天是正常模式"))),
+          h("div", { className: "qbw-budget-note", style: { marginTop: "8px", paddingTop: "8px" } },
+            h("div", { className: "qbw-hint" }, "改完点右边「保存省钱模式」，立刻生效，不用重启桥接。"),
+            h(Btn, { onClick: () => saveCfg && saveCfg(), disabled: !!disabled || !!busy }, busy === "save" ? "保存中…" : "保存省钱模式"))),
         h("div", { className: "qbw-budget-note" },
           h("div", { className: "qbw-hint" },
             "· 金额与 token 是两套独立额度：可以只填一种，也可以两种都填；两种都填时先到的那条生效。",
@@ -6087,7 +6312,7 @@ F("socialV2.voice.ffmpegPath", "ffmpeg 路径", "留空走 PATH", "text", { wide
         if (tab === "purpose") return h(PurposeTab, { qq, setQq: setQqPath, unified, setUnified: setUnifiedPath, overview, busy, setBusy, toast: notify, reload, goTab: setTab });
         if (tab === "qq") return h(QQTab, { cfg: qq, set: setQqPath, admin: unified?.admin ?? {}, setAdmin, unified, setUnified: setUnifiedPath, overview, busy, setBusy, toast: notify, reload, goTab: setTab, onSave: save });
         if (tab === "bili") return h(BiliTab, { cfg: bili, set: setBiliPath, qq: normalizedQq, setQqPath, admin: unified?.admin ?? {}, setAdmin, unified, setUnified: setUnifiedPath, qqPrivate: normalizedQq?.allow?.private ?? [], qqAllowAll: normalizedQq?.allowAllWhenEmpty === true, overview, busy, setBusy, toast: notify, reload, onSave: save });
-        if (tab === "tokens") return h(TokenTab, { budget, limits: limitDraft, onChange: setLimitDraft, disabled: !!busy, alertedToday: tokenAlerted, onSave: () => save(false), busy, toast: notify });
+        if (tab === "tokens") return h(TokenTab, { budget, limits: limitDraft, onChange: setLimitDraft, disabled: !!busy, alertedToday: tokenAlerted, onSave: () => save(false), busy, toast: notify, qq: normalizedQq, set: setQqPath, saveCfg: () => save(false) });
         if (tab === "watch") return h(WatchTab, { busy, setBusy, toast: notify, goTab: setTab });
         if (tab === "voice") return h(VoiceTab, { toast: notify });
         if (tab === "pet") return h(PetTab, { toast: notify, unified, setUnified: setUnifiedPath });

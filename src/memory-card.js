@@ -871,7 +871,7 @@ export function renderFullMemoryCard(records, { now = Date.now(), truncated = fa
   const sections = [
     ['## 初次相遇（和主人）', groups.firstMet.sort(byDate)],
     ['## 最初的日子（和主人）', groups.initial.sort(byDate)],
-    ['## 和主人（管理员）', groups.owner.sort(byDate)],
+    ['## 和他', groups.owner.sort(byDate)],
     ['## 桌宠（私下相处）', groups.pet.sort(byDate)],
     ['## B站（冲浪）', groups.bili.sort(byDate)],
     ['## QQ 与群里的记忆', groups.qq.sort(byDate)],
@@ -890,7 +890,7 @@ export function renderFullMemoryCard(records, { now = Date.now(), truncated = fa
     lines.push('', title);
     for (const record of records) {
       const text = String(record.text ?? record.title ?? '').replace(/\s+/g, ' ').trim();
-      const who = asArray(record.tags).includes('owner') ? '主人' : (record.speaker || '');
+      const who = asArray(record.tags).includes('owner') ? '他' : (record.speaker || '');
       const prefix = who ? `${who}：` : '';
       const reply = record.botReply ? ` → 她回：${short(String(record.botReply), 600)}` : '';
       lines.push(`- ${dateOnly(record.createdAt)} [清晰] ${prefix}${short(text, 1200)}${reply}（重要 ${record.importance}）`);
@@ -1787,7 +1787,7 @@ export function renderMemoryCard(card, options = {}) {
     { key: 'firstMet', title: '## 初次相遇（和主人）', priority: 120, lines: sections.firstMet.slice(0, limits.firstMet).map((record) => recordLine(record, { platform, full })) },
     { key: 'anchors', title: '## 永远不会忘的', priority: 100, lines: sections.anchors.slice(0, limits.anchors).map((record) => recordLine(record, { platform, full })) },
     { key: 'initial', title: '## 最初的日子（和主人）', priority: 45, lines: sections.initial.slice(0, limits.initial).map((record) => recordLine(record, { platform, full })) },
-    { key: 'owner', title: '## 和主人（管理员）的记忆', priority: 40, lines: sections.owner.slice(0, limits.owner).map((record) => recordLine(record, { platform, full })) },
+    { key: 'owner', title: '## 和他的记忆', priority: 40, lines: sections.owner.slice(0, limits.owner).map((record) => recordLine(record, { platform, full })) },
     { key: 'recent', title: '## 最近记得的', priority: 30, lines: sections.recent.slice(0, limits.recent).map((record) => recordLine(record, { platform, full })) },
     { key: 'pet', title: '## 桌宠（私下相处）', priority: 36, lines: (sections.petModule ?? []).slice(0, limits.pet).map((record) => recordLine(record, { platform, full })) },
     { key: 'bili', title: '## B站（冲浪）', priority: 22, lines: sections.biliModule.slice(0, limits.bili).map((record) => recordLine(record, { platform, full })) },

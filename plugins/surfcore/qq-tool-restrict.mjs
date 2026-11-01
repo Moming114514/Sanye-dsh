@@ -171,9 +171,13 @@ const SAFE_PREFIXES = [
 const SAFE_EXACT = new Set([
   'ask_user_question',
   'todo_write',
+  // TOOLWL_VIDEO_PATCH: 让她能真的"看视频"——抽帧拼图/局部放大/元信息/按台词定位。
+  'video_storyboard',
+  'video_probe',
+  'video_zoom',
+  'video_locate',
   // 第三方上下文压缩（billion-context 注入的全局工具）：只操作上下文，不含本地执行/网络写操作。
-  // 2026-10-30 用户要求放行：不放行时模型会反复重试被拒工具（实测一个回合 197 次），
-  // 且 QQ 会话本身没有这两套压缩就更容易爆上下文。
+  // 2025-10-30 用户要求放行：不放行时模型会反复重试被拒工具（实测一个回合 197 次）。
   'compress',
   'decompress',
   'search_context',

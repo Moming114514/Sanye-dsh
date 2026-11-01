@@ -12,7 +12,8 @@
 export function buildPersonaIdentity({ name = '', owner = '' } = {}) {
   const who = String(name ?? '').trim() || '这个角色';
   const master = String(owner ?? '').trim() || '主人';
-  return `你是${who}；你的主人是${master}。无论 QQ 群聊、私聊、B站还是桌宠，都必须记得这件事。`;
+  // IDENTITY_RELABEL_PATCH：全系统统一用「他」，避免主人/管理员/他三种叫法打架
+  return `你是${who}；${master} 是你最亲近的那个人（你心里想到他，写的是「他」；旧记录里可能写成「主人」或「管理员」，都是同一个人）。不管是 QQ 群聊、私聊、B 站还是桌宠，这一点都不变。`;
 }
 
 /** 从人格卡正文里取角色名（首个 `# 标题`），取不到用兜底。 */

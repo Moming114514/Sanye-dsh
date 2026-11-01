@@ -350,6 +350,22 @@ const TOOL_CONFIG_FLAGS = {
   qq_get_self_image: 'getSelfImage',
   qq_sticker_note: 'stickerNote',
   qq_set_sticker_remark: 'setStickerRemark',
+  qq_send_qzone_msg: 'sendQzone',   // QZONE_PATCH
+  qq_delete_qzone_msg: 'sendQzone',
+  qq_set_profile: 'setProfile',
+  qq_set_avatar: 'setAvatar',
+  qq_list_friend_requests: 'friends',
+  qq_handle_friend_request: 'friends',
+  qq_qzone_feed: 'sendQzone',   // QZONE_FEED_PATCH
+  qq_qzone_comment: 'sendQzone',
+  qq_recall_memory: 'memory',   // MEMV2_MCP
+  qq_diary: 'memory',
+  qq_view_sticker: 'viewSticker',
+  qq_style_note: 'styleNote', // STYLE_PATCH
+  qq_read_group_recent: 'readGroup', // VIEW_STICKER_PATCH
+  qq_loop: 'loops', // LOOPS_PATCH
+  qq_impression: 'impressions', // IMPR_PATCH
+  qq_person_note: 'people', // NEXT_PATCH
 };
 const TOOL_PROFILE = String(cfg.socialV2?.toolProfile || (cfg.socialV2?.tools?.getSnapshot === false ? 'full' : 'balanced'));
 const PROFILE_HIDDEN = {
@@ -380,6 +396,309 @@ const disabledTools = [];
     return registerTool(name, ...rest);
   };
 }
+
+// ── 记忆：回忆 / 日记（MEMV2_MCP，2026-10-31）────────────────────────────
+server.tool(
+  'qq_recall_memory',
+  '翻你自己的旧记忆。平时的记忆卡只带最近的、而且会被截断；想确认"以前是不是聊过 XX"就用这个查历史聊天与日记。返回若干条命中片段（含来源文件），查不到就说明真的没记过，别编。',
+  {
+    token: z.string().describe('会话令牌（见唤醒提示中的【会话令牌】）'),
+    query: z.string().describe('要回忆的关键词，越具体越好，比如"生日"、"那个插件"、"他说过的话"'),
+    limit: z.number().optional().describe('最多返回几条，默认 6')
+  },
+  async ({ token, query, limit }) => {
+    try {
+      const data = await agentApi('/api/socialV2/recall', {
+        method: 'POST',
+        body: JSON.stringify({ query, limit }),
+        headers: { 'x-agent-token': token },
+        timeoutMs: 30000
+      });
+      return { content: [{ type: 'text', text: serializeModelData(data) }] };
+    } catch (error) {
+      return { content: [{ type: 'text', text: '回忆失败：' + (error?.message ?? error) }] };
+    }
+  }
+);
+
+server.tool(
+  'qq_diary',
+  '写一句自己的日记（当天只写值得留的那一两句，别记流水账）。日记会主动出现在你后面两天的记忆里。',
+  {
+    token: z.string().describe('会话令牌（见唤醒提示中的【会话令牌】）'),
+    text: z.string().describe('要记的内容，一两句话，第一人称')
+  },
+  async ({ token, text }) => {
+    try {
+      const data = await agentApi('/api/socialV2/diary', {
+        method: 'POST',
+        body: JSON.stringify({ text }),
+        headers: { 'x-agent-token': token },
+        timeoutMs: 20000
+      });
+      return { content: [{ type: 'text', text: serializeModelData(data) }] };
+    } catch (error) {
+      return { content: [{ type: 'text', text: '写日记失败：' + (error?.message ?? error) }] };
+    }
+  }
+);
+
+// ── 看说说 / 评论说说（QZONE_FEED_PATCH，2026-10-30）─────────────────────────
+server.tool(
+  'qq_qzone_feed',
+  '读 QQ 空间说说列表（默认读管理员的）。返回每条说说的 tid、正文、已有评论、配图数。想评论某条就用它的 tid 调 qq_qzone_comment。注意：点赞接口不可用，只有「看」和「评论」。',
+  {
+    token: z.string().describe('会话令牌（见唤醒提示中的【会话令牌】）'),
+    uin: z.string().optional().describe('要看谁的说说，默认是管理员（ownerQQ）'),
+    num: z.number().optional().describe('取几条，默认 10，最多 20')
+  },
+  async ({ token, uin, num }) => {
+    try {
+      const data = await agentApi('/api/socialV2/qzone-feed', {
+        method: 'POST',
+        body: JSON.stringify({ uin, num }),
+        headers: { 'x-agent-token': token },
+        timeoutMs: 60000
+      });
+      return { content: [{ type: 'text', text: serializeModelData(data) }] };
+    } catch (error) {
+      return { content: [{ type: 'text', text: `读说说失败：${error?.message ?? error}` }], isError: true };
+    }
+  }
+);
+
+server.tool(
+  'qq_qzone_comment',
+  '在一条说说下面评论（默认评在管理员的说说下）。要回复某个人（比如回他）就填 replyTo=对方 QQ 号。tid 从 qq_qzone_feed 拿。评论是公开的，别人看得见，所以只说该说的话，别把聊天里的私事写上去；一次别连着刷好几条。',
+  {
+    token: z.string().describe('会话令牌（见唤醒提示中的【会话令牌】）'),
+    tid: z.string().describe('要说说的 tid（先用 qq_qzone_feed 查）'),
+    content: z.string().describe('评论内容（1-200 字）'),
+    hostUin: z.string().optional().describe('说说主人的 QQ 号，默认管理员'),
+    replyTo: z.string().optional().describe('要回复谁的 QQ 号（回他本人就填管理员号；不填就是普通评论）'),
+    replyNick: z.string().optional().describe('被回复人的昵称（可省略）')
+  },
+  async ({ token, tid, content, hostUin, replyTo, replyNick }) => {
+    try {
+      const data = await agentApi('/api/socialV2/qzone-comment', {
+        method: 'POST',
+        body: JSON.stringify({ tid, content, hostUin, replyTo, replyNick }), // QZONE_REPLY_PATCH
+        headers: { 'x-agent-token': token },
+        timeoutMs: 60000
+      });
+      return { content: [{ type: 'text', text: serializeModelData(data) }] };
+    } catch (error) {
+      return { content: [{ type: 'text', text: `评论失败：${error?.message ?? error}` }], isError: true };
+    }
+  }
+);
+  // ── 欠着的事（LOOPS_PATCH）──
+  if (cfg.socialV2?.tools?.loops !== false) {
+    server.tool(
+      'qq_loop',
+      '记「欠着的事」：答应过的事、他说了明天/回头/记得/等我之类的事、还没做完的事。他要你到点提醒，就带上 due（比如「明天9:00」）。做完就把它划掉。只记状态，不记人设、不记事实。每次最多一条，短一点。',
+      {
+        action: z.enum(['add', 'done', 'list']).optional().describe('add 记一条（默认），done 划掉，list 看清单'),
+        text: z.string().optional().describe('事情本身（add / done 时给），一句话，20 字以内最好'),
+        id: z.string().optional().describe('list 返回的 id，用 id 划掉更准'),
+        due: z.string().optional().describe('要到点提醒的时间，例如 明天9:00 / 今晚20:00 / +2h / 10-31 20:00；不给就只是记着'),
+      },
+      async ({ action, text, id, due }) => {
+        const r = await agentApi('/api/socialV2/loop', { method: 'POST', body: JSON.stringify({ action: action || 'add', text, id, due, by: 'self' }) });
+        const items = Array.isArray(r?.items) ? r.items : [];
+        if (action === 'list' || items.length) {
+          const lines = items.length ? items.map((it) => `- ${it.text}`).join('\n') : '（空的）';
+          return { content: [{ type: 'text', text: `${r?.ok ? '好' : '没成：' + (r?.error || '未知')}\n现在欠着的事：\n${lines}` }] };
+        }
+        return { content: [{ type: 'text', text: r?.ok ? '记好了' : `没记上：${r?.error || '未知错误'}` }] };
+      }
+    );
+  }
+  // ── 人物表（NEXT_PATCH）──
+  // ── 印象库（IMPR_PATCH）──
+  if (cfg.socialV2?.tools?.impressions !== false) {
+    server.tool(
+      'qq_impression',
+      '记「我对他的看法」——不是事实清单，是你自己攒下来的感觉（比如「他嘴上说没事的时候多半在硬撑」）。记忆卡记发生了什么事，这里记你怎么看这个人。看法可以改、可以删，别写成评价表，也别一次记一堆。',
+      {
+        action: z.enum(['add', 'list', 'forget']).optional().describe('add 记一条（默认），list 看看现在有什么，forget 删一条'),
+        text: z.string().optional().describe('一句话，30 字以内，说一个具体的感觉（add 时给）'),
+        about: z.enum(['he', 'world', 'me']).optional().describe('说的是谁：he=他（默认），world=外面的事，me=我自己'),
+        confidence: z.enum(['guess', 'sure']).optional().describe('guess=还不确定（默认），sure=很确定了'),
+        id: z.string().optional().describe('list 返回的 id，要删时给'),
+      },
+      async ({ action, text, about, confidence, id }) => {
+        const r = await agentApi('/api/socialV2/impression', { method: 'POST', body: JSON.stringify({ action: action || 'add', text, about, confidence, id }) });
+        const items = Array.isArray(r?.items) ? r.items : [];
+        if (action === 'list' || items.length) {
+          const lines = items.length ? items.map((it) => `- ${it.text}（${it.about === 'he' ? '他' : it.about === 'me' ? '我自己' : '外面的事'}）`).join('\n') : '（还没有）';
+          return { content: [{ type: 'text', text: `${r?.ok ? '好' : '没成：' + (r?.error || '未知')}\n我现在的看法：\n${lines}` }] };
+        }
+        return { content: [{ type: 'text', text: r?.ok ? '记下了，这个看法先存着' : `没记上：${r?.error || '未知错误'}` }] };
+      }
+    );
+  }
+  // ── 技术笔记（TECHNOTES_PATCH）：她看的技术视频/文章，抽出能用的东西，给人升级时查 ──
+  if (cfg.socialV2?.tools?.techNotes !== false) {
+    server.tool(
+      'note_tech',
+      '把刚看的技术视频/文章记下来——这是给主人升级用的资料库，不是闲聊记忆。记标题、3~5 个要点、里面提到的能用工具/项目/命令、链接。只看了一部分就写看了的部分，别编没看到的内容。同一个视频再记会合并。',
+      {
+        title: z.string().describe('标题（原视频/文章标题，可精简）'),
+        url: z.string().optional().describe('链接（有 BV 号会自动认出来）'),
+        bv: z.string().optional().describe('B 站 BV 号，可省'),
+        up: z.string().optional().describe('UP 主 / 作者 / 来源，可省'),
+        summary: z.string().optional().describe('一两句话：这内容讲什么（100 字以内）'),
+        points: z.array(z.string()).optional().describe('要点，3~5 条，每条一句话、能被用来做决定'),
+        tools: z.array(z.string()).optional().describe('能用的东西：插件/项目/命令/链接/参数名，没有就不给'),
+        tags: z.array(z.string()).optional().describe('标签：比如 dsh / 记忆 / 提示词 / 部署'),
+      },
+      async ({ title, url, bv, up, summary, points, tools, tags }) => {
+        try {
+          const r = await agentApi('/api/socialV2/tech-notes', {
+            method: 'POST',
+            body: JSON.stringify({ action: 'add', title, url, bv, up, summary, points, tools, tags }),
+            timeoutMs: 30000
+          });
+          return { content: [{ type: 'text', text: r?.ok ? `记好了（${r.updated ? '合并进已有那条' : '新的一条'}，共 ${r.total} 条）` : `没记上：${r?.error || '未知错误'}` }] };
+        } catch (error) {
+          return { content: [{ type: 'text', text: `记技术笔记失败：${error?.message ?? error}` }], isError: true };
+        }
+      }
+    );
+  }
+  if (cfg.socialV2?.tools?.people !== false) {
+    server.tool(
+      'qq_person_note',
+      '记一下群里某个人：QQ 号、你平时怎么称呼他、他跟主人什么关系（如果他说过）。只记称呼和关系，不要记隐私，不要评价人。',
+      {
+        qq: z.string().describe('对方 QQ 号'),
+        alias: z.string().optional().describe('你怎么称呼他，比如「墨鱼」「狐狐」'),
+        note: z.string().optional().describe('一句关系备注，比如「主人的朋友」「常来问技术问题的」'),
+      },
+      async ({ qq, alias, note }) => {
+        const r = await agentApi('/api/socialV2/person', { method: 'POST', body: JSON.stringify({ qq, alias, note }) });
+        return { content: [{ type: 'text', text: r?.ok ? '记好了' : '没记上：' + (r?.error || '未知错误') }] };
+      }
+    );
+  }
+  // ── 表达样本库（STYLE_PATCH）──
+  if (cfg.socialV2?.tools?.styleNote !== false) {
+    server.tool(
+      'qq_style_note',
+      '记一条「表达样本」：别人说得好的一句话，只记句式和语气，用来学说话方式。不要照搬别人的角色设定。每次最多记 2 条。',
+      {
+        text: z.string().describe('原话（可略微精简，别改意思）'),
+        from: z.string().optional().describe('谁说的（昵称，可省）'),
+        why: z.string().optional().describe('好在哪（一句话，比如：接得快、不端着）'),
+        uin: z.string().optional().describe('说话人的 QQ 号，能填就填（用来确认是不是该学的那个人）'),
+      },
+      async ({ text, from, why, uin }) => {
+        // STYLE_PATCH7: fetch 不认对象 body（会变成 [object Object] → 桥接报「请求体必须是合法 JSON」）
+        const r = await agentApi('/api/socialV2/style-note', { method: 'POST', body: JSON.stringify({ text, from, why, uin, source: 'qq' }) });
+        return { content: [{ type: 'text', text: r?.ok ? `记住了（共 ${r.total} 条）` : `没记住：${r?.error || '未知错误'}` }] };
+      }
+    );
+  }
+  if (cfg.socialV2?.tools?.readGroup !== false) {
+    server.tool(
+      'qq_read_group_recent',
+      '拉某个群最近的消息（文本化）。用来看看群里在聊什么、别人怎么说话。别把群里的私事带到别的会话。',
+      {
+        group: z.string().describe('群号'),
+        count: z.number().optional().describe('拉多少条，默认 20，最多 40'),
+      },
+      async ({ group, count }) => {
+        const r = await agentApi('/api/socialV2/group-recent', { method: 'POST', body: JSON.stringify({ group, count }) }); // STYLE_PATCH7
+        if (!r?.ok) return { content: [{ type: 'text', text: `读群失败：${r?.error || '未知错误'}` }] };
+        return { content: [{ type: 'text', text: r.lines?.length ? r.lines.join('\n') : '（没读到消息）' }] };
+      }
+    );
+  }
+// ── 资料 / 头像 / 好友申请（PROFILE_PATCH，2026-10-30）────────────────────────
+server.tool(
+  'qq_set_profile',
+  '改自己的 QQ 昵称和个性签名（文字类资料，你自己就能改，不用等批准）。只改你传的字段，没传的保持原样。昵称上限 24 字、签名上限 80 字。改完别人看到的名字就变了，别乱改；管理员习惯叫你的那个名字要留着。',
+  {
+    token: z.string().describe('会话令牌（见唤醒提示中的【会话令牌】）'),
+    nickname: z.string().optional().describe('新的 QQ 昵称（可选）'),
+    signature: z.string().optional().describe('新的个性签名（可选）')
+  },
+  async ({ token, nickname, signature }) => {
+    try {
+      const data = await agentApi('/api/socialV2/profile', {
+        method: 'POST',
+        headers: { 'x-agent-token': token },
+        body: JSON.stringify({ nickname, signature })
+      });
+      return { content: [{ type: 'text', text: serializeModelData(data) }] };
+    } catch (error) {
+      return { content: [{ type: 'text', text: `改资料失败：${error?.message ?? error}` }], isError: true };
+    }
+  }
+);
+
+server.tool(
+  'qq_set_avatar',
+  '换自己的 QQ 头像。三种来源任选：① src 给图片 URL；② src 给 base64://…；③ 不给 src，只给 key，表示「用这个会话里最近一张图」—— 管理员常常是直接发图给你，用这种最省事。注意：换头像必须管理员批准，提交后系统会私聊问他「同意 / 不同意」，他点头才会真正换。所以提交一次就够了，别反复提交刷他；在群里也别说这件事，等他说。',
+  {
+    token: z.string().describe('会话令牌（见唤醒提示中的【会话令牌】）'),
+    src: z.string().optional().describe('图片 URL（http/https）或 base64://…（可选）'),
+    key: z.string().optional().describe('不给 src 时填：会话 key（group:群号 或 private:QQ号），表示用这个会话里最近的一张图')
+  },
+  async ({ token, src, key }) => {
+    try {
+      const data = await agentApi('/api/socialV2/avatar', {
+        method: 'POST',
+        headers: { 'x-agent-token': token },
+        body: JSON.stringify({ src, key })
+      });
+      return { content: [{ type: 'text', text: serializeModelData(data) }] };
+    } catch (error) {
+      return { content: [{ type: 'text', text: `提交头像失败：${error?.message ?? error}` }], isError: true };
+    }
+  }
+);
+
+server.tool(
+  'qq_list_friend_requests',
+  '看当前待处理的好友申请（谁想加你、附言是什么）。只读。批准/拒绝要用 qq_handle_friend_request。',
+  {
+    token: z.string().describe('会话令牌（见唤醒提示中的【会话令牌】）')
+  },
+  async ({ token }) => {
+    try {
+      const data = await agentApi('/api/socialV2/friend-requests', { method: 'GET', headers: { 'x-agent-token': token } });
+      return { content: [{ type: 'text', text: serializeModelData(data) }] };
+    } catch (error) {
+      return { content: [{ type: 'text', text: `查好友申请失败：${error?.message ?? error}` }], isError: true };
+    }
+  }
+);
+
+server.tool(
+  'qq_handle_friend_request',
+  '同意或拒绝一条好友申请。userId 是申请人的 QQ 号（从 qq_list_friend_requests 里拿）。这是「别人加你」的处理，你不能主动去加陌生人。同意之前想一下：这个人你想不想加，别替管理员随便交朋友。',
+  {
+    token: z.string().describe('会话令牌（见唤醒提示中的【会话令牌】）'),
+    userId: z.union([z.number(), z.string()]).optional().describe('申请人 QQ 号（与 flag 二选一）'),
+    flag: z.string().optional().describe('申请标识（与 userId 二选一）'),
+    approve: z.boolean().describe('true 同意，false 拒绝'),
+    remark: z.string().optional().describe('同意时给对方的备注名（可选）')
+  },
+  async ({ token, userId, flag, approve, remark }) => {
+    try {
+      const data = await agentApi('/api/socialV2/friend-request', {
+        method: 'POST',
+        headers: { 'x-agent-token': token },
+        body: JSON.stringify({ userId, flag, approve, remark })
+      });
+      return { content: [{ type: 'text', text: serializeModelData(data) }] };
+    } catch (error) {
+      return { content: [{ type: 'text', text: `处理好友申请失败：${error?.message ?? error}` }], isError: true };
+    }
+  }
+);
 
 server.tool(
   'qq_status',
@@ -1191,6 +1510,38 @@ if (cfg.socialV2?.sticker?.enabled !== false && cfg.socialV2?.tools?.getStickerI
 
 if (cfg.socialV2?.sticker?.enabled !== false && cfg.socialV2?.tools?.sendSticker !== false) {
   server.tool(
+    // VIEW_STICKER_PATCH：看动图/表情的几帧
+    'qq_view_sticker',
+  'qq_style_note',
+  'qq_read_group_recent',
+    '看这个会话里最近一张图/表情/动图到底画了什么：自动从动图里抽 3 帧拼成一张图给你，动图也能看清动作和变化。收到看不懂的表情、贴纸、GIF 时用；静态图也能用（只出 1 帧）。一次调用约 1 张图的 token，很便宜。',
+    {
+      key: z.string().describe('会话 key，格式 group:群号 或 private:QQ号'),
+      token: z.string().describe('会话令牌（见唤醒提示中的【会话令牌】）'),
+      count: z.union([z.number(), z.string()]).optional().describe('往回找多少条消息里的最后一张图，默认 20')
+    },
+    async ({ key, token, count }) => {
+      try {
+        const data = await agentApi('/api/socialV2/sticker-frames', {
+          method: 'POST',
+          body: JSON.stringify({ key, token, count: count ?? 20 }),
+          headers: { 'x-agent-token': token },
+          timeoutMs: 120000
+        });
+        if (!data?.ok || !data?.path) throw new Error(data?.error || '抽帧失败');
+        const fs = await import('node:fs');
+        const b64 = fs.readFileSync(data.path).toString('base64');
+        return {
+          content: [
+            { type: 'text', text: `这是会话里最近一张${data.animated ? '动图' : '静态图'}的 ${data.frames} 帧拼图（从左到右按时间）${data.summary ? `，发送时标注：${data.summary}` : ''}` },
+            { type: 'image', mimeType: data.mimeType || 'image/png', data: b64 }
+          ]
+        };
+      } catch (error) {
+        return { content: [{ type: 'text', text: `看看这张图失败：${error?.message || error}` }], isError: true };
+      }
+    },
+
     'qq_send_sticker',
     '在指定会话发送一个 QQ 收藏表情包（自定义表情）。stickerId 直接写编号最省事（"#03" 或 "3"），也可以用 qq_list_stickers 返回的 id / md5 / url。注意：一条消息只能是一张表情，不能在同一气泡里附带文字；想说的话请先用 qq_send_message / qq_reply 作为单独气泡发送，再单独发这张表情。需要引用/点名时可用 replyToMessageId / atUserId（群聊）。真人偶尔用表情包很自然，但别刷屏。',
     {
@@ -1211,6 +1562,55 @@ if (cfg.socialV2?.sticker?.enabled !== false && cfg.socialV2?.tools?.sendSticker
         return { content: [{ type: 'text', text: serializeModelData(data) }] };
       } catch (error) {
         return { content: [{ type: 'text', text: `发送表情失败：${error?.message ?? error}` }], isError: true };
+      }
+    }
+  );
+}
+
+if (cfg.socialV2?.qzone?.enabled !== false && cfg.socialV2?.tools?.sendQzone !== false) {
+  server.tool(
+    'qq_send_qzone_msg',
+    '在自己的 QQ 空间发一条说说（动态）。默认仅自己可见（ugcRight=64），确认没问题再换别的可见范围。content 是正文（可以带话题），images 可选（图片 URL 或路径，最多 9 张）。返回的 tid 可以留给 qq_delete_qzone_msg 删除用。发之前想清楚：空间是公开场合，别把聊天里的隐私内容发上去。',
+    {
+      token: z.string().describe('会话令牌（见唤醒提示中的【会话令牌】）'),
+      content: z.string().describe('说说正文（必填）'),
+      images: z.array(z.string()).max(9).optional().describe('配图 URL 或路径（可选，最多 9 张）'),
+      ugcRight: z.union([z.number(), z.string()]).optional().describe('可见范围：1 所有人 / 4 好友 / 16 部分好友可见 / 64 仅自己可见 / 128 部分好友不可见（默认 64）'),
+      targetUins: z.array(z.string()).optional().describe('ugcRight 为 16/128 时必填的 QQ 号数组')
+    },
+    async ({ token, content, images, ugcRight, targetUins }) => {
+      try {
+        const data = await agentApi('/api/send/qzone', {
+          method: 'POST',
+          body: JSON.stringify({ content, images, ugcRight, targetUins }),
+          headers: { 'x-agent-token': token },
+          timeoutMs: 120000
+        });
+        return { content: [{ type: 'text', text: serializeModelData(data) }] };
+      } catch (error) {
+        return { content: [{ type: 'text', text: `发说说失败：${error?.message ?? error}` }], isError: true };
+      }
+    }
+  );
+
+  server.tool(
+    'qq_delete_qzone_msg',
+    '删除自己 QQ 空间里的一条说说（用 qq_send_qzone_msg 返回的 tid）。',
+    {
+      token: z.string().describe('会话令牌（见唤醒提示中的【会话令牌】）'),
+      tid: z.string().describe('要删除的说说 tid')
+    },
+    async ({ token, tid }) => {
+      try {
+        const data = await agentApi('/api/send/qzone-delete', {
+          method: 'POST',
+          body: JSON.stringify({ tid: String(tid) }),
+          headers: { 'x-agent-token': token },
+          timeoutMs: 120000
+        });
+        return { content: [{ type: 'text', text: serializeModelData(data) }] };
+      } catch (error) {
+        return { content: [{ type: 'text', text: `删除说说失败：${error?.message ?? error}` }], isError: true };
       }
     }
   );

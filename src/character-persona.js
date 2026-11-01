@@ -221,7 +221,9 @@ export function readPersonaLayerText(kind = 'core', scene = '') {
     ? layers.daily
     : kind === 'scene'
       ? (layers.scenes?.[scene] || '')
-      : layers.core;
+      : kind === 'tone' // TONE_PATCH：0.8.x 漏了 tone 分支，会把语气层当成核心
+        ? layers.tone
+        : layers.core;
   try { return file ? fs.readFileSync(file, 'utf8') : ''; } catch { return ''; }
 }
 

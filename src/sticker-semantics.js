@@ -435,9 +435,12 @@ export function ensureStickerIndex(entries) {
 // 匹配分 = 情绪相似（含相邻情绪）+ 内容向量相似 + 关键词命中，再叠加使用倾向 / 近期重复惩罚。
 // 权重是拍出来的，但经过 fixtures 校准：情绪权重最高（用户要的是「情绪相近」），
 // 内容权重次之（同一情绪下要挑对画面），关键词只做微调。
-const W_EMOTION = 0.46;
-const W_CONTENT = 0.38;
-const W_KEYWORD = 0.16;
+// STICKER_W_PATCH：7 张小库 + 描述很短时，TF-IDF 余弦普遍偏低，
+// 原权重(0.46/0.38/0.16)会让「太菜了」这类关键词明确的场景一个都挑不到。
+// 改成偏情绪/关键词，内容权重压低。
+const W_EMOTION = 0.44;
+const W_CONTENT = 0.28;
+const W_KEYWORD = 0.28;
 const DEFAULT_MIN_SCORE = 0.34;
 const DEFAULT_TOP_K = 3;
 

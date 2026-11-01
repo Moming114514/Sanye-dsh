@@ -22,9 +22,7 @@ import { SENSITIVE_RE } from './sensitive.js';
 import { looksLikeUnfinished } from './v2-wait.js';
 import { compactModelMessage } from './qq-model-view.js';
 import {
-  historyWatermark, normalizeHistoryConfig,
-  selectMissedHistory, summarizeHistoryCatchup,
-} from './history-catchup.js';
+  historyWatermark, normalizeHistoryConfig, selectMissedHistory, summarizeHistoryCatchup, } from './history-catchup.js';
 import { safeFetchBuffer, looksLikeImageBuffer } from './safe-fetch.js';
 import { discoverDshBaseUrl, isLoopbackBaseUrl, probeDshBaseUrl } from './dsh-port.js';
 import { AUDIO_EXTS, cleanupTemp, describeAudio, inspectAudio, listAudioFiles, parseTargetKey, processAudioVolume, resolveAudioProcessing, resolveAudioSource, safeJoinLibrary } from './send-voice-lib.js';
@@ -37,28 +35,16 @@ import { hardenDir, manualDirCommand } from './state-acl.mjs';
 import { extractForwardIds, forwardIdFromData, sanitizeForwardId, formatForwardResponse } from './forward.js';
 import { buildProvenanceBlock, buildSelfIdentityBlock, selfIdentityPath } from './self-identity.js';
 import {
-  GREETING_RETRY_MS, buildMorningGreetingPrompt, localDateKey, parseGreetingTime,
-  pickGreetingTheme, planMorningGreeting,
-} from './greeting-schedule.js';
+  GREETING_RETRY_MS, buildMorningGreetingPrompt, localDateKey, parseGreetingTime, pickGreetingTheme, planMorningGreeting, } from './greeting-schedule.js';
 import {
-  analyzePersona, applyPurposeOutcome, buildPurposePrompt, collectMaterials, deriveDrives,
-  ensurePurposeDay, ensurePurposeSchedule, evaluatePurposeTick, formGoalHypotheses,
-  markPurposeDelivered, markPurposeSkip, minePurposeSeeds, normalizePurposeConfig,
-  normalizePurposeState, parsePurposeMemo, planNextFire, selectPurpose, summarizePurposeState,
-} from './purpose-engine.js';
-import { resolvePriceTable } from './model-prices.js';
+  analyzePersona, applyPurposeOutcome, buildPurposePrompt, collectMaterials, deriveDrives, ensurePurposeDay, ensurePurposeSchedule, evaluatePurposeTick, formGoalHypotheses, markPurposeDelivered, markPurposeSkip, minePurposeSeeds, normalizePurposeConfig, normalizePurposeState, parsePurposeMemo, planNextFire, selectPurpose, summarizePurposeState, } from './purpose-engine.js';
+import { isPeakAt, resolvePriceTable } from './model-prices.js';
 import {
-  DEFAULT_QQ_FISH_GUARD, appendFishGuardTrigger, assessFishDensity, fishGuardPromptLine, fishGuardReasonText,
-  isFishName, normalizeQqFishGuard,
-} from './fish-guard.js';
+  DEFAULT_QQ_FISH_GUARD, appendFishGuardTrigger, assessFishDensity, fishGuardPromptLine, fishGuardReasonText, isFishName, normalizeQqFishGuard, } from './fish-guard.js';
 import {
-  assessConversationClosure, classifyMessage, closeGate, closurePromptBlock, closureStatus,
-  closureSuppressesWake, makeClosureRecord, normalizeClosureConfig,
-  normalizeClosureRecord, reopenClosure,
-} from './conversation-closure.js';
+  assessConversationClosure, classifyMessage, closeGate, closurePromptBlock, closureStatus, closureSuppressesWake, makeClosureRecord, normalizeClosureConfig, normalizeClosureRecord, reopenClosure, } from './conversation-closure.js';
 import {
-  adminFromQqConfig, adminMarker, adminPromptBlock,
-} from './admin-identity.js';
+  adminFromQqConfig, adminMarker, adminPromptBlock, } from './admin-identity.js';
 import { isOwnerOnlyFrame, canConsumePending, buildQuestionAnswers } from './question-answers.js';
 import { createOwnerAudit } from './owner-audit.js';
 import { createTokenLedger } from './token-ledger.js';
@@ -69,12 +55,13 @@ import { pickPeerAlias, buildPeerAliasTag } from './callname.js';
 import { buildPersonaIdentity, personaNameFromCard } from './persona-identity.js';
 import { evaluateWakeBudget, evaluateOutbound, localDayStart } from './token-guard.js';
 import {
-  blockMessage, evaluateBudget, localDayKey, readBudget, readDailyUsage,
-} from './token-budget.js';
+  blockMessage, evaluateBudget, localDayKey, readBudget, readDailyUsage, } from './token-budget.js';
 import { createBiliMemory } from './bili-memory.js';
 import {
-  appendMemoryInboxEvent, looksNoteworthyMessage, resolveMemoryCardPaths,
-} from './memory-card.js';
+  appendMemoryInboxEvent, looksNoteworthyMessage, resolveMemoryCardPaths, loadMemoryCard, saveMemoryCardOutputs, touchMemories } from './memory-card.js';
+import { fuzzyRecallFiles } from './recall-vec.js'; // RECALL_FUZZY_PATCH
+import { impressionsBlock, impressionsData, addImpression, forgetImpression, impressionsPath } from './impressions.js'; // IMPR_PATCH
+import { addTechNote, forgetTechNote, searchTechNotes, techNotesData, techNotesBlock, techNotesPath } from './tech-notes.js'; // TECHNOTES_PATCH
 import {
   activeMemoryPaths, activePersonaFile, activePlatformStateDir, characterPaths, readCurrentCharacter,
   readPersonaLayerText,
@@ -90,6 +77,12 @@ import { createBiliDynamicsSync } from './bili-dynamics.js';
 import { createBiliShareScheduler } from './bili-share-scheduler.js';
 import { createBiliCardSender, normalizeCardMode } from './bili-card.js';
 import { fetchVideoInfo } from './bili-api.js';
+import { moodObserve, moodLine, moodTick, moodDiaryTick, moodStatusText, moodPublic, moodUpdate } from './mood-lib.js'; // MOODV2_IMPORT2
+import { pickStudyVideo, studyStatusText, studyCfg, readStudyState, writeStudyState, hasWatched, addToFolder, favoriteByBvid } from './bili-study.js';
+import { appendStyleSample, readStyleSamples, styleStats, styleSamplesBlock, styleObserve, styleTick, styleCandidates, styleSetStatus } from './style-lib.js'; // STYLE_PATCH STYLE_GATE_PATCH
+import { loopsBlock, loopsMeta, addLoop, doneLoop, listLoops } from './loops-lib.js'; // LOOPS_PATCH
+import { parseDue, dueReminders, markReminded, learnPeople, notePerson, peopleBlock, noteAlive, lastEventAgo, alertState, setAlert, reportState, markReported, fmtReport } from './next-lib.js'; // NEXT_PATCH
+import { transcribeRecord, voiceTextOf } from './voice-lib.js'; // VOICE_PATCH // BILISTUDY_PATCH BILISTUDY_PATCH2
 import {
   loadSlang,
   saveSlang,
@@ -125,6 +118,88 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const STATE_DIR = path.join(ROOT, 'state');
+
+// QUIET_PATCH：夜间 / 主动重启时，不把「断线自愈」发到 QQ（只记日志）
+const QUIET_MARK_FILE = path.join(STATE_DIR, 'restart-quiet.json');
+let quietMarkRead = false;
+function isQuietHour(now = new Date()) {
+  const h = now.getHours() + now.getMinutes() / 60;
+  return h >= 23.5 || h < 9;
+}
+function tookRestartMark() {
+  if (quietMarkRead) return false;
+  quietMarkRead = true;
+  try {
+    const raw = fs.readFileSync(QUIET_MARK_FILE, 'utf8');
+    fs.unlinkSync(QUIET_MARK_FILE);
+    const ts = Number((JSON.parse(raw) || {}).ts || 0);
+    return ts > 0 && Date.now() - ts < 15 * 60 * 1000;
+  } catch { return false; }
+}
+
+// ── 主人开关机：state/qq-off.json 为真时，桥接不投递任何消息、不调模型 ──────────
+const QQ_OFF_FILE = path.join(STATE_DIR, 'qq-off.json');
+let qqOffPendingAt = 0;
+
+function qqIsOff() {
+  try {
+    const raw = fs.readFileSync(QQ_OFF_FILE, 'utf8');
+    return JSON.parse(raw || '{}').off === true;
+  } catch {
+    return false;
+  }
+}
+
+function qqSetOff(off, by) {
+  try {
+    fs.mkdirSync(STATE_DIR, { recursive: true });
+    fs.writeFileSync(QQ_OFF_FILE, JSON.stringify({ off: !!off, by: String(by == null ? '' : by), at: new Date().toISOString() }, null, 2));
+  } catch (error) {
+    log('[开关机] 写状态失败：' + (error && error.message ? error.message : error));
+  }
+}
+
+// ── QQ 三态：open 正常 / owneronly 只听主人 / off 关机（沿用 qq-off.json）─────
+const QQ_MODE_FILE = path.join(STATE_DIR, 'qq-mode.json');
+
+function qqMode() {
+  if (qqIsOff()) return 'off';
+  try {
+    const mode = JSON.parse(fs.readFileSync(QQ_MODE_FILE, 'utf8') || '{}').mode;
+    return mode === 'owneronly' ? 'owneronly' : 'open';
+  } catch {
+    return 'open';
+  }
+}
+
+function qqSetMode(mode, by) {
+  const next = mode === 'owneronly' ? 'owneronly' : 'open';
+  try {
+    fs.mkdirSync(STATE_DIR, { recursive: true });
+    fs.writeFileSync(QQ_MODE_FILE, JSON.stringify({ mode: next, by: String(by == null ? '' : by), at: new Date().toISOString() }, null, 2));
+  } catch (error) {
+    log('[模式] 写状态失败：' + (error && error.message ? error.message : error));
+  }
+}
+
+// ── OWNERONLY_GATE_PATCH ─────────────────────────────────────────────────────
+// 「只听主人」原来只拦了群消息触发的那一条路（evaluateWakeTriggerV2），
+// 补唤醒、主动机会、睡眠到期、回复检查这些定时唤醒照样会叫醒群里的她。
+// 这里记下每个群最后一次说话的人：open 时不管，owneronly 时群唤醒一律要求「他最近说过话」。
+const lastGroupSpeaker = new Map();
+function noteGroupSpeaker(key, uin) {
+  try {
+    if (!String(key || '').startsWith('group:')) return;
+    lastGroupSpeaker.set(String(key), { uin: String(uin == null ? '' : uin), at: Date.now() });
+  } catch {}
+}
+function ownerOnlyGroupAllowed(key) {
+  const rec = lastGroupSpeaker.get(String(key));
+  if (!rec) return false;
+  if (Date.now() - Number(rec.at || 0) > 6 * 60 * 60 * 1000) return false;
+  return rec.uin === String(cfg.ownerQQ ?? '');
+}
+
 const STATE_FILE = path.join(STATE_DIR, 'sessions.json');
 const ROLE_STATE_FILE = path.join(STATE_DIR, 'current-role.json');
 const GROUP_POLICY_FILE = path.join(STATE_DIR, 'group-policy.json');
@@ -585,6 +660,8 @@ function presetStatus(name) {
 // 社交模式“静默标记”：模型输出该标记时，桥接不把内容发到 QQ。
 // 用于让 AI 在“不想接话/潜水”时有合法沉默出口，而不是写“（内心戏）”被当成消息发出去。
 const SILENT_MARKER = '[SILENT]';
+// STYLE_PATCH13: 黑箱模式——某些内部任务（如学说法）不希望她的回复发到 QQ
+const suppressOutboundOnce = new Map(); // STYLE_PATCH14: key -> 过期时间戳
 function isSilentMarker(text) {
   return /^\s*\[SILENT\]\s*$/i.test(String(text ?? '').trim());
 }
@@ -917,6 +994,15 @@ function loadConfig() {
         listStickers: true,
         getStickerImage: true,
         sendSticker: true,
+        sendQzone: true,
+        recallMemory: true,
+        diary: true,
+    setProfile: true,
+    setAvatar: true,
+    friends: true,
+        setProfile: true,
+        setAvatar: true,
+        friends: true,
         setStickerRemark: false,
         stickerNote: true,
         collectSticker: true,
@@ -973,6 +1059,7 @@ function loadConfig() {
         directBypassGap: true,        // 被 @/叫到/引用时越过这个最小间隔（每日/花费上限仍生效）
         maxOutboundPerTurn: 8,       // 一次醒来最多发 8 条（burst/单发/表情/拍一拍/语音都算）
         maxDailyCostCNY: 8,          // 近 24h 全局花费上限；0 = 不限
+        downgradeAtRatio: 0.5,        // 花费到额度的这个比例后自动降级（群里只回 @）；0.5 = 一半
       },
       wait: {
         defaultMs: 30000,
@@ -1070,6 +1157,10 @@ function loadConfig() {
     listStickers: true,
     getStickerImage: true,
     sendSticker: true,
+    sendQzone: true,
+    setProfile: true,
+    setAvatar: true,
+    friends: true,
     setStickerRemark: false,
     stickerNote: true,
     collectSticker: true,
@@ -1546,11 +1637,21 @@ async function segmentsToText(segments, options = {}) {
         }
         break;
       }
-      case 'face': out.push(`[表情${d.id ?? ''}]`); break;
+      // FACE_NAME_PATCH QQ 小表情：客户端会带 raw.faceText（如 "/捂脸"），老代码只看 id 所以模型只见到 [表情264]
+      case 'face': {
+        const rawText = String(d?.raw?.faceText ?? d?.raw?.faceName ?? '').replace(/^\//, '').trim();
+        const faceName = String(d.summary ?? '').trim() || rawText;
+        out.push(faceName ? `[表情:${faceName}]` : (d.id != null && d.id !== '' ? `[表情#${d.id}]` : '[表情]'));
+        break;
+      }
       // 市场表情（mface）在部分网关实现里出现：有 summary 就用它，别让模型只看到 "[mface]"。
-      case 'mface': out.push(`[表情${d.summary ? `:${d.summary}` : ''}]`); break;
+      case 'mface': { const n = String(d.summary ?? d?.raw?.faceName ?? '').trim(); out.push(n ? `[表情:${n}]` : '[表情]'); break; }
       case 'image': out.push('[图片]'); break;
-      case 'record': out.push('[语音]'); break;
+      case 'record': { // VOICE_PATCH
+        const vt = voiceTextOf(d?.file);
+        out.push(vt ? '[语音转写]' + vt : '[语音]');
+        break;
+      }
       case 'video': out.push('[视频]'); break;
       case 'file': out.push(`[文件${d.name ?? ''}]`); break;
       case 'reply': {
@@ -1643,7 +1744,7 @@ function extractMediaFromSegments(segments) {
         kind: 'face',
         faceId: String(d.id ?? ''),
         url: String(d.url ?? ''),
-        summary: sanitizeMediaSummary(d.summary)
+        summary: sanitizeMediaSummary(d.summary || String(d?.raw?.faceText ?? d?.raw?.faceName ?? '').replace(/^\//, '')), // FACE_NAME_PATCH
       });
     }
   }
@@ -1863,6 +1964,19 @@ async function main() {
 
   function stickerEnabled() {
     return cfg.socialV2?.sticker?.enabled !== false;
+  }
+
+  // QQ 空间说说（QZONE_PATCH）
+  function qzoneEnabled() {
+    return cfg.socialV2?.qzone?.enabled !== false;
+  }
+
+  function qzoneUgcRight(value) {
+    const allowed = [1, 4, 16, 64, 128];
+    const n = Number(value);
+    if (allowed.includes(n)) return n;
+    const d = Number(cfg.socialV2?.qzone?.defaultUgcRight);
+    return allowed.includes(d) ? d : 64;
   }
 
   function saveStickerStoreSafe() {
@@ -2633,7 +2747,116 @@ async function main() {
     return stickerEntries.find((e) => e.id === entry.id) || null;
   }
 
+  // STICKER_TMPPATH_PATCH
+  // NapCat 的 add_custom_face 只接受「容器内可见的本地路径」（base64:// 会被原样 stat → ENAMETOOLONG）。
+  // /home/dsh/napcat/config 挂载进容器 /app/napcat/config，所以把字节写到这里，再传容器内路径。
+  const STICKER_TMP_HOST = '/home/dsh/napcat/config/_sticker-tmp';
+  const STICKER_TMP_CONTAINER = '/app/napcat/config/_sticker-tmp';
+  function stickerTempPath(buffer, mimeType = '') {
+    try {
+      fs.mkdirSync(STICKER_TMP_HOST, { recursive: true, mode: 0o755 });
+      // 顺手清理 30 分钟前的临时文件
+      for (const name of fs.readdirSync(STICKER_TMP_HOST)) {
+        const p = path.join(STICKER_TMP_HOST, name);
+        try {
+          if (Date.now() - fs.statSync(p).mtimeMs > 30 * 60 * 1000) fs.unlinkSync(p);
+        } catch {}
+      }
+      const m = String(mimeType || '').toLowerCase();
+      const ext = m.includes('gif') ? 'gif' : m.includes('png') ? 'png' : m.includes('webp') ? 'webp' : 'jpg';
+      const name = 'qc-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.' + ext;
+      const hostPath = path.join(STICKER_TMP_HOST, name);
+      fs.writeFileSync(hostPath, buffer, { mode: 0o644 });
+      try { fs.chmodSync(hostPath, 0o644); } catch {}
+      return STICKER_TMP_CONTAINER + '/' + name;
+    } catch (error) {
+      throw new Error('写入临时表情文件失败（NapCat 需要容器内可读路径）: ' + (error?.message ?? error));
+    }
+  }
+
+  // STICKER_CAP_PATCH：表情库上限。超过 maxItems 就淘汰「用得最少、最旧」的，
+  // 并同步从 QQ 收藏里删掉（否则下次 sync 又会把它们拉回来）。
+  function stickerMaxItems() {
+    const raw = Number(cfg.socialV2?.sticker?.maxItems);
+    if (!Number.isFinite(raw)) return 50;
+    return Math.max(5, Math.min(200, Math.round(raw)));
+  }
+
+  async function pruneStickerLibrary(protectId = '', opts = {}) {
+    const dryRun = opts.dryRun === true;
+    const capOverride = Number(opts.cap);
+    const cap = Number.isFinite(capOverride) && capOverride > 0 ? Math.round(capOverride) : stickerMaxItems();
+    const list = Array.isArray(stickerEntries) ? stickerEntries : [];
+    if (list.length <= cap) return { total: list.length, cap, removed: 0, dryRun, candidates: [] };
+    const score = (e) => [Number(e.useCount) || 0, Number(e.lastUsedAt) || 0, Number(e.no) || 0];
+    const ranked = [...list].sort((a, b) => {
+      const sa = score(a); const sb = score(b);
+      return sb[0] - sa[0] || sb[1] - sa[1] || sb[2] - sa[2];
+    });
+    const keep = new Set(ranked.slice(0, cap).map((e) => String(e.id)));
+    if (protectId) keep.add(String(protectId));
+    const drop = list.filter((e) => !keep.has(String(e.id)));
+    const candidates = drop.map((e) => ({
+      id: e.id,
+      no: e.no ?? null,
+      useCount: Number(e.useCount) || 0,
+      note: String(e.localNote || e.desc || e.content || '').slice(0, 24)
+    }));
+    if (!drop.length) return { total: list.length, cap, removed: 0, dryRun, candidates: [] };
+    if (dryRun) return { total: list.length, cap, removed: 0, dryRun, candidates };
+    log('[sticker] 表情库 ' + list.length + ' 张，超过上限 ' + cap + '，淘汰 ' + drop.length + ' 张');
+    let removed = 0;
+    for (const e of drop) {
+      try {
+        const res = await bot.request('delete_custom_face', { res_id: e.resId || e.id });
+        if (res && res.status === 'ok') {
+          removed++;
+          log('[sticker] 已淘汰 #' + (e.no ?? '?') + '「' + String(e.localNote || e.desc || e.content || '').slice(0, 16) + '」（用过 ' + (e.useCount || 0) + ' 次）');
+        } else {
+          log('[sticker] 淘汰失败 #' + (e.no ?? '?') + ': ' + (res?.wording || res?.retcode || 'unknown'));
+        }
+      } catch (error) { log('[sticker] 淘汰异常:', error?.message ?? error); }
+    }
+    await syncStickerLibrary(true);
+    return { total: (stickerEntries || []).length, cap, removed, dryRun, candidates };
+  }
+
   // 收藏聊天里的一张表情（add_custom_face），并按 AI 看到的含义写简短备注（modify_custom_face）。
+  // STICKER_AUTOADD_PATCH：聊天里收到的表情自动记进本地库（只进本地库，不入 QQ 收藏）。
+  // 目的：让「表情待补」提示有东西可提示；真正的看图补描述仍由 AI 自己用工具完成。
+  function autoKeepStickerFromMedia(media) {
+    try {
+      const sc = cfg.socialV2?.sticker ?? {};
+      const ccfg = sc.collect ?? {};
+      if (sc.enabled === false || ccfg.enabled === false) return;
+      if (!media || (media.kind !== 'sticker' && media.kind !== 'image')) return;
+      const id = String(media.emojiId || media.resId || '').trim();
+      if (id.length < 8) return;            // 普通小黄脸（face）不存，只收表情包/市场表情
+      if (!media.url && !media.file) return;
+      if (stickerEntries.some((e) => e && e.id === id)) return;
+      const maxItems = Math.max(1, Number(sc.maxItems) || 50);
+      if (stickerEntries.length >= maxItems) return;
+      const now = Date.now();
+      const perMin = Math.max(0, Number(ccfg.maxPerMinute) || 2);
+      const perHour = Math.max(0, Number(ccfg.maxPerHour) || 10);
+      const kept = stickerEntries.filter((e) => e && e.source === 'collected' && e.collectedAt);
+      if (kept.filter((e) => now - Number(e.collectedAt) < 60_000).length >= perMin) return;
+      if (kept.filter((e) => now - Number(e.collectedAt) < 3_600_000).length >= perHour) return;
+      stickerEntries.push({
+        id, resId: id, url: String(media.url || ''), desc: '', localNote: '',
+        emotion: 'neutral', emotionAlt: [], content: '', keywords: [], tags: [],
+        usage: '', source: 'collected', collectedAt: now,
+        createdAt: new Date(now).toISOString(), updatedAt: new Date(now).toISOString()
+      });
+      const idx = ensureStickerIndex(stickerEntries);
+      stickerEntries.splice(0, stickerEntries.length, ...idx.entries);
+      saveStickerStoreSafe();
+      log(`[表情库] 收到一张新表情，已记下待补描述（${id.slice(-10)}）`);
+    } catch (error) {
+      log('[表情库] 收录失败:', error?.message ?? error);
+    }
+  }
+
   async function collectStickerV2(key, messageRef, remark, meta = {}) {
     const assertSendAllowed = captureSendGuard(key);
     const st = getSocialV2State(key);
@@ -2644,18 +2867,19 @@ async function main() {
     if (!mediaList.length) throw new Error('这条消息没有可收藏的图片/表情');
     const media = mediaList[0];
     let file = '';
-    if (media?.kind === 'image') {
+    // STICKER_KIND_PATCH：'sticker'（QQ 表情/动图）也要走图片字节这条路，否则动图收藏必失败
+    if (media?.kind === 'image' || media?.kind === 'sticker') {
       // 优先取图片字节转 base64，避免 SnowLuma 直接下载聊天图片 URL 失败（带签名/防盗链）。
       // 严禁把消息里的原始 media.url / media.file 直接交给 OneBot 去下载：那会绕过 SSRF/本地文件防护。
       const img = await fetchOneBotImage(media);
       if (img?.buffer) {
-        file = 'base64://' + img.buffer.toString('base64');
+        file = stickerTempPath(img.buffer, img.mimeType);
       } else {
         throw new Error('无法安全获取该图片字节，已拒绝收藏');
       }
     } else if (media?.kind === 'face') {
       const face = await fetchFaceMedia(media);
-      if (face?.buffer) file = 'base64://' + face.buffer.toString('base64');
+      if (face?.buffer) file = stickerTempPath(face.buffer, face.mimeType);
     }
     if (!file) throw new Error('无法获取该表情的图片源');
     assertSendAllowed();
@@ -2663,15 +2887,28 @@ async function main() {
     if (!addRes || addRes.status !== 'ok' || addRes.retcode !== 0) {
       throw new Error(`add_custom_face 失败: ${addRes?.wording || addRes?.retcode || 'unknown'}`);
     }
-    const emojiId = String(addRes.data?.emoji_id || '');
-    if (!emojiId) throw new Error('add_custom_face 未返回 emoji_id');
+    let emojiId = String(addRes.data?.emoji_id || '');
+    if (!emojiId) {
+      // 该版本 NapCat 不返回 emoji_id：用「收藏前/后 id 差集」找出新加的那张。
+      const beforeIds = new Set((stickerEntries || []).map((e) => String(e.id)));
+      const syncedNow = await syncStickerLibrary(true);
+      const addedEntry = (syncedNow?.entries ?? stickerEntries).find((e) => !beforeIds.has(String(e.id)));
+      emojiId = String(addedEntry?.id || '');
+      if (emojiId) log('[sticker] add_custom_face 未返回 emoji_id，已通过差集识别新表情 ' + emojiId);
+    }
+    if (!emojiId) throw new Error('add_custom_face 成功但没有拿到新表情编号，请用 qq_list_stickers 复查');
     const maxRemarkChars = Math.max(1, Number(cfg.socialV2?.sticker?.collect?.maxRemarkChars) || 20);
     const cleanRemark = String(remark ?? '').trim().slice(0, maxRemarkChars);
     if (cleanRemark) {
       assertSendAllowed();
-      const modRes = await bot.request('modify_custom_face', { emoji_id: emojiId, desc: cleanRemark });
-      if (!modRes || modRes.status !== 'ok' || modRes.retcode !== 0) {
-        log(`[sticker] 收藏成功但备注失败 ${emojiId}: ${modRes?.wording || modRes?.retcode || 'unknown'}`);
+      // STICKER_REMARK_QUIET：有些 NapCat 没实现 modify_custom_face，会一直报「备注失败」但其实无影响
+      // （我们自己库里有描述）。失败一次就记住，之后不再调用、也不再刷日志。
+      if (!globalThis.__stickerRemarkUnsupported) {
+        const modRes = await bot.request('modify_custom_face', { emoji_id: emojiId, desc: cleanRemark });
+        if (!modRes || modRes.status !== 'ok' || modRes.retcode !== 0) {
+          globalThis.__stickerRemarkUnsupported = true;
+          log(`[sticker] 这个 NapCat 不支持给收藏表情写备注（${modRes?.wording || modRes?.retcode || 'unknown'}），以后静默跳过，描述只写本地库`);
+        }
       }
     }
     // 强制刷新本地库，让刚收藏的表情立即可用（并在合并时拿到编号 + 兜底情绪/内容）。
@@ -2686,6 +2923,8 @@ async function main() {
         keywords: meta.keywords
       }) || entry;
     }
+    // STICKER_CAP_PATCH：收藏完顺手把超过上限的旧表情淘汰掉
+    try { await pruneStickerLibrary(emojiId); } catch (error) { log('[sticker] 淘汰旧表情失败:', error?.message ?? error); }
     return { emojiId, entry: tagged || null, remark: cleanRemark };
   }
 
@@ -2977,10 +3216,15 @@ async function main() {
       .map(publicSlangEntry);
   }
 
-  function withSlangContext(promptText) {
+  function withSlangContext(promptText, moodKey) { // MOODV2_SIG
     const now = new Date();
     const timeLine = `【当前时间】${now.toLocaleString('zh-CN', { hour12: false })}（${Intl.DateTimeFormat().resolvedOptions().timeZone}）`;
     const parts = [timeLine];
+    try {
+      const _mk = String(moodKey || '').startsWith('group:') ? 'group' : 'private';
+      const _ml = moodLine(promptText, _mk);
+      if (_ml) parts.push(_ml); // MOODV2_INJECT
+    } catch {}
     if (cfg.slang?.enabled !== false) {
       const block = buildSlangContext(slangEntries, cfg.slang?.injectMax ?? 8);
       if (block) parts.push(block);
@@ -3845,9 +4089,14 @@ async function main() {
     if (currentMode !== 'reserved2' || cfg.socialV2?.enabled === false) return;
     const timer = setTimeout(() => {
       try {
-        const all = pickBacklogSessions(socialV2.conversations.entries(), {
+        // BACKLOG_PRIVATE_ONLY_PATCH：重启补唤醒只补私聊。群里积压的旧消息等真正有人叫她才处理，
+        // 否则每次重启都冷启动 2~3 个群，单轮 ¥0.2 级别的缓存未命中全从这里来。
+        const allPicked = pickBacklogSessions(socialV2.conversations.entries(), {
           isAllowed: (key) => isSessionAllowedInCurrentMode(key),
         });
+        const all = allPicked.filter((x) => String(x.key || '').startsWith('private:'));
+        const skippedGroups = allPicked.length - all.length;
+        if (skippedGroups > 0) log(`[reserved2] 启动补唤醒：跳过 ${skippedGroups} 个群（只补私聊；群里等有人叫她再说）`);
         // 限量：默认最多 3 个会话（按未读条数降序），避免重启后一次性叫醒几十个群、白烧 token。
         // 从 5 降到 3 的依据：Phase 1A 样本里 backlog 是最贵的唤醒类型（冷启动）。
         const cap = Math.max(1, Math.min(20, Number(cfg.socialV2?.wake?.backlogMaxSessions) || 3));
@@ -4282,7 +4531,10 @@ async function main() {
         if (a.length !== b.length) return false;
         return crypto.timingSafeEqual(a, b);
       })();
-      if (consoleToken && !tokenMatches) {
+      // STYLE_PATCH4: 学说法相关端点允许本机回环进程免控制台令牌（MCP 子进程与本服务同机）
+      const loopbackStyleApi = /^(127\.0\.0\.1|::1|::ffff:127\.0\.0\.1)$/.test(String(req.socket?.remoteAddress || ''))
+        && /^\/api\/socialV2\/(style-note|style-list|style-candidate|group-recent|loop|person)$/.test(url.pathname);
+      if (consoleToken && !tokenMatches && !loopbackStyleApi) {
         if (req.method === 'GET' && url.pathname === '/') {
           res.writeHead(401, { 'content-type': 'text/html; charset=utf-8', ...SECURITY_HEADERS });
           res.end('<!doctype html><meta charset="utf-8"><title>需要令牌</title><script>const t=prompt(\'请输入控制台访问令牌\');if(t)location.href=\'/?token=\'+encodeURIComponent(t);</script>');
@@ -4320,7 +4572,13 @@ async function main() {
         if (!hasToken) {
           const tokenlessAgentAllowed = url.pathname === '/api/status'
             || url.pathname.startsWith('/api/send/')
-            || url.pathname.startsWith('/api/images/');
+            || url.pathname.startsWith('/api/images/')
+            // STYLE_PATCH5: 学说法 / 跨群读取三个端点（只读或只写本地样本，不触碰会话令牌面）
+            || url.pathname === '/api/socialV2/group-recent'
+            || url.pathname === '/api/socialV2/style-list'
+            || url.pathname === '/api/socialV2/style-note'
+            || url.pathname === '/api/socialV2/loop'
+            || url.pathname === '/api/socialV2/person';
           if (!tokenlessAgentAllowed) {
             sendJson({ ok: false, error: '未授权：该接口的智能体调用必须携带有效的会话令牌' }, 403);
             return;
@@ -4433,6 +4691,64 @@ async function main() {
         if (req.method === 'GET' && url.pathname === '/api/owner-audit') {
           const limit = Math.max(1, Math.min(200, Number(url.searchParams.get('limit')) || 50));
           sendJson({ ok: true, entries: ownerAudit.readTail(limit), health: ownerAudit.health, path: ownerAudit.path });
+          return;
+        }
+        // 调试：查看/触发花费降级（?notify=1 立即发一次通知，用于验证）
+        // DBGPROMPT_PATCH：仅控制台令牌可用，手动给某个 QQ 会话投递提示词
+        if (req.method === 'POST' && url.pathname === '/api/debug/prompt') {
+          const want = String(url.searchParams.get('token') || '');
+          if (!want || want !== String(cfg.consoleToken || '')) { sendJson({ ok: false, error: '令牌无效' }, 403); return; }
+          const body = await readBody();
+          const key0 = String(body.key || '').trim();
+          const text0 = String(body.text || '').trim();
+          if (!key0 || !text0) { sendJson({ ok: false, error: 'key 和 text 必填' }, 400); return; }
+          try {
+            // RELATEDMEM_PATCH：?related=1 时把“这句话会挑出的记忆”一起送进去，方便验证
+            const relTest = String(url.searchParams.get('related') || '') === '1';
+            const relBlock = relTest ? relatedMemoryBlock(text0) : '';
+            await deliverPrompt(key0, relBlock ? `${text0}\n\n${relBlock}` : text0);
+            sendJson({ ok: true, key: key0, relatedChars: relBlock.length, relatedBlock: relBlock });
+          } catch (e) {
+            sendJson({ ok: false, error: String(e?.message || e) }, 500);
+          }
+          return;
+        }
+
+        if (req.method === 'GET' && url.pathname === '/api/debug/promise') { // PROMISE_PATCH
+          const want = String(url.searchParams.get('token') || '');
+          if (!want || want !== String(cfg.consoleToken || '')) { sendJson({ ok: false, error: '令牌无效' }, 403); return; }
+          const s = String(url.searchParams.get('text') || '').replace(/\s+/g, ' ').trim();
+          const hitWhen = PROMISE_RE_WHEN.test(s);
+          const hitAct = PROMISE_RE_ACT.test(s);
+          const selfPromise = /(我|咱)(去|先|这就|回头)?(帮你|给你|替你)/.test(s);
+          const selfSubject = /(我|咱|帮你|给你|替你)/.test(s);
+          const done = PROMISE_DONE.test(s);
+          const will = !done && s.length >= 5 && s.length <= 200 && ((hitWhen && hitAct && selfSubject) || selfPromise);
+          const sent = will ? String(s.split(/[。！？!?\n]/).map((x) => x.trim()).filter(Boolean).find((x) => PROMISE_RE_WHEN.test(x) || /(帮你|给你|替你)/.test(x)) || s).slice(0, 60) : '';
+          sendJson({ ok: true, text: s, will, when: hitWhen, act: hitAct, selfPromise, done, captured: sent });
+          return;
+        }
+        if (req.method === 'GET' && url.pathname === '/api/debug/related') { // RELATEDMEM_PATCH
+          const want = String(url.searchParams.get('token') || '');
+          if (!want || want !== String(cfg.consoleToken || '')) { sendJson({ ok: false, error: '令牌无效' }, 403); return; }
+          const q = String(url.searchParams.get('text') || '');
+          const block = relatedMemoryBlock(q);
+          sendJson({ ok: true, text: q, chars: block.length, block });
+          return;
+        }
+        if (req.method === 'GET' && url.pathname === '/api/debug/guard') {
+          const info = tokenGuardDowngrade();
+          const notify = url.searchParams.get('notify') === '1';
+          if (notify) notifyDowngradeOnce(info);
+          sendJson({ ok: true, now: new Date().toISOString(), todayCost: Number(info.cost || 0), cap: info.cap, ratio: info.ratio, downgraded: info.on, notified: notify });
+          return;
+        }
+        // STICKER_CAP_PATCH：看一眼/执行一次表情库淘汰（?dry=1 只返回候选，不删）
+        if (req.method === 'GET' && url.pathname === '/api/debug/sticker-prune') {
+          const dry = url.searchParams.get('dry') === '1';
+          const cap = Number(url.searchParams.get('cap')) || 0;
+          const r = await pruneStickerLibrary('', { dryRun: dry, cap });
+          sendJson({ ok: true, ...r, maxItems: stickerMaxItems() });
           return;
         }
         if (req.method === 'GET' && url.pathname === '/api/status') {
@@ -5585,6 +5901,18 @@ async function main() {
           return;
         }
         // ── 二代仿真模式（reserved2）内部 Agent API ─────────────────────────
+        if (url.pathname === '/api/socialV2/mood') { // MOODV2_API
+          try {
+            if (req.method === 'GET') return sendJson(moodPublic());
+            if (req.method === 'POST') {
+              const body = (await readBody()) || {};
+              return sendJson(moodUpdate(body));
+            }
+            return sendJson({ ok: false, error: 'method not allowed' }, 405);
+          } catch (err) {
+            return sendJson({ ok: false, error: String(err?.message || err) }, 500);
+          }
+        }
         if (req.method === 'GET' && url.pathname === '/api/socialV2/config') {
           sendJson({ ok: true, config: cfg.socialV2 ?? {} });
           return;
@@ -5618,7 +5946,7 @@ async function main() {
             merged.autoReplyCheckMs = Number.isFinite(n) ? Math.max(1000, Math.round(n)) : (current.autoReplyCheckMs ?? 30000);
           }
           // tools：只接受布尔开关
-          const toolFlags = ['getPrompt', 'getUnread', 'getRecent', 'socialState', 'sendGroup', 'sendPrivate', 'reply', 'sendBurst', 'sendMessage', 'waitMessages', 'feedback', 'getMyRecent', 'getMessageDetail', 'getActiveMembers', 'setWakeConfig', 'markRead', 'memory', 'slangQuery', 'slangSubmit', 'getImages', 'getForwardMsg', 'sendPoke', 'listStickers', 'getStickerImage', 'sendSticker', 'setStickerRemark', 'stickerNote', 'collectSticker', 'getSelfImage', 'sendVoice'];
+          const toolFlags = ['getPrompt', 'getUnread', 'getRecent', 'socialState', 'sendGroup', 'sendPrivate', 'reply', 'sendBurst', 'sendMessage', 'waitMessages', 'feedback', 'getMyRecent', 'getMessageDetail', 'getActiveMembers', 'setWakeConfig', 'markRead', 'memory', 'slangQuery', 'slangSubmit', 'getImages', 'getForwardMsg', 'sendPoke', 'listStickers', 'getStickerImage', 'sendSticker', 'setStickerRemark', 'stickerNote', 'collectSticker', 'getSelfImage', 'sendVoice', 'sendQzone', 'setProfile', 'setAvatar', 'friends', 'recallMemory', 'diary'];
           if (body.tools && typeof body.tools === 'object') {
             merged.tools = { ...(current.tools ?? {}), ...body.tools };
             for (const k of toolFlags) {
@@ -5666,11 +5994,11 @@ async function main() {
             merged.tokenGuard = { ...(current.tokenGuard ?? {}), ...body.tokenGuard };
             if (merged.tokenGuard.enabled !== undefined) merged.tokenGuard.enabled = merged.tokenGuard.enabled === true;
             if (merged.tokenGuard.directBypassGap !== undefined) merged.tokenGuard.directBypassGap = merged.tokenGuard.directBypassGap === true;
-            for (const k of ['maxWakesPerDay', 'privateMaxWakesPerDay', 'minWakeGapMs', 'maxOutboundPerTurn', 'maxDailyCostCNY']) {
+            for (const k of ['maxWakesPerDay', 'privateMaxWakesPerDay', 'minWakeGapMs', 'maxOutboundPerTurn', 'maxDailyCostCNY', 'downgradeAtRatio']) {
               if (merged.tokenGuard[k] !== undefined) {
                 const n = Number(merged.tokenGuard[k]);
                 merged.tokenGuard[k] = Number.isFinite(n) ? Math.max(0, n) : current.tokenGuard?.[k] ?? 0;
-                if (k !== 'maxDailyCostCNY') merged.tokenGuard[k] = Math.round(merged.tokenGuard[k]);
+                if (k !== 'maxDailyCostCNY' && k !== 'downgradeAtRatio') merged.tokenGuard[k] = Math.round(merged.tokenGuard[k]);
               }
             }
           }
@@ -5902,6 +6230,12 @@ async function main() {
             listStickers: 'qq_list_stickers',
             getStickerImage: 'qq_get_sticker_image',
             sendSticker: 'qq_send_sticker',
+            sendQzone: 'qq_send_qzone_msg',
+            recallMemory: 'qq_recall_memory',
+            diary: 'qq_diary',
+            setProfile: 'qq_set_profile',
+            setAvatar: 'qq_set_avatar',
+            friends: 'qq_list_friend_requests',
             setStickerRemark: 'qq_set_sticker_remark',
             stickerNote: 'qq_sticker_note',
             collectSticker: 'qq_collect_sticker',
@@ -6214,8 +6548,10 @@ async function main() {
               return;
             }
           }
+          // STYLE_PATCH2_GATE: 管理员从控制台改配置时跳过「沉睡前观察」
+          const viaConsoleGate = String(req.headers['x-console-token'] || '') === String(cfg.consoleToken || '');
           // 沉睡前强制观察窗口：除非对方明确结束、或已经安静/等待足够时间，否则不允许 AI 聊两句就设置潜水。
-          if (isSleepingConfigV2(next) && preSleepWaitBlockedV2(st)) {
+          if (!viaConsoleGate && isSleepingConfigV2(next) && preSleepWaitBlockedV2(st)) {
             const preSleepMs = Math.max(0, Number(cfg.socialV2?.wake?.preSleepWaitMs) || 300000);
             const remaining = Math.max(0, preSleepMs - ((st.lastIncomingAt || 0) ? Date.now() - st.lastIncomingAt : 0));
             const remainMin = Math.ceil(remaining / 60000);
@@ -6680,6 +7016,7 @@ async function main() {
             saveSocialV2State();
             log(`[reserved2] 工具统一发送 ${key}: 成功 ${sentMessages.length}/${messages.length} 条`);
             appendActivity(`${key} [reserved2] 工具统一发送：成功 ${sentMessages.length}/${messages.length} 条`);
+            try { notePromisesFromReply(key, messages); } catch {} // PROMISE_PATCH
             if (sentMessages.length > 0) scheduleReplyCheckV2(key);
             const burstHint = messages.length >= 3 ? '你已经连发了多条，确认是必要的吗？真人很少一口气补完。' : undefined;
             const spaceWarn = findCjkSpaceWarning(messages);
@@ -7370,6 +7707,474 @@ async function main() {
             sendJson({ ok: false, error: error?.message ?? String(error) }, 500);
           }
           return;
+        }
+
+        // ── 记忆：回忆检索 / 写日记（MEMV2_MEM）──────────────────────────
+        if (req.method === 'POST' && (url.pathname === '/api/socialV2/recall' || url.pathname === '/api/socialV2/diary')) {
+          const mbody = await readBody();
+          const mtoken = String(req.headers['x-agent-token'] ?? mbody.token ?? '').trim();
+          const ctoken = String(req.headers['x-console-token'] ?? '').trim();
+          const okConsole = ctoken && consoleToken && ctoken === consoleToken;
+          if (!okConsole && (!mtoken || !isLiveAgentToken(mtoken))) { sendJson({ ok: false, error: 'agent token 无效' }, 403); return; }
+          if (url.pathname === '/api/socialV2/recall') {
+            const hits = memv2Recall(mbody.query, mbody.limit);
+            // RECALL_TOUCH_PATCH：被回忆到的记忆回温（复习效应）+ 模糊补召回（RECALL_FUZZY_PATCH）
+            try {
+              const __lim = Math.max(1, Math.min(20, Number(mbody.limit) || 6));
+              if (hits.length < __lim) {
+                const __extra = fuzzyRecallFiles(memv2RecallFiles(), mbody.query, { limit: __lim - hits.length });
+                for (const e of __extra) if (!hits.some((h) => h.text === e.text)) hits.push(e);
+                hits.sort((a, b) => b.score - a.score);
+              }
+              if (hits.length) {
+                const __card = loadMemoryCard(MEMORY_CARD_PATHS);
+                const __touched = touchMemories(__card, String(mbody.query ?? ''));
+                if (__touched > 0) saveMemoryCardOutputs(MEMORY_CARD_PATHS, __card, cfg.memoryCard || {}, Date.now());
+                log('[记忆] 回忆命中 ' + hits.length + ' 条 · 回温 ' + __touched + ' 条');
+              }
+            } catch (__e) { log('[记忆] 回温/模糊召回失败：' + String(__e?.message ?? __e).slice(0, 120)); }
+            sendJson({ ok: true, query: String(mbody.query ?? ''), count: hits.length, hits });
+            return;
+          }
+          const day = memv2AppendDiary(mbody.text);
+          if (!day) { sendJson({ ok: false, error: 'text 不能为空' }, 400); return; }
+          log('[记忆] 写了日记 ' + day + '：' + String(mbody.text).slice(0, 40));
+          sendJson({ ok: true, date: day });
+          return;
+        }
+
+        // ── 资料 / 头像 / 好友申请（PROFILE_PATCH，2026-10-30）────────────────────
+        // VIEW_STICKER_PATCH：看动图/表情的几帧（返回拼图路径，MCP 侧读文件转 base64 给模型）
+        // VIEW_STICKER_DBGURL 调试: GET /api/debug/frames?key=group:123&token=<consoleToken>[&url=&file=&kind=]
+        if (req.method === 'GET' && url.pathname === '/api/debug/frames') {
+          const dtok = String(url.searchParams.get('token') || '').trim();
+          if (dtok !== consoleToken) { sendJson({ ok: false, error: 'token 不对' }, 401); return; }
+          const dk = String(url.searchParams.get('key') || '').trim();
+          const dparts = dk.split(':');
+          const forceUrl = String(url.searchParams.get('url') || '').trim();
+          const forceFile = String(url.searchParams.get('file') || '').trim();
+          const forceKind = String(url.searchParams.get('kind') || '').trim();
+          try {
+            let dt = null;
+            if (forceUrl || forceFile) {
+              dt = { kind: forceKind === 'sticker' ? 'sticker' : 'image', file: forceFile, url: forceUrl, subType: '', summary: '', emojiId: '' };
+            } else {
+              if (dparts.length !== 2 || (dparts[0] !== 'group' && dparts[0] !== 'private')) { sendJson({ ok: false, error: 'key 必须是 group:群号 或 private:QQ号' }, 400); return; }
+              const dh = await fetchOneBotHistory(dparts[0], Number(dparts[1]), 20);
+              const dmsgs = Array.isArray(dh) ? dh : (Array.isArray(dh?.messages) ? dh.messages : []);
+              for (const msg of [...dmsgs].reverse()) {
+                for (const seg of [...(msg?.message ?? [])].reverse()) {
+                  if (seg?.type === 'image' || seg?.type === 'mface') {
+                    const d = seg.data ?? {};
+                    dt = { kind: seg.type === 'mface' ? 'sticker' : 'image', file: String(d.file ?? ''), url: String(d.url ?? ''), subType: String(d.sub_type ?? ''), summary: String(d.summary ?? ''), emojiId: String(d.emoji_id ?? '') };
+                    break;
+                  }
+                }
+                if (dt) break;
+              }
+              if (!dt) { sendJson({ ok: false, error: 'no media in last 20' }, 404); return; }
+            }
+            const dc = findCachedMedia(dk);
+            const ds = await stickerFrameSheet(dt, dc && dc.file ? dc.file : '');
+            sendJson({ ok: true, key: dk, media: { kind: dt.kind, file: dt.file, url: dt.url, cached: dc && dc.file ? dc.file : '' }, sheet: ds });
+          } catch (e) {
+            sendJson({ ok: false, error: String(e && e.message ? e.message : e) }, 502);
+          }
+          return;
+        }
+        if (req.method === 'POST' && url.pathname === '/api/socialV2/sticker-frames') {
+          if (currentMode !== 'reserved2') { sendJson({ ok: false, error: '该接口仅 reserved2 模式可用' }, 403); return; }
+          const vbody = await readBody();
+          const vtoken = String(req.headers['x-agent-token'] ?? vbody.token ?? '').trim();
+          if (!vtoken || !isLiveAgentToken(vtoken)) { sendJson({ ok: false, error: 'agent token 无效' }, 403); return; }
+          if (socialV2.paused) { sendJson({ ok: false, error: 'AI 已暂停，当前不允许执行该操作' }, 403); return; }
+          const vkey = String(vbody.key ?? '').trim();
+          const vm = /^(group|private):(\d+)$/.exec(vkey);
+          if (!vm) { sendJson({ ok: false, error: 'key 必须是 group:群号 或 private:QQ号' }, 400); return; }
+          try {
+            const vhist = await fetchOneBotHistory(vm[1], Number(vm[2]), Number(vbody.count) > 0 ? Math.min(Number(vbody.count), 50) : 20);
+            const vmsgs = Array.isArray(vhist) ? vhist : (Array.isArray(vhist?.messages) ? vhist.messages : []);
+            let target = null;
+            for (const msg of [...vmsgs].reverse()) {
+              for (const seg of [...(msg?.message ?? [])].reverse()) {
+                if (seg?.type === 'image' || seg?.type === 'mface') {
+                  const d = seg.data ?? {};
+                  target = { kind: seg.type === 'mface' ? 'sticker' : 'image', file: String(d.file ?? ''), url: String(d.url ?? ''), subType: String(d.sub_type ?? d.subType ?? ''), summary: String(d.summary ?? ''), emojiId: String(d.emoji_id ?? d.emojiId ?? '') };
+                  break;
+                }
+              }
+              if (target) break;
+            }
+            // VIEW_STICKER_GXH: gxh.vip 直链会 404，改从历史里找同一张图的可下载链接
+            if (String(target.url || '').includes('gxh.vip')) {
+              const wantFile = String(target.file || '').split('/').pop();
+              const wantEmoji = String(target.emojiId || '');
+              let fixed = false;
+              for (const msg of [...vmsgs].reverse()) {
+                for (const seg of msg?.message ?? []) {
+                  if (seg?.type !== 'image' && seg?.type !== 'mface') continue;
+                  const d = seg.data ?? {};
+                  const u = String(d.url ?? '');
+                  if (!u.startsWith('http') || u.includes('gxh.vip')) continue;
+                  const f = String(d.file ?? '').split('/').pop();
+                  const eid = String(d.emoji_id ?? d.emojiId ?? '');
+                  if ((wantFile && f === wantFile) || (wantEmoji && eid === wantEmoji)) { target.url = u; fixed = true; log('[看图] gxh 直链失效，改用历史里的可下载链接'); break; }
+                }
+                if (fixed) break;
+              }
+            }
+            const cached = findCachedMedia(vkey);
+            const sheet = await stickerFrameSheet(target, cached?.file ?? '');
+            log(`[看图] 已抽 ${sheet.frames} 帧${sheet.animated ? '（动图）' : ''} → ${sheet.path}`);
+            sendJson({ ok: true, key: vkey, ...sheet, summary: target.summary || '' });
+          } catch (e) {
+            sendJson({ ok: false, error: `抽帧失败：${e?.message || e}` }, 502);
+          }
+          return;
+        }
+
+        // QZONE_FEED_PATCH（2026-10-30）：读说说 / 在说说下评论。
+        // 点赞接口实测走不通：like_v6 / emotion_cgi_like_v6 多种参数组合一律 HTTP 500（评论区同域同 cookie 正常），
+        // 所以这里只做「看列表」和「评论」，没有点赞。
+        if (req.method === 'POST' && url.pathname === '/api/debug/stylelearn') { // STYLE_PATCH2_TRIGGER
+          try {
+            const ct = String(req.headers['x-console-token'] || '');
+            if (ct !== String(cfg.consoleToken || '')) { sendJson({ ok: false, error: '控制台令牌无效' }, 401); return; }
+            const body = await readBody();
+            const groups = styleLearnCfgNow().groups;
+            const gid = String(body?.group || groups[0] || '').replace(/\D/g, '');
+            if (!gid) { sendJson({ ok: false, error: '没有可用的群' }, 400); return; }
+            if (!cfg.ownerQQ) { sendJson({ ok: false, error: '没配置 ownerQQ' }, 400); return; }
+            const task = '【学说法·手动】去群里看看（群 ' + gid + '）：先用 qq_read_group_recent 拉最近 25 条（就用这一个工具；不要用 qq_get_recent / qq_get_unread / qq_get_prompt，那几个只能看当前会话，跨群一定报凭证错误，不是工具坏了）。重点看一个人：**QQ 2000000000**，群昵称以「亚托莉」三个字开头（后面还可能有别的字）。按 QQ 号认最准；找不到他就只记通用框架，别硬认人。只提炼「说话框架」：怎么起句、怎么接话、怎么求人、怎么拒绝、怎么吐槽但不伤人；**不要抄口头禅和梗**，也别整段模仿——她的说话方式以她自己为主，别人只是参考。记 1~2 条就够，写「好在哪」时要写框架层面的原因（例：先用一句软话把事说清，再给结论）。她得是温柔、善良、单纯的：脏话、攻击、阴阳怪气、贬低别人一律不学。'
+              + '记完不用改人格卡，也别在群里发言，回来跟我说一句学到的要点。';
+            deliverPrompt('private:' + cfg.ownerQQ, task, { reason: 'style-learn-manual' });
+            log('[学样] 手动触发：' + gid);
+            sendJson({ ok: true, group: gid });
+          } catch (e) {
+            sendJson({ ok: false, error: String(e?.message || e) }, 500);
+          }
+          return;
+        }
+        if (url.pathname === '/api/socialV2/style-note' || url.pathname === '/api/socialV2/style-list' || url.pathname === '/api/socialV2/style-candidate' /* STYLE_GATE_PATCH */ || url.pathname === '/api/socialV2/group-recent' || url.pathname === '/api/socialV2/loop' || url.pathname === '/api/socialV2/person' || url.pathname === '/api/socialV2/impression' /* IMPR_PATCH */ || url.pathname === '/api/socialV2/tech-notes' /* TECHNOTES_PATCH */) { // STYLE_PATCH LOOPS_PATCH NEXT_PATCH
+          try {
+            const token = String(req.headers['x-agent-token'] || '');
+            const consoleOk = String(req.headers['x-console-token'] || '') === String(cfg.consoleToken || '');
+            const localOk = (req.socket?.remoteAddress === '127.0.0.1' || req.socket?.remoteAddress === '::1' || req.socket?.remoteAddress === '::ffff:127.0.0.1'); // STYLE_PATCH3
+            if (!isLiveAgentToken(token) && !consoleOk && !localOk) return sendJson({ ok: false, error: 'agent token 无效' }, 403);
+            if (url.pathname === '/api/socialV2/style-list') { // STYLE_GATE_PATCH
+              return sendJson({ ok: true, samples: readStyleSamples(30), stats: styleStats(), ...styleCandidates() });
+            }
+            const body = await readBody();
+            if (url.pathname === '/api/socialV2/person') { // NEXT_PATCH
+              const pr = notePerson({ qq: body?.qq, alias: body?.alias, note: body?.note });
+              log('[人物] ' + (pr.ok ? '记了 ' + pr.qq : '失败：' + pr.error));
+              return sendJson(pr, pr.ok ? 200 : 400);
+            }
+            if (url.pathname === '/api/socialV2/loop') { // LOOPS_PATCH
+              const lcAction = String(body?.action || 'add');
+              if (lcAction === 'list') return sendJson({ ok: true, items: listLoops(cfg) });
+              if (lcAction === 'done') return sendJson(doneLoop({ id: body?.id, text: body?.text, raw: cfg }));
+              const lcDue = parseDue(body?.due || body?.dueText || ''); // NEXT_PATCH
+              const lcR = addLoop({ text: body?.text, by: body?.by, due: lcDue, raw: cfg });
+              log('[欠事] ' + (lcR.ok ? `记了一条（共 ${lcR.total}）` : '失败：' + lcR.error));
+              return sendJson(lcR, lcR.ok ? 200 : 400);
+            }
+            if (url.pathname === '/api/socialV2/impression') { // IMPR_PATCH
+              const imAction = String(body?.action || 'list');
+              if (imAction === 'list') return sendJson({ ok: true, ...impressionsData() });
+              if (imAction === 'forget') {
+                const imD = forgetImpression(body?.id);
+                log('[印象] ' + (imD.ok ? `删了一条（剩 ${imD.total}）` : '失败：' + imD.error));
+                return sendJson(imD, imD.ok ? 200 : 400);
+              }
+              const imR = addImpression({ text: body?.text, about: body?.about, confidence: body?.confidence });
+              log('[印象] ' + (imR.ok ? `记了一条（共 ${imR.total}）` : '失败：' + imR.error));
+              return sendJson(imR, imR.ok ? 200 : 400);
+            }
+            if (url.pathname === '/api/socialV2/tech-notes') { // TECHNOTES_PATCH
+              const tnAction = String(body?.action || 'list');
+              if (tnAction === 'list' || tnAction === 'search') {
+                const items = searchTechNotes({ q: body?.q, tag: body?.tag, limit: body?.limit });
+                return sendJson({ ok: true, items, total: items.length });
+              }
+              if (tnAction === 'forget') {
+                const tnD = forgetTechNote(body?.id);
+                log('[技术笔记] ' + (tnD.ok ? `删了一条（剩 ${tnD.total}）` : '失败：' + tnD.error));
+                return sendJson(tnD, tnD.ok ? 200 : 400);
+              }
+              const tnR = addTechNote({
+                title: body?.title, url: body?.url, bv: body?.bv, up: body?.up,
+                summary: body?.summary, points: body?.points, tools: body?.tools, tags: body?.tags,
+              });
+              log('[技术笔记] ' + (tnR.ok ? `${tnR.updated ? '合并' : '记了'}「${String(body?.title || '').slice(0, 30)}」（共 ${tnR.total}）` : '失败：' + tnR.error));
+              return sendJson(tnR, tnR.ok ? 200 : 400);
+            }
+            if (url.pathname === '/api/socialV2/style-candidate') { // STYLE_GATE_PATCH
+              const act = String(body?.action || 'list');
+              if (act === 'set') {
+                const r = styleSetStatus(String(body?.id || ''), String(body?.status || ''));
+                log('[学样] 人工' + (r.ok ? `：${body?.status} ${String(body?.id).slice(0, 12)}` : '失败：' + r.error));
+                return sendJson(r, r.ok ? 200 : 400);
+              }
+              return sendJson({ ok: true, ...styleCandidates() });
+            }
+            if (url.pathname === '/api/socialV2/style-note') {
+              if (!v2ToolEnabled('styleNote')) return sendJson({ ok: false, error: 'styleNote 已关闭' }, 403);
+              { // STYLE_STRICT_PATCH：只学目标的人，别把路人/自己记进来
+                const stl = styleLearnCfgNow();
+                if (stl.strictTarget && stl.targetQQ) {
+                  const okUin = String(body?.uin || '') === String(stl.targetQQ);
+                  const okName = /亚托莉/.test(String(body?.from || ''));
+                  if (!okUin && !okName) {
+                    log('[学样] 拒收：' + String(body?.from || '空') + '（不是目标 ' + stl.targetQQ + '）');
+                    return sendJson({ ok: false, error: '只学 QQ ' + stl.targetQQ + '（亚托莉）的说法，别人的不记' }, 400);
+                  }
+                }
+              }
+              const r = appendStyleSample(body || {});
+              log('[学样] ' + (r.ok ? `记了一条（共 ${r.total}）` : '失败：' + r.error));
+              return sendJson(r.ok ? { ok: true, total: r.total, duplicated: !!r.duplicated } : { ok: false, error: r.error }, r.ok ? 200 : 400);
+            }
+            if (!v2ToolEnabled('readGroup')) return sendJson({ ok: false, error: 'readGroup 已关闭' }, 403);
+            const gid = String(body?.group || '').replace(/\D/g, '');
+            const cnt = Math.max(5, Math.min(40, Number(body?.count) || 20));
+            if (!gid) return sendJson({ ok: false, error: 'group 不能为空' }, 400);
+            const r = await bot.request('get_group_msg_history', { group_id: Number(gid), count: cnt });
+            const msgs = Array.isArray(r?.data?.messages) ? r.data.messages : (Array.isArray(r?.messages) ? r.messages : []);
+            const lines = [];
+            for (const m of msgs) {
+              const whoBase = String(m?.sender?.card || m?.sender?.nickname || m?.sender?.user_id || '?'); // STYLE_PATCH11
+              const uid = m?.sender?.user_id;
+              const who = uid ? whoBase + '（' + uid + '）' : whoBase;
+              const segs = Array.isArray(m?.message) ? m.message : [];
+              const parts = [];
+              for (const s of segs) {
+                if (s?.type === 'text') parts.push(String(s?.data?.text || ''));
+                else if (s?.type === 'at') parts.push('@' + String(s?.data?.qq || ''));
+                else if (s?.type === 'image' || s?.type === 'mface') parts.push('[图]');
+                else if (s?.type === 'face') parts.push('[表情]');
+              }
+              const body2 = parts.join('').replace(/\s+/g, ' ').trim().slice(0, 160);
+              if (body2) lines.push(who + '：' + body2);
+            }
+            return sendJson({ ok: true, group: gid, count: lines.length, lines: lines.slice(-cnt) });
+          } catch (e) {
+            return sendJson({ ok: false, error: String(e?.message || e) }, 500);
+          }
+        }
+        if (req.method === 'POST' && (url.pathname === '/api/socialV2/qzone-feed' || url.pathname === '/api/socialV2/qzone-comment')) {
+          if (currentMode !== 'reserved2') { sendJson({ ok: false, error: '该接口仅 reserved2 模式可用' }, 403); return; }
+          const qbody = await readBody();
+          const qtoken = String(req.headers['x-agent-token'] ?? qbody.token ?? '').trim();
+          if (!qtoken || !isLiveAgentToken(qtoken)) { sendJson({ ok: false, error: 'agent token 无效' }, 403); return; }
+          if (socialV2.paused) { sendJson({ ok: false, error: 'AI 已暂停，当前不允许执行该操作' }, 403); return; }
+          try {
+            const ck = async (domain) => { try { const r = await bot.request('get_cookies', { domain }); return String(r?.cookies ?? r?.data?.cookies ?? ''); } catch { return ''; } };
+            const qCookie = [...new Set([await ck('user.qzone.qq.com'), await ck('h5.qzone.qq.com')].join('; ').split(/;\s*/).filter(Boolean))].join('; ');
+            const pSkeyRaw = ((/p_skey=([^;]+)/.exec(qCookie) || [])[1] || '').replace(/^@/, '');
+            if (!pSkeyRaw) { sendJson({ ok: false, error: '拿不到 QQ 空间登录态（缺 p_skey），可能 QQ 没登录' }, 502); return; }
+            let qh = 5381;
+            for (let qi = 0; qi < pSkeyRaw.length; qi += 1) qh += (qh << 5) + pSkeyRaw.charCodeAt(qi);
+            const qGtk = qh & 0x7fffffff;
+            const qUnwrap = (t) => { const s = String(t).trim().replace(/^_Callback\(/, '').replace(/\);?$/, ''); try { return JSON.parse(s); } catch { return null; } };
+            const qUa = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36';
+            const qOwner = String(cfg.ownerQQ ?? '').trim();
+            if (url.pathname === '/api/socialV2/qzone-feed') {
+              const uin = String(qbody.uin ?? qOwner).trim() || qOwner;
+              const num = Math.min(Math.max(Number(qbody.num ?? 10) || 10, 1), 20);
+              const feedUrl = `https://user.qzone.qq.com/proxy/domain/taotao.qq.com/cgi-bin/emotion_cgi_msglist_v6?uin=${uin}&ftype=0&sort=0&pos=0&num=${num}&hostUin=${uin}&inCharset=utf-8&outCharset=utf-8&notice=0&format=json&g_tk=${qGtk}`;
+              const qres = await fetch(feedUrl, {
+                headers: { cookie: qCookie, 'user-agent': qUa, referer: `https://user.qzone.qq.com/${uin}` },
+                signal: AbortSignal.timeout(15000)
+              });
+              const qdata = qUnwrap(await qres.text());
+              if (!qdata || qdata.code !== 0) { sendJson({ ok: false, error: `空间返回 ${qdata?.code ?? qres.status}` }, 502); return; }
+              const qitems = (qdata.msglist || []).map((m) => ({
+                tid: m.tid,
+                content: String(m.content ?? ''),
+                created: m.createTime ?? m.created_time ?? null,
+                comments: (m.commentlist || []).map((c) => ({
+                  name: String(c.name ?? ''),
+                  uin: String(c.uin ?? ''),
+                  commentId: String(c.tid ?? ''),
+                  isOwner: String(c.uin ?? '') === qOwner,
+                  content: String(c.content ?? ''),
+                  replies: (c.list_3 || []).map((r) => ({ name: String(r.name ?? ''), uin: String(r.uin ?? ''), content: String(r.content ?? '') })),
+                  replyCount: Number(c.reply_num ?? 0)
+                })),
+                imageCount: (m.pic || []).length
+              }));
+              sendJson({ ok: true, uin, count: qitems.length, items: qitems });
+              return;
+            }
+            // qzone-comment
+            const content = String(qbody.content ?? '').trim();
+            if (!content) { sendJson({ ok: false, error: 'content 不能为空' }, 400); return; }
+            if (content.length > 200) { sendJson({ ok: false, error: '评论过长（上限 200 字）' }, 400); return; }
+            const hostUin = String(qbody.hostUin ?? qbody.uin ?? qOwner).trim() || qOwner;
+            const qTid = String(qbody.tid ?? '').trim();
+            if (!qTid) { sendJson({ ok: false, error: 'tid 不能为空（先用 qq_qzone_feed 拿列表）' }, 400); return; }
+            // QZONE_REPLY_PATCH：要「回复」某个人时，正文前加 @ 提及（网页端同款写法，会显示成 @昵称 + 内容）
+            const replyUin = String(qbody.replyTo ?? qbody.reply_to_qq ?? '').trim();
+            const replyNick = String(qbody.replyNick ?? qbody.reply_to_nick ?? '').trim();
+            const cContent = replyUin
+              ? `@{uin:${replyUin},nick:${replyNick || replyUin},who:1,auto:1}${content}`
+              : content;
+            const form = new URLSearchParams({
+              topicId: `${hostUin}_${qTid}`, content: cContent, hostUin, uin: String(selfUserId || ''),
+              feedsType: '100', inSame: '1', format: 'json', plat: 'qzone', source: 'ic',
+              qzreferrer: `https://user.qzone.qq.com/${hostUin}`
+            });
+            const cres = await fetch(`https://user.qzone.qq.com/proxy/domain/taotao.qzone.qq.com/cgi-bin/emotion_cgi_re_feeds?g_tk=${qGtk}`, {
+              method: 'POST',
+              headers: { cookie: qCookie, 'user-agent': qUa, referer: `https://user.qzone.qq.com/${hostUin}`, 'content-type': 'application/x-www-form-urlencoded' },
+              body: form,
+              signal: AbortSignal.timeout(15000)
+            });
+            const cdata = qUnwrap(await cres.text());
+            if (!cdata || cdata.code !== 0) { sendJson({ ok: false, error: `评论失败 ${cdata?.code ?? cres.status}` }, 502); return; }
+            log(`[qzone] 已评论 ${hostUin} 的说说 ${qTid}${replyUin ? `（回复 ${replyUin}）` : ''}`);
+            sendJson({ ok: true, hostUin, tid: qTid, content, replyTo: replyUin || null });
+            return;
+          } catch (error) {
+            sendJson({ ok: false, error: `空间操作失败：${error?.message ?? error}` }, 500);
+            return;
+          }
+        }
+        if (req.method === 'POST' && (url.pathname === '/api/socialV2/profile' || url.pathname === '/api/socialV2/avatar' || url.pathname === '/api/socialV2/friend-request')) {
+          if (currentMode !== 'reserved2') { sendJson({ ok: false, error: '该接口仅 reserved2 模式可用' }, 403); return; }
+          const body = await readBody();
+          const token = String(req.headers['x-agent-token'] ?? body.token ?? '').trim();
+          if (!token || !isLiveAgentToken(token)) { sendJson({ ok: false, error: 'agent token 无效' }, 403); return; }
+          if (socialV2.paused) { sendJson({ ok: false, error: 'AI 已暂停，当前不允许执行该操作' }, 403); return; }
+          try {
+            if (url.pathname === '/api/socialV2/profile') {
+              if (!v2ToolEnabled('setProfile')) { sendJson({ ok: false, error: '工具未启用：qq_set_profile' }, 403); return; }
+              const nickname = String(body.nickname ?? '').trim();
+              const signature = String(body.signature ?? '').trim();
+              if (!nickname && !signature) { sendJson({ ok: false, error: 'nickname 与 signature 至少填一个' }, 400); return; }
+              if (nickname.length > 24) { sendJson({ ok: false, error: '昵称过长（上限 24 字）' }, 400); return; }
+              if (signature.length > 80) { sendJson({ ok: false, error: '签名过长（上限 80 字）' }, 400); return; }
+              const payload = {};
+              if (nickname) payload.nickname = nickname;
+              if (signature) payload.personal_note = signature;
+              const res = await bot.request('set_qq_profile', payload);
+              if (nickname) { try { selfDisplayName = nickname; selfNickname = nickname.toLowerCase(); } catch { /* 只影响 @ 识别，失败不致命 */ } }
+              log(`[资料] 已改资料 nickname=${nickname || '(不变)'} signature=${signature ? '有' : '(不变)'}`);
+              sendJson({ ok: true, nickname: nickname || null, signature: signature || null, raw: res });
+              return;
+            }
+            if (url.pathname === '/api/socialV2/avatar') {
+              if (!v2ToolEnabled('setAvatar')) { sendJson({ ok: false, error: '工具未启用：qq_set_avatar' }, 403); return; }
+              let src = String(body.src ?? body.url ?? body.base64 ?? '').trim();
+              let file = '';
+              if (!src) {
+                // FRIEND_BATCH_PATCH：不接链接也行 —— 用这个会话里最近的一张图
+                const aimKey = String(body.key ?? '').trim();
+                const km = /^(group|private):(\d+)$/.exec(aimKey);
+                if (!km) { sendJson({ ok: false, error: '不给 src 时请给 key（group:群号 / private:QQ号），用最近那张图当头像' }, 400); return; }
+                const hist = await fetchOneBotHistory(km[1], Number(km[2]), 30);
+                // AVATAR_LASTIMG_PATCH：fetchOneBotHistory 返回的是**消息数组**（或 null），不是 { messages } ——
+                // 旧写法 hist?.messages / hist?.data?.messages 永远取空，于是永远报「会话里没有图片」。
+                const msgs = Array.isArray(hist) ? hist
+                  : (Array.isArray(hist?.messages) ? hist.messages
+                    : (Array.isArray(hist?.data?.messages) ? hist.data.messages : []));
+                let picked = null;
+                for (let i = msgs.length - 1; i >= 0 && !picked; i -= 1) {
+                  const segs = Array.isArray(msgs[i]?.message) ? msgs[i].message : [];
+                  picked = extractMediaFromSegments(segs).find((m) => m.kind === 'image' || m.kind === 'sticker') || null;
+                }
+                if (!picked) { sendJson({ ok: false, error: '这个会话最近没有图片，让他先发一张' }, 404); return; }
+                const got = await fetchOneBotImage(picked);
+                file = stickerTempPath(got.buffer, got.mimeType);
+                src = 'fromLastImage';
+              } else {
+                file = await resolveAvatarFile(src);
+              }
+              writeAvatarPend({ file, src: src.slice(0, 200), at: Date.now(), by: 'agent' });
+              let ownQQ = '';
+              try { ownQQ = String(cfg.ownerQQ ?? ''); } catch { ownQQ = ''; }
+              if (ownQQ) {
+                void sendToQQ(`private:${ownQQ}`, '她想换头像，等你点头。\n同意发 /同意头像，不同意发 /不同意头像。');
+              }
+              appendActivity('[头像] 她提交了新头像，等管理员批准');
+              log('[头像] 已记录待批准头像，已通知管理员');
+              sendJson({ ok: true, pending: true, message: '已提交给管理员批准，他同意后才会真正换' });
+              return;
+            }
+            // /api/socialV2/friend-request
+            if (!v2ToolEnabled('friends')) { sendJson({ ok: false, error: '工具未启用：qq_handle_friend_request' }, 403); return; }
+            const argQQ = String(body.userId ?? body.qq ?? '').trim();
+            const argFlag = String(body.flag ?? '').trim();
+            const list = readFriendReqs();
+            const item = (argFlag ? list.find((r) => String(r.flag) === argFlag) : null)
+              || (argQQ ? list.find((r) => String(r.userId) === argQQ) : null)
+              || (argQQ || argFlag ? null : (list.length === 1 ? list[0] : null));
+            if (!item) { sendJson({ ok: false, error: '没找到这条好友申请（先用 qq_list_friend_requests 看列表）' }, 404); return; }
+            const approve = body.approve !== false && String(body.approve) !== 'false';
+            const remark = String(body.remark ?? '').trim();
+            const payload = { flag: item.flag, approve };
+            if (remark) payload.remark = remark;
+            const res = await bot.request('set_friend_add_request', payload);
+            writeFriendReqs(list.filter((r) => String(r.flag) !== String(item.flag)));
+            log(`[好友] ${approve ? '已同意' : '已拒绝'} ${item.userId}`);
+            sendJson({ ok: true, userId: item.userId, approve, raw: res });
+            return;
+          } catch (error) {
+            log(`[资料] 操作失败：${error?.message ?? error}`);
+            sendJson({ ok: false, error: `操作失败：${error?.message ?? error}` }, 500);
+            return;
+          }
+        }
+
+        if (req.method === 'GET' && url.pathname === '/api/socialV2/friend-requests') {
+          const token = String(url.searchParams.get('token') ?? req.headers['x-agent-token'] ?? '').trim();
+          if (token && !isLiveAgentToken(token)) { sendJson({ ok: false, error: 'agent token 无效' }, 403); return; }
+          const list = readFriendReqs().map((r) => ({ userId: r.userId, nickname: r.nickname, comment: r.comment, at: r.at }));
+          sendJson({ ok: true, count: list.length, requests: list });
+          return;
+        }
+
+        // ── QQ 空间说说（QZONE_PATCH，2026-10-30）─────────────────────────────────
+        if (req.method === 'POST' && (url.pathname === '/api/send/qzone' || url.pathname === '/api/send/qzone-delete')) {
+          if (currentMode !== 'reserved2') { sendJson({ ok: false, error: '该接口仅 reserved2 模式可用' }, 403); return; }
+          const body = await readBody();
+          const token = String(req.headers['x-agent-token'] ?? body.token ?? '').trim();
+          if (!token || !isLiveAgentToken(token)) { sendJson({ ok: false, error: 'agent token 无效' }, 403); return; }
+          if (!qzoneEnabled()) { sendJson({ ok: false, error: '说说功能已关闭' }, 403); return; }
+          if (!v2ToolEnabled('sendQzone')) { sendJson({ ok: false, error: '工具未启用：qq_send_qzone_msg' }, 403); return; }
+          if (socialV2.paused) { sendJson({ ok: false, error: 'AI 已暂停，当前不允许执行发送工具' }, 403); return; }
+          try {
+            if (url.pathname === '/api/send/qzone-delete') {
+              const tid = String(body.tid ?? '').trim();
+              if (!tid) { sendJson({ ok: false, error: 'tid 不能为空' }, 400); return; }
+              const res = await bot.request('delete_qzone_msg', { tid });
+              log(`[qzone] 删除说说 tid=${tid}`);
+              sendJson({ ok: true, tid, raw: res });
+              return;
+            }
+            const content = String(body.content ?? '').trim();
+            if (!content) { sendJson({ ok: false, error: 'content 不能为空' }, 400); return; }
+            if (content.length > 1500) { sendJson({ ok: false, error: '正文过长（上限 1500 字）' }, 400); return; }
+            const images = Array.isArray(body.images) ? body.images.map((x) => String(x)).filter(Boolean).slice(0, 9) : [];
+            const ugcRight = qzoneUgcRight(body.ugcRight);
+            const targetUins = Array.isArray(body.targetUins) ? body.targetUins.map((x) => String(x)).filter(Boolean) : [];
+            if ((ugcRight === 16 || ugcRight === 128) && !targetUins.length) {
+              sendJson({ ok: false, error: 'ugcRight 16/128 需要 targetUins' }, 400);
+              return;
+            }
+            const payload = { content, images, ugc_right: ugcRight };
+            if (targetUins.length) payload.target_uins = targetUins;
+            const res = await bot.request('send_qzone_msg', payload);
+            const tid = String(res?.data?.tid ?? res?.tid ?? '');
+            log(`[qzone] 已发说说 ugc_right=${ugcRight} 图片=${images.length} tid=${tid || '（未返回）'}`);
+            sendJson({ ok: true, tid, ugcRight, images: images.length });
+            return;
+          } catch (error) {
+            log(`[qzone] 失败：${error?.message ?? error}`);
+            sendJson({ ok: false, error: `说说操作失败：${error?.message ?? error}` }, 500);
+            return;
+          }
         }
 
         if (req.method === 'POST' && url.pathname === '/api/socialV2/send-sticker') {
@@ -8558,6 +9363,12 @@ async function main() {
           const replyToMessageId = body.replyToMessageId;
           const atUserId = body.atUserId ?? null;
           const key = isPrivate ? `private:${targetId}` : `group:${targetId}`;
+          // STYLE_PATCH14: 黑箱任务期间丢弃发送工具发出的消息
+          if ((suppressOutboundOnce.get(key) || 0) > Date.now()) {
+            log('[黑箱] 丢弃一条发送 (' + key + ')');
+            sendJson({ ok: true, suppressed: true });
+            return;
+          }
           // 安全边界：发送工具只允许在 closed-agent（管理员私聊）或 reserved2（二代 AI 带会话令牌）下使用；
           // chat/reserved 的自动转发已覆盖正常回复，MCP 发送工具不应成为 prompt injection 的越权出口。
           if (currentMode === 'chat' || currentMode === 'reserved') {
@@ -9355,6 +10166,116 @@ async function main() {
       return null;
     }
     return { buffer: buf, mimeType: mimeFromBuffer(buf) };
+  }
+
+  // VIEW_STICKER_CACHE（2026-10-31）：收到图片/表情就先落盘，看动图时优先用本地缓存
+  // 原因：自己发出的表情在历史里只有 gxh.vip 链接（404），只有收到的才有 multimedia 链接
+  const MEDIA_CACHE_DIR = path.join(STATE_DIR, 'media-cache');
+  const MEDIA_CACHE_INDEX = path.join(MEDIA_CACHE_DIR, 'index.json');
+  function readMediaCache() {
+    try { const j = JSON.parse(fs.readFileSync(MEDIA_CACHE_INDEX, 'utf8')); return Array.isArray(j) ? j : []; } catch { return []; }
+  }
+  function writeMediaCache(list) {
+    try { fs.mkdirSync(MEDIA_CACHE_DIR, { recursive: true }); fs.writeFileSync(MEDIA_CACHE_INDEX, JSON.stringify(list.slice(-300))); } catch {}
+  }
+  async function cacheIncomingMedia(key, msgId, segments) {
+    if (!Array.isArray(segments) || !msgId) return;
+    const list = readMediaCache();
+    let i = 0;
+    for (const seg of segments) {
+      if (seg?.type !== 'image' && seg?.type !== 'mface') continue;
+      const idx = i; i += 1;
+      const id = `${msgId}:${idx}`;
+      if (list.some((e) => e && e.id === id)) continue;
+      const d = seg.data ?? {};
+      const media = { kind: seg.type === 'mface' ? 'sticker' : 'image', file: String(d.file ?? ''), url: String(d.url ?? ''), subType: String(d.sub_type ?? d.subType ?? ''), emojiId: String(d.emoji_id ?? d.emojiId ?? ''), summary: String(d.summary ?? '') };
+      try {
+        const got = await fetchOneBotImage(media);
+        if (!got?.buffer?.length) continue;
+        fs.mkdirSync(MEDIA_CACHE_DIR, { recursive: true });
+        const ext = /gif/i.test(got.mimeType || '') ? 'gif' : /png/i.test(got.mimeType || '') ? 'png' : /webp/i.test(got.mimeType || '') ? 'webp' : 'jpg';
+        const file = path.join(MEDIA_CACHE_DIR, `${msgId}-${idx}.${ext}`);
+        fs.writeFileSync(file, got.buffer);
+        list.push({ id, key, msgId, at: Date.now(), file, size: got.buffer.length, kind: media.kind, summary: media.summary });
+        log(`[看图] 已缓存${media.kind === 'sticker' ? '表情' : '图片'} ${msgId}:${idx}（${got.buffer.length} 字节）`);
+      } catch {}
+    }
+    writeMediaCache(list);
+  }
+  function findCachedMedia(key) {
+    const list = readMediaCache().filter((e) => e && e.key === key);
+    return list.length ? list[list.length - 1] : null;
+  }
+
+  // VIEW_STICKER_PATCH（2026-10-31）：把动图/表情抽 3 帧拼成一张横排图，给模型"看"动作
+  async function stickerFrameSheet(media, cachedFile = '') {
+    const fsMod = await import('node:fs');
+    // VIEW_STICKER_CACHE：优先用收到时缓存下来的原图（自己发的表情链接多半已失效）
+    let got = null;
+    if (cachedFile) {
+      try {
+        const buf = fsMod.readFileSync(cachedFile);
+        if (buf?.length) got = { buffer: buf, mimeType: /\.gif$/i.test(cachedFile) ? 'image/gif' : /\.png$/i.test(cachedFile) ? 'image/png' : /\.webp$/i.test(cachedFile) ? 'image/webp' : 'image/jpeg' };
+      } catch {}
+    }
+    if (!got?.buffer) got = await fetchOneBotImage(media);
+    if (!got?.buffer) throw new Error('取不到这张图的原始数据');
+    const dir = '/home/dsh/napcat/config/_sticker-tmp';
+    fsMod.mkdirSync(dir, { recursive: true });
+    const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const ext = /gif/i.test(got.mimeType || '') ? 'gif' : /png/i.test(got.mimeType || '') ? 'png' : /webp/i.test(got.mimeType || '') ? 'webp' : 'jpg';
+    const src = `${dir}/src-${stamp}.${ext}`;
+    fsMod.writeFileSync(src, got.buffer);
+    let duration = 0;
+    try {
+      const probe = execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=nw=1:nk=1', src], { encoding: 'utf8', timeout: 15000 });
+      duration = Number(String(probe).trim()) || 0;
+    } catch {}
+    const isAnimated = duration >= 0.12;
+    // VIEW_STICKER_FIX3：先按 fps 均匀抽最多 6 帧，再取首/中/尾（-ss 定位到 GIF 末尾会抽出 0 字节）
+    const files = [];
+    if (!isAnimated) {
+      const out = `${dir}/f-${stamp}-0.png`;
+      try {
+        execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', src, '-frames:v', '1', '-vf', 'scale=240:-1:flags=lanczos', out], { timeout: 20000 });
+        if (fsMod.existsSync(out) && fsMod.statSync(out).size > 0) files.push(out);
+      } catch {}
+    } else {
+      const seq = `${dir}/seq-${stamp}-%02d.png`;
+      try {
+        execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', src, '-vf', 'fps=4,scale=240:-1:flags=lanczos', '-frames:v', '6', seq], { timeout: 25000 });
+      } catch {}
+      const seqFiles = [];
+      for (let i = 1; i <= 6; i += 1) {
+        const f = `${dir}/seq-${stamp}-${String(i).padStart(2, '0')}.png`;
+        if (fsMod.existsSync(f) && fsMod.statSync(f).size > 0) seqFiles.push(f);
+      }
+      const wanted = seqFiles.length >= 3
+        ? [0, Math.floor(seqFiles.length / 2), seqFiles.length - 1]
+        : seqFiles.map((_, i) => i);
+      for (const idx of wanted) { if (seqFiles[idx]) files.push(seqFiles[idx]); }
+      for (const f of seqFiles) { if (files.includes(f)) continue; try { fsMod.unlinkSync(f); } catch {} }
+    }
+    if (!files.length) throw new Error('抽帧失败');
+    let sheet = files[0];
+    if (files.length > 1) {
+      const out = `${dir}/sheet-${stamp}.png`;
+      const args = [];
+      files.forEach((f) => args.push('-i', f));
+      args.push('-filter_complex', `hstack=inputs=${files.length}`, '-loglevel', 'error', out);
+      try { execFileSync('ffmpeg', ['-y', ...args], { timeout: 30000 }); sheet = out; } catch {}
+    }
+    try { fsMod.unlinkSync(src); } catch {}
+    for (const f of files) { if (f !== sheet) { try { fsMod.unlinkSync(f); } catch {} } }
+    const sheetName = sheet.split('/').pop();
+    return {
+      path: sheet,
+      containerPath: `/app/napcat/config/_sticker-tmp/${sheetName}`,
+      frames: files.length,
+      animated: isAnimated,
+      durationSec: Number(duration.toFixed(2)),
+      mimeType: 'image/png'
+    };
   }
 
   async function fetchOneBotImage(media) {
@@ -10616,6 +11537,99 @@ async function main() {
     return g && typeof g === 'object' ? g : {};
   }
 
+  // 花费降级：当日花费达到额度的一定比例后，群里自动降级成「只回 @」（等同高峰策略）。
+  let guardCostCache = { at: 0, cost: 0 };
+  function tokenGuardTodayCost() {
+    if (Date.now() - guardCostCache.at < 60000) return guardCostCache.cost;
+    let cost = 0;
+    try {
+      const u = bridgeDailyUsage();
+      cost = Number(u?.qq?.cost || 0) + Number(u?.bili?.cost || 0) + Number(u?.other?.cost || 0);
+      if (!(cost > 0) && u?.total?.cost) cost = Number(u.total.cost) || 0;
+    } catch (error) {
+      log('[降级] 读取当日花费失败：' + (error && error.message ? error.message : error));
+    }
+    guardCostCache = { at: Date.now(), cost };
+    return cost;
+  }
+  // 降级当天私聊通知管理员一次（写 state/downgrade-notified.json，重启不重复）
+  const DOWNGRADE_MARK_FILE = path.join(STATE_DIR, 'downgrade-notified.json');
+
+  // BOOST_PATCH —— /加油 N：今天额外再加 N 元额度（只影响降级线，不落配置文件）
+  const TOKEN_BOOST_FILE = path.join(SURFCORE_DIR, 'token-boost.json');
+  function tokenBoostExtra() {
+    try {
+      const j = JSON.parse(fs.readFileSync(TOKEN_BOOST_FILE, 'utf8')) || {};
+      const today = localDayKey();
+      if (j.day !== today) return 0;
+      const n = Number(j.extra);
+      return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : 0;
+    } catch { return 0; }
+  }
+  function tokenBoostAdd(cny) {
+    const day = localDayKey();
+    let j = {};
+    try { j = JSON.parse(fs.readFileSync(TOKEN_BOOST_FILE, 'utf8')) || {}; } catch {}
+    const base = j.day === day && Number.isFinite(Number(j.extra)) ? Number(j.extra) : 0;
+    const extra = Math.round((base + Number(cny)) * 100) / 100;
+    try {
+      fs.mkdirSync(STATE_DIR, { recursive: true });
+      fs.writeFileSync(TOKEN_BOOST_FILE, JSON.stringify({ day, extra, at: new Date().toISOString() }, null, 2) + '\n', 'utf8');
+    } catch (error) {
+      log('[加油] 写入失败：' + (error && error.message ? error.message : error));
+    }
+    return extra;
+  }
+  let downgradeNotifiedDay = '';
+  function notifyDowngradeOnce(info) {
+    try {
+      const day = localDayKey();
+      let mark = {};
+      try { mark = JSON.parse(fs.readFileSync(DOWNGRADE_MARK_FILE, 'utf8')) || {}; } catch {}
+      if (downgradeNotifiedDay === day || mark.day === day) return;
+      downgradeNotifiedDay = day;
+      fs.mkdirSync(STATE_DIR, { recursive: true });
+      fs.writeFileSync(DOWNGRADE_MARK_FILE, JSON.stringify({ day, at: new Date().toISOString() }) + '\n', 'utf8');
+      const owner = cfg.ownerQQ;
+      if (!owner) return;
+      const text = '【省钱模式】今天已经花了 ¥' + Number(info.cost || 0).toFixed(2)
+        + '（额度 ¥' + info.cap + '，到 ' + Math.round(info.ratio * 100) + '% 就降级）。'
+        + '群里的消息我暂时只回 @ 了，私聊照常。想临时放开就发 /谷价。';
+      void sendToQQ('private:' + owner, text).catch((e) => log('[降级] 通知失败：' + (e?.message ?? e)));
+      log('[降级] 已私聊通知管理员：¥' + Number(info.cost || 0).toFixed(2) + ' / ¥' + info.cap);
+      /* QBW_GROUP_NOTICE —— 降级时在群里说一句，避免大家以为她突然不理人 */
+      try {
+        const gc = tokenGuardCfg();
+        if (gc.downgradeGroupNotice !== false) {
+          const groups = Array.isArray(cfg.allow?.groups) ? cfg.allow.groups.slice(0, 3) : [];
+          const notice = String(gc.downgradeGroupNoticeText || '').trim()
+            || '今天开销有点高，我先省着点说话啦，有事 @ 我就行。';
+          for (const gid of groups) {
+            const gkey = 'group:' + gid;
+            void sendToQQ(gkey, notice).catch((e) => log('[降级] 群通知失败 ' + gkey + '：' + (e?.message ?? e)));
+          }
+          if (groups.length) log('[降级] 已在群里说了一句：' + groups.join(','));
+        }
+      } catch (e) { log('[降级] 群通知异常：' + (e?.message ?? e)); }
+    } catch (error) {
+      log('[降级] 通知异常：' + (error?.message ?? error));
+    }
+  }
+
+  function tokenGuardDowngrade() {
+    const g = tokenGuardCfg();
+    if (g.enabled === false) return { on: false, cost: 0, cap: 0, ratio: 0 };
+    const capRaw = Number(g.maxDailyCostCNY);
+    const cap = Number.isFinite(capRaw) && capRaw > 0 ? capRaw : (capRaw === 0 ? 0 : 8);
+    if (cap <= 0) return { on: false, cost: 0, cap: 0, ratio: 0 };
+    const ratioRaw = Number(g.downgradeAtRatio);
+    const ratio = Number.isFinite(ratioRaw) && ratioRaw > 0 && ratioRaw <= 1 ? ratioRaw : 0.5;
+    const extra = tokenBoostExtra();
+    const capEff = Math.round((cap + extra) * 100) / 100;
+    const cost = tokenGuardTodayCost();
+    return { on: cost >= capEff * ratio, cost, cap: capEff, baseCap: cap, extra, ratio };
+  }
+
   // ── 每日 token 额度（2026-10-23 用户要求）────────────────────────────
   // 权威用量由插件用 session/event 采集并写 token-usage-daily.json（含 B站）；
   // 桥接只读快照，快照超过 10 分钟没更新才回落到自己的 tokenLedger。
@@ -10625,7 +11639,8 @@ async function main() {
     const raw = g.maxDailyCostCNY;
     const n = Number(raw);
     // 没填过 → 默认 ¥8；明确 0 → 不限（尊重旧配置语义）。
-    const cny = raw === undefined || raw === null || !Number.isFinite(n) ? 8 : (n > 0 ? n : null);
+    const cnyBase = raw === undefined || raw === null || !Number.isFinite(n) ? 8 : (n > 0 ? n : null);
+    const cny = cnyBase == null ? null : Math.round((cnyBase + tokenBoostExtra()) * 100) / 100;
     return readBudget(SURFCORE_DIR, {
       qq: { cny, tokens: null },
       bili: { cny: null, tokens: null },
@@ -11678,7 +12693,9 @@ async function main() {
   }
 
   async function purposeTick() {
+    if (isPeakNow() || tokenGuardDowngrade().on) return; // 高峰时段不主动搭话，省钱
     if (purposeEvaluating || purposeRun || purposeWarming) return;
+    if (qqIsOff()) return;
     // 载体切到桌宠后，桥接不再自动出发（手动「立即试一次」/ 桌宠离线回落仍可走 runPurpose）。
     if (purposeCarrierNow() === 'pet') return;
     // 桌宠专注模式：连 QQ 载体的自动主动搭话也一起停，避免用户开着专注还被私聊。
@@ -11936,6 +12953,7 @@ async function main() {
 
   // 实际的 DSH prompt 投递（不再直接对外暴露，统一走 promptQueues 串行队列）。
   async function deliverPromptNow(key, promptText, opts = {}) {
+    if (opts && (opts.silentOutbound || opts.reason === 'style-learn')) suppressOutboundOnce.set(key, Date.now() + 15 * 60 * 1000); // STYLE_PATCH13
     if (!isSessionAllowedInCurrentMode(key)) throw new Error(`当前模式不允许会话 ${key}`);
     // Recheck queued wakes at dispatch time: no model call while paused/disabled
     // and no reserved2 prompt leaking into an ordinary chat after a mode switch.
@@ -12020,10 +13038,10 @@ async function main() {
         });
       } catch {}
     }
-    let content = [{ type: 'text', text: withAlignmentContext(key, withSlangContext(promptText)) }];
+    let content = [{ type: 'text', text: withAlignmentContext(key, withSlangContext(promptText, key)) }];
     if (Array.isArray(opts.media) && opts.media.length > 0) {
       const imageParts = await resolveMediaList(opts.media);
-      content = [{ type: 'text', text: withAlignmentContext(key, withSlangContext(promptText)) }, ...imageParts];
+      content = [{ type: 'text', text: withAlignmentContext(key, withSlangContext(promptText, key)) }, ...imageParts];
     }
     // 媒体解析成功后再标记退场，避免解析异常时残留退场标记。
     if (!isCurrentSession(key, sessionId)) throw new Error('投递前会话已重置或权限已变化');
@@ -12068,6 +13086,8 @@ async function main() {
         entry = { queue: [], running: false };
         promptQueues.set(key, entry);
       }
+      // STYLE_PATCH13
+      if (opts && (opts.silentOutbound || opts.reason === 'style-learn')) suppressOutboundOnce.set(key, Date.now() + 15 * 60 * 1000);
       entry.queue.push({ promptText, opts, resolve, reject });
       processPromptQueue(key);
     });
@@ -12376,12 +13396,245 @@ async function main() {
   // 记忆卡注入块：插件每次整理后原子写 memory-card-prompt-qq.md，这里按 mtime 缓存读。
   // 不解析 JSON、不依赖插件代码——桥接和插件是不同进程，文件是唯一契约。
   let memoryCardPromptCache = { key: '', text: '' };
+  // MEMV2_MEM 分层记忆：骨架（self.md，稳定）→ 记忆卡（截断到 1800 字）→ 最近两天日记
+  // 目的：每轮注入量从 3.5KB 降到约 2.3KB，同时保留“我是谁”的连续性；
+  // 被截掉的细节由 qq_recall_memory 按需回查，不再每轮全塞。
+  const MEMV2_DIR = path.dirname(MEMORY_CARD_PATHS.promptQq);
+  const MEMV2_SELF = path.join(MEMV2_DIR, 'self.md');
+  const MEMV2_DIARY = path.join(MEMV2_DIR, 'diary.md');
+  // MEMCARD_ALIGN_PATCH????? injectMaxChars.qq = 2200???? priority ????????
+  // ????? 1800 ????????????????????"???????????"?????
+  // ??? 2400?? memory-card.js ????????
+  const MEMV2_CARD_MAX = 2800;
+  const MEMV2_SELF_MAX = 700;
+  const MEMV2_DIARY_MAX = 400;
+
+  function memv2Capped(file, maxChars) {
+    try {
+      const t = fs.readFileSync(file, 'utf8').trim();
+      if (!t) return '';
+      return t.length > maxChars ? t.slice(0, maxChars) + '…（后面省了，细节用「回忆」工具查）' : t;
+    } catch { return ''; }
+  }
+
+  function memv2DiaryTail(maxChars) {
+    try {
+      const raw = fs.readFileSync(MEMV2_DIARY, 'utf8').trim();
+      if (!raw) return '';
+      const parts = raw.split(/\n(?=## )/);
+      const tail = parts.slice(-2).join('\n\n');
+      return tail.length > maxChars ? tail.slice(-maxChars) : tail;
+    } catch { return ''; }
+  }
+
+  function memv2RecallFiles() {
+    return [MEMORY_CARD_PATHS.promptQq, path.join(MEMV2_DIR, 'memory-card-full.jsonl'), path.join(MEMV2_DIR, 'memory-inbox.jsonl'), MEMV2_DIARY];
+  }
+
+  function memv2Recall(query, limit = 6) {
+    const q = String(query ?? '').trim();
+    if (!q) return [];
+    const terms = [...new Set(q.split(/[\s，。,.!?、；:：]+/).filter((t) => t.length >= 1))];
+    const hits = [];
+    for (const f of memv2RecallFiles()) {
+      let raw = '';
+      try { raw = fs.readFileSync(f, 'utf8'); } catch { continue; }
+      for (const line of raw.split('\n')) {
+        const s = line.trim();
+        if (!s || s.startsWith('{') === false && s.length < 4) continue;
+        let score = 0;
+        for (const t of terms) if (s.includes(t)) score += t.length >= 2 ? 2 : 1;
+        if (score === 0) continue;
+        hits.push({ file: path.basename(f), score, text: s.length > 240 ? s.slice(0, 240) + '…' : s });
+      }
+    }
+    hits.sort((a, b) => b.score - a.score);
+    return hits.slice(0, Math.max(1, Math.min(20, Number(limit) || 6)));
+  }
+
+  function memv2AppendDiary(text) {
+    const body = String(text ?? '').replace(/\s+/g, ' ').trim().slice(0, 500);
+    if (!body) return null;
+    const day = new Date().toLocaleDateString('sv-SE');
+    let raw = '';
+    try { raw = fs.readFileSync(MEMV2_DIARY, 'utf8'); } catch {}
+    const head = '## ' + day;
+    if (raw.includes(head)) {
+      raw = raw.replace(head, head + '\n- ' + body);
+    } else {
+      raw = (raw ? raw.trimEnd() + '\n\n' : '') + head + '\n- ' + body;
+    }
+    fs.writeFileSync(MEMV2_DIARY, raw, { mode: 0o600 });
+    return day;
+  }
+
+
+  // ── RELATEDMEM_PATCH：按“这一句”挑最相关的几条记忆，临时注入本轮（不进常驻提示词）──
+  const relmemCache = { key: '', records: [], df: new Map(), total: 0 };
+  const RELMEM_STOP = new Set(['一个', '什么', '我们', '你们', '他们', '这个', '那个', '现在', '就是', '还是', '可以', '没有', '知道', '觉得', '时候', '今天', '明天', '真的', '不是', '自己', '因为', '所以', '但是', '如果', '这样', '那样', '一点', '有点', '已经', '东西', '事情', '问题', '然后', '还有', '这里', '那里', '怎么', '这么', '那么', '一起', '一样', '不是', '不会', '不能']);
+  function relmemGrams(s) {
+    const text = String(s || '').toLowerCase().replace(/[\s\p{P}\p{S}]+/gu, ' ').trim();
+    const out = [];
+    for (const chunk of text.split(' ')) {
+      if (!chunk) continue;
+      if (/^[a-z0-9_.+-]+$/.test(chunk)) { if (chunk.length >= 2) out.push(chunk); continue; }
+      const chars = Array.from(chunk);
+      for (let i = 0; i < chars.length - 1; i += 1) {
+        const g = chars[i] + chars[i + 1];
+        if (!RELMEM_STOP.has(g)) out.push(g);
+      }
+    }
+    return out;
+  }
+  function relmemIndex() {
+    try {
+      const st = fs.statSync(MEMORY_CARD_PATHS.json);
+      const key = `${st.mtimeMs}:${st.size}`;
+      if (relmemCache.key === key) return relmemCache;
+      const card = JSON.parse(fs.readFileSync(MEMORY_CARD_PATHS.json, 'utf8'));
+      const recs = (card.records || []).filter((r) => r && !r.forgottenAt && (r.text || r.title));
+      const df = new Map();
+      for (const r of recs) {
+        const set = new Set(relmemGrams(`${r.title || ''} ${r.text || ''}`));
+        for (const g of set) df.set(g, (df.get(g) || 0) + 1);
+      }
+      relmemCache.key = key;
+      relmemCache.records = recs;
+      relmemCache.df = df;
+      relmemCache.total = recs.length;
+      return relmemCache;
+    } catch {
+      return { key: '', records: [], df: new Map(), total: 0 };
+    }
+  }
+  function relmemClean(s) {
+    return String(s || '').replace(/\[图片\]/g, '').replace(/\[表情\]/g, '').replace(/\s+/g, ' ').trim();
+  }
+  function relatedMemoryBlock(text) {
+    const rc = cfg.socialV2?.relatedMemories ?? {};
+    if (rc.enabled === false) return '';
+    const q = String(text ?? '').trim();
+    if (q.length < 2 || q.startsWith('/')) return '';
+    const maxItems = Math.max(1, Math.min(6, Number(rc.maxItems) || 3));
+    const maxChars = Math.max(120, Math.min(900, Number(rc.injectMaxChars) || 300));
+    const minHits = Math.max(1, Math.min(4, Number(rc.minHits) || 2));
+    const idx = relmemIndex();
+    if (!idx.records.length) return '';
+    const qg = [...new Set(relmemGrams(q))];
+    const needHits = Math.min(minHits, qg.length);
+    if (!qg.length) return '';
+    const n = Math.max(1, idx.total);
+    const scored = [];
+    for (const r of idx.records) {
+      const hay = new Set(relmemGrams(`${r.title || ''} ${r.text || ''}`));
+      let score = 0;
+      let hit = 0;
+      for (const g of qg) {
+        if (!hay.has(g)) continue;
+        hit += 1;
+        score += Math.log(1 + n / (idx.df.get(g) || 1));
+      }
+      if (hit < needHits) continue;
+      score += (Number(r.importance) || 0) / 250;
+      if (r.pinned) score += 0.3;
+      const last = Date.parse(r.lastSeenAt || r.createdAt || '') || 0;
+      if (last && Date.now() - last < 14 * 86400000) score += 0.15;
+      scored.push({ r, score });
+    }
+    if (!scored.length) return '';
+    scored.sort((a, b) => b.score - a.score);
+    const lines = [];
+    let used = 0;
+    for (const { r } of scored.slice(0, maxItems)) {
+      const line = '- ' + relmemClean(r.text || r.title || '').slice(0, 90);
+      if (used + line.length > maxChars) break;
+      lines.push(line);
+      used += line.length;
+    }
+    if (!lines.length) return '';
+    return `【和这句话有关的记忆（你自己想起来的旧事，只当背景：和当前话题无关就当没想起来，不要硬提）】\n${lines.join('\n')}`;
+  }
+  function relatedMemorySuffix(key, text) {
+    try {
+      // 只在私聊注入：群聊里不能把「和主人」的旧事塞给所有人看
+      if (!String(key || '').startsWith('private:')) return '';
+      const block = relatedMemoryBlock(text);
+      if (!block) return '';
+      if (cfg.socialV2?.relatedMemories?.log !== false) log(`[相关记忆] ${key} 注入 ${block.split('\n').length - 1} 条 for「${String(text).slice(0, 30)}」`);
+      return '\n\n' + block;
+    } catch (e) {
+      log('[相关记忆] 计算失败:', e?.message ?? e);
+      return '';
+    }
+  }
+
+  // ── PROMISE_PATCH：从她自己刚发的话里识别“欠下的事”，自动进 loops（欠事层）──
+  const PROMISE_RE_WHEN = /(明天|后天|下次|回头|等会|一会儿|晚点|过会|周末|这两天|今晚|等下|稍后|待会)/;
+  const PROMISE_RE_ACT = /(查|找|弄|做|发|看|问|告诉你|给你|帮你|找给|发你|整理|写|画|下)/;
+  const PROMISE_DONE = /(弄好了|弄完了|查到了|找到了|做好了|发你了|给你了|处理好了|写好了|都搞定了)/;
+  function notePromisesFromReply(key, messages) {
+    try {
+      if (cfg.socialV2?.loops?.autoCapture === false) return;
+      const texts = Array.isArray(messages) ? messages : [];
+      for (const t of texts) {
+        // PROMISE_PATCH2：引号里是转述别人的话，不是在承诺；描述「你是…的人」也不是承诺
+        const s = String(t ?? '').replace(/[「『“"]([^」』”"]{0,80})[」』”"]/g, ' ').replace(/\s+/g, ' ').trim();
+        if (s.length < 5 || s.length > 200) continue;
+        if (/你是|那个人|你说的|就是那个/.test(s)) continue;
+        if (PROMISE_DONE.test(s)) continue;
+        const hitWhen = PROMISE_RE_WHEN.test(s);
+        const hitAct = PROMISE_RE_ACT.test(s);
+        const selfPromise = /(我|咱)(去|先|这就|回头)?(帮你|给你|替你)/.test(s);
+        const selfSubject = /(我|咱|帮你|给你|替你)/.test(s);
+        if (!(hitWhen && hitAct && selfSubject) && !selfPromise) continue;
+        const sent = s.split(/[。！？!?\n]/).map((x) => x.trim()).filter(Boolean).find((x) => PROMISE_RE_WHEN.test(x) || /(帮你|给你|替你)/.test(x));
+        const text = String(sent || s).slice(0, 60).trim();
+        if (text.length < 5) continue;
+        const out = addLoop({ text, by: '自己', raw: cfg });
+        if (out?.ok) log(`[欠事] 捕获：${text}`);
+      }
+    } catch (e) {
+      log('[欠事] 捕获失败:', e?.message ?? e);
+    }
+  }
+
   function memoryCardPromptBlock() {
     try {
       const stat = fs.statSync(MEMORY_CARD_PATHS.promptQq);
-      const key = `${stat.mtimeMs}:${stat.size}`;
+      let s1 = { mtimeMs: 0, size: 0 };
+      let s2 = { mtimeMs: 0, size: 0 };
+      try { s1 = fs.statSync(MEMV2_SELF); } catch {}
+      try { s2 = fs.statSync(MEMV2_DIARY); } catch {}
+      let imprStat = 'x';
+      try { imprStat = String(fs.statSync(impressionsPath()).mtimeMs); } catch {} // IMPR_PATCH
+      let tnStat = ''; try { tnStat = String(fs.statSync(techNotesPath()).mtimeMs); } catch {} // TECHNOTES_PATCH
+      const key = `${stat.mtimeMs}:${stat.size}|${s1.mtimeMs}:${s1.size}|${s2.mtimeMs}:${s2.size}|${loopsMeta()}|${imprStat}|${tnStat}`; // LOOPS_PATCH IMPR_PATCH TECHNOTES_PATCH
       if (memoryCardPromptCache.key === key) return memoryCardPromptCache.text;
-      const text = fs.readFileSync(MEMORY_CARD_PATHS.promptQq, 'utf8').trim();
+      const selfText = memv2Capped(MEMV2_SELF, MEMV2_SELF_MAX);
+      // OWNER_RELABEL_PATCH：记忆卡里统一叫「他」——主人/管理员/他三种叫法同一个人，别让她混着用
+      const relabelOwner = (t) => String(t || '')
+        .replace(/主人（私聊）/g, '他（私聊）')
+        .replace(/主人（群聊）/g, '他（群聊）')
+        .replace(/和主人（管理员）/g, '和他')
+        .replace(/（和主人）/g, '（和他）')
+        .replace(/## 和主人/g, '## 和他');
+      const card = relabelOwner(memv2Capped(MEMORY_CARD_PATHS.promptQq, MEMV2_CARD_MAX));
+      const diary = memv2DiaryTail(MEMV2_DIARY_MAX);
+      const loops = loopsBlock(cfg); // LOOPS_PATCH
+      const people = peopleBlock(cfg); // NEXT_PATCH
+      // RECALL_RULE_PATCH：把「先查再答」写成硬规矩（约 60 token）
+      const recallRule = '【用记忆的规矩】提到过去发生的事、约定/承诺、TA 的偏好或习惯时，先用 qq_recall_memory 查一下再回答；查不到就直说记不清，别凭感觉编。';
+      const imprs = impressionsBlock(cfg.socialV2?.impressions); // IMPR_PATCH
+        const techNotesLine = techNotesBlock(cfg.socialV2?.techNotes); // TECHNOTES_PATCH
+        // STYLE_INJECT_PATCH：学到的说法要真进提示词，否则只是收集
+        const stlCfg = styleLearnCfgNow();
+        const styleMax = Math.max(0, Number(stlCfg?.injectMaxChars ?? 520) || 520);
+        const stlBlock = stlCfg?.enabled && styleMax ? styleSamplesBlock(styleMax, Number(stlCfg?.injectMaxItems) || 6) : '';
+        const styleLine = stlBlock
+          ? ['【说话方式（从别人那儿学来的框架；是参考，不是台词：别整段照搬原话，更别学成对方的口气）】', stlBlock].join('\n')
+          : '';
+      const text = [selfText, recallRule, loops, people, imprs, techNotesLine, styleLine, card, diary ? '【最近两天的日记（你自己写的）】\n' + diary : '']
+        .filter(Boolean).join('\n\n');
       memoryCardPromptCache = { key, text };
       return text;
     } catch {
@@ -12572,9 +13825,222 @@ async function main() {
     }
   }
 
+  // BILISTUDY_PATCH
+  setInterval(() => {
+    (async () => {
+      try {
+        const sc = studyCfg(cfg.socialV2?.biliStudy);
+        if (!sc.enabled) return;
+        if (isPeakNow() || tokenGuardDowngrade().on) {
+          log('[学习] 高峰或省钱模式，跳过本次');
+          return;
+        }
+        let st = readStudyState();
+        if (st.pendingBvid && st.pendingAt && Date.now() - st.pendingAt > 15 * 60 * 1000 && Number(st.nudged || 0) < 2) {
+          const watched = await hasWatched(st.pendingBvid, os.homedir(), st.pendingAt);
+          if (watched) {
+            log('[学习] 确认她已看：' + st.pendingBvid);
+            try {
+              const info = await fetchVideoInfo(String(st.pendingBvid), { timeoutMs: 15000 });
+              const aid = info?.data?.aid || info?.aid;
+              const fj = studyCfg(cfg.socialV2?.biliStudy).folderId;
+              if (aid && fj) {
+                const fr = await addToFolder({ aid, folderId: fj });
+                log('[学习] 补收进收藏夹：' + st.pendingBvid + '（' + (fr.ok ? 'ok' : fr.reason) + '）');
+              }
+            } catch (e) { log('[学习] 补收藏夹失败：' + (e?.message || e)); }
+            writeStudyState({ pendingBvid: '', pendingAt: 0, nudged: 0 });
+          } else {
+            const owner0 = String(cfg.ownerQQ || '');
+            log('[学习] 还没看，催一次：' + st.pendingBvid + '（第 ' + (Number(st.nudged || 0) + 1) + ' 次）');
+            if (owner0) {
+              await deliverPrompt('private:' + owner0, '刚才那条视频你还没看吧？现在看：https://www.bilibili.com/video/' + st.pendingBvid + '/ 用 video_storyboard 抽 6 格 + 平台字幕，看完回我 2~3 句。');
+            }
+            writeStudyState({ nudged: Number(st.nudged || 0) + 1, pendingAt: Date.now() });
+          }
+          st = readStudyState();
+        }
+        if (st.nextAt && Date.now() < st.nextAt) return;
+
+        const r = await pickStudyVideo({ cfg: cfg.socialV2?.biliStudy });
+        if (!r.ok) {
+          log('[学习] 没挑到：' + r.reason);
+          writeStudyState({ nextAt: Date.now() + 30 * 60 * 1000 });
+          return;
+        }
+        writeStudyState({ nextAt: Date.now() + 4 * 60 * 60 * 1000 });
+        const v = r.video;
+        log('[学习] 挑到 ' + v.bvid + ' ' + v.title + '（收藏=' + (r.favorited ? 'ok' : r.favReason) + '）');
+        const owner = String(cfg.ownerQQ || '');
+        if (!owner) return;
+        const dur = v.durationText || (Math.round(v.durationSec / 60) + ' 分钟');
+        const msg = '【今日学习】B站上这条可能对你有用：\n《' + v.title + '》\n作者 ' + v.author
+          + ' · 时长 ' + dur + ' · ' + v.play + ' 播放\nhttps://www.bilibili.com/video/' + v.bvid + '/\n\n'
+          + '现在就去看：用 video_storyboard 抽 6 格画面 + 读平台字幕，看完用 2~3 句话跟我说：它讲了什么、有没有能直接用到你自己身上的东西。'
+          + '没看完之前别只回我“收到”；如果工具报错，把错误原文发我。别转发到群里，别评论。';
+        await deliverPrompt('private:' + owner, msg);
+        writeStudyState({ pendingBvid: v.bvid, pendingAt: Date.now(), nudged: 0 }); // BILISTUDY_PATCH2
+      } catch (err) {
+        log('[学习] 异常：' + (err?.message || err));
+      }
+    })();
+  }, 10 * 60 * 1000);
+  log('[学习] 已启动：每 10 分钟看一眼要不要学新视频');
+
+  // STYLE_PATCH: 每天固定时间让她去群里「学说法」（只记句式，不改人格）
+  function styleLearnCfgNow() {
+    const c = cfg.socialV2?.styleLearn ?? {};
+    const groups = Array.isArray(c.groups) && c.groups.length
+      ? c.groups.map(String)
+      : (Array.isArray(cfg.allow?.groups) ? cfg.allow.groups.map(String) : []);
+    const rounds = Array.isArray(c.rounds) && c.rounds.length
+      ? c.rounds.map((r) => [Number(r?.[0]) || 0, Number(r?.[1]) || 0])
+      : [[Number.isFinite(c.hour) ? c.hour : 20, Number.isFinite(c.minute) ? c.minute : 30]];
+    return {
+      enabled: c.enabled !== false,
+      hour: Number.isFinite(c.hour) ? c.hour : 20,
+      minute: Number.isFinite(c.minute) ? c.minute : 30,
+      groups,
+      rounds, // STYLELEARN2_CFG
+      targetQQ: String(c.targetQQ || '2000000000'),
+      strictTarget: c.strictTarget !== false, // STYLE_STRICT_PATCH：只认目标 QQ / 昵称含「亚托莉」
+      perRound: Math.max(1, Math.min(4, Number(c.perRound) || 2)),
+    };
+  }
+  async function styleLearnTick() {
+    try {
+      const c = styleLearnCfgNow();
+      if (!c.enabled || !c.groups.length) return;
+      const now = new Date();
+      const day = now.toISOString().slice(0, 10);
+      const stFile = path.join(STATE_DIR, 'style-learn.json');
+      let st = {};
+      try { st = JSON.parse(fs.readFileSync(stFile, 'utf8')); } catch {}
+      // STYLE_CATCHUP：只要今天该轮的时间已过、且还没做，就补跑（重启/错过 10 分钟窗口都不丢）
+      let round = -1;
+      { const minsNow = now.getHours() * 60 + now.getMinutes();
+        (c.rounds || []).forEach((r, i) => { const at = Number(r?.[0]) * 60 + Number(r?.[1]); if (Number.isFinite(at) && minsNow >= at) round = i; }); }
+      if (round < 0) return;
+      const doneKey = day + '#' + round;
+      if (st?.done && st.done[doneKey]) return;
+      if (isPeakNow()) { log('[学样] 跳过（高峰时段）：' + doneKey); return; }
+      if (tokenGuardDowngrade().on) { log('[学样] 跳过（省钱模式）：' + doneKey); return; }
+      if (!cfg.ownerQQ) return;
+      const gid = c.groups[Math.floor(Math.random() * c.groups.length)];
+      const doneMap = Object.assign({}, st && st.done ? st.done : {}, { [doneKey]: true }); // STYLELEARN2_STATE
+      fs.writeFileSync(stFile, JSON.stringify({ day, done: doneMap, lastRound: round, group: gid, at: new Date().toISOString() }));
+      let task = '【学说法】去群里看看（群 ' + gid + '）：先用 qq_read_group_recent 拉最近 25 条（就用这一个工具；不要用 qq_get_recent / qq_get_unread / qq_get_prompt，那几个只能看当前会话，跨群一定报凭证错误，不是工具坏了）。重点看一个人：**QQ 2000000000**，群昵称以「亚托莉」三个字开头（后面还可能有别的字）。按 QQ 号认最准；找不到他就只记通用框架，别硬认人。只提炼「说话框架」：怎么起句、怎么接话、怎么求人、怎么拒绝、怎么吐槽但不伤人；**不要抄口头禅和梗**，也别整段模仿——她的说话方式以她自己为主，别人只是参考。记 1~2 条就够，写「好在哪」时要写框架层面的原因（例：先用一句软话把事说清，再给结论）。她得是温柔、善良、单纯的：脏话、攻击、阴阳怪气、贬低别人一律不学。 // STYLE_PATCH10'
+        + '记完就不用改人格卡，也别在群里发言，**更不要私聊汇报**（黑箱模式）：记完就结束这一轮，不要写回话内容。';
+      task = '【学说法】去烤研群（群 ' + gid + '）看看：先用 qq_read_group_recent 拉最近 40 条（只用这一个工具，别用 qq_get_recent / qq_get_unread / qq_get_prompt，跨群一定报凭证错误）。**只学 QQ ' + c.targetQQ + '（群昵称以「亚托莉」开头）这一个人的说话方式**，群里其他人的话只当上下文，不许学。按 QQ 号认人最准；找不到他就只记通用框架，别硬认人。只提炼「说话框架」：怎么起句、怎么接话、怎么求人、怎么拒绝、怎么吐槽但不伤人；**不要抄口头禅和梗**，也别整段模仿。记 ' + c.perRound + ' 条，每条都要写框架层面的「好在哪」（例：先用一句软话把事说清，再给结论）。脏话、攻击、阴阳怪气、贬低别人一律不学。记完不改人格卡、不在群里发言、不私聊汇报。'; // STYLELEARN2_TASK
+      deliverPrompt('private:' + cfg.ownerQQ, task, { reason: 'style-learn', silentOutbound: true });
+      log('[学样] 已排定今天的学习任务：' + gid);
+    } catch (e) {
+      log('[学样] 定时任务出错：' + String(e?.message || e));
+    }
+  }
+  try { setInterval(() => { void styleLearnTick(); }, 5 * 60 * 1000); } catch {}
+  try { setInterval(() => { styleTick(cfg); }, 30 * 60 * 1000); } catch {} // STYLE_GATE_PATCH：候选过期丢弃
+
+  // MOOD_DIARY_TICK：把当天心情的主色调写进日记（一天一条，零模型开销）
+  async function moodDiaryTick() {
+    try {
+      const mc = cfg.socialV2?.mood || {};
+      if (mc.enabled === false || mc.diary === false) return;
+      const now = new Date();
+      const day = now.toLocaleDateString('sv-SE');
+      const stFile = path.join(STATE_DIR, 'mood-diary.json');
+      let st = {};
+      try { st = JSON.parse(fs.readFileSync(stFile, 'utf8')); } catch {}
+      if (st && st.day === day) return;
+      const hh = Number(mc.diaryHour ?? 23), mm = Number(mc.diaryMinute ?? 20);
+      if (now.getHours() * 60 + now.getMinutes() < hh * 60 + mm) return;
+      let m = null;
+      try { m = JSON.parse(fs.readFileSync(path.join(STATE_DIR, 'mood.json'), 'utf8')); } catch {}
+      const vals = m?.values || m?.scores || {};
+      const top = Object.entries(vals).sort((a, b) => b[1] - a[1]).slice(0, 2)
+        .filter(([, v]) => Number(v) >= 25).map(([k, v]) => MOOD_CN_SIMPLE[k] || k);
+      if (!top.length) return;
+      const line = '（心情）今天主要是' + top.join('、') + '。';
+      memv2AppendDiary(line);
+      fs.writeFileSync(stFile, JSON.stringify({ day, at: new Date().toISOString(), line }));
+      log('[心情] 已写进日记：' + top.join('、'));
+    } catch (e) { log('[心情] 写日记出错：' + String(e?.message || e)); }
+  }
+  const MOOD_CN_SIMPLE = { calm: '平静', happy: '开心', curious: '好奇', focused: '专注', excited: '兴奋', tired: '有点累', annoyed: '烦躁', down: '低落', fear: '不安', disgust: '反感', surprise: '意外', hurt: '受伤', sulk: '闷闷的', proud: '得意', gloomy: '沉', anxious: '焦虑', numb: '没感觉', lonely: '孤单', flutter: '心动', love: '喜欢', jealous: '吃味', shame: '羞', guilt: '内疚', awkward: '尴尬', sympathy: '心疼', disappointed: '失望', nostalgia: '怀念', coy: '想撒娇', conflict: '别扭', burnout: '撑不住', cracked: '有点崩' };
+  try { setInterval(() => { void moodDiaryTick(); }, 5 * 60 * 1000); } catch {}
+
+  // ── NEXT_PATCH：提醒 / 告警 / 日报 ──
+  async function reminderTick() {
+    try {
+      if (cfg.socialV2?.reminders?.enabled === false) return;
+      const due = dueReminders();
+      if (!due.length) return;
+      const owner = cfg.ownerQQ;
+      if (!owner) return;
+      const take = due.slice(0, 3);
+      for (const it of take) {
+        await sendToQQ('private:' + owner, '⏰ 提醒你：' + it.text);
+        log('[提醒] 已发出：' + it.text);
+      }
+      markReminded(take.map((x) => x.id));
+    } catch {}
+  }
+
+  async function alertTick() {
+    try {
+      const c = cfg.socialV2?.alerts ?? {};
+      if (c.enabled === false) return;
+      const gapMs = (Number(c.gapMin) || 25) * 60000;
+      const ago = lastEventAgo();
+      if (ago < 0 || ago < gapMs) return;
+      const st = alertState();
+      if (st.alertedAt && Date.now() - st.alertedAt < (Number(c.cooldownMin) || 60) * 60000) return;
+      const owner = cfg.ownerQQ;
+      if (!owner) return;
+      // QUIET_PATCH：链路真断才提醒；夜里和主动重启时不打扰
+      if (snowlumaHealth?.connected === true || isQuietHour() || tookRestartMark()) {
+        log('[告警] 静默跳过（连接正常/夜间/主动重启），事件中断 ' + Math.round(ago / 60000) + ' 分钟');
+        setAlert({ alertedAt: Date.now() });
+        return;
+      }
+      await sendToQQ('private:' + owner, '我这边已经 ' + Math.round(ago / 60000) + ' 分钟没收到消息了，可能断了，我在自己恢复。');
+      setAlert({ alertedAt: Date.now() });
+      log('[告警] 事件中断 ' + Math.round(ago / 60000) + ' 分钟');
+    } catch {}
+  }
+
+  async function reportTick() {
+    try {
+      const rc = cfg.socialV2?.report ?? {};
+      if (rc.enabled === false) return;
+      const now = new Date();
+      const target = (Number(rc.hour ?? 23)) * 60 + Number(rc.minute ?? 30);
+      if (now.getHours() * 60 + now.getMinutes() < target) return;
+      const day = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+      if (reportState().day === day) return;
+      const owner = cfg.ownerQQ;
+      if (!owner) return;
+      const info = tokenGuardDowngrade();
+      let study = '';
+      try {
+        const st = readStudyState();
+        if (st && st.count) study = String(st.count) + ' 条' + (st.lastBvid ? '（' + st.lastBvid + '）' : '');
+      } catch {}
+      const text = fmtReport({ day, cost: Number(info.cost || 0), cap: info.cap, study });
+      await sendToQQ('private:' + owner, text);
+      markReported(day);
+      log('[日报] 已发送');
+    } catch {}
+  }
+
   function startProactiveScheduler() {
     if (cfg.chat?.proactive?.enabled === false) return;
     setInterval(() => { checkProactiveAt().catch(() => {}); }, 5 * 60 * 1000);
+    setInterval(() => { void qzoneWatchTick(); }, 60 * 1000); // QZONE_WATCH_PATCH
+    setInterval(() => { void reminderTick(); }, 60 * 1000); // NEXT_PATCH
+    setInterval(() => { void alertTick(); }, 60 * 1000); // NEXT_PATCH
+    setInterval(() => { void reportTick(); }, 5 * 60 * 1000); // NEXT_PATCH
+    setInterval(() => { try { moodTick(); moodDiaryTick(); } catch {} }, 5 * 60 * 1000); // MOODV2_TICK
     log(`[搭话] 已启动：每群每小时最多一次主动 @（至少 ${cfg.chat?.proactive?.minMessages ?? 10} 条上下文）`);
   }
 
@@ -13153,6 +14619,348 @@ async function main() {
     return text;
   }
 
+  // ── 高峰待确认：群里别人 @ 她时，先私信问管理员（不叫模型、不花钱）─────────
+  const PEAK_PEND_FILE = path.join(STATE_DIR, 'peak-pending.json');
+  const peakAskLastAt = new Map();
+
+  function readPeakPending() {
+    try {
+      const obj = JSON.parse(fs.readFileSync(PEAK_PEND_FILE, 'utf8'));
+      return obj && typeof obj === 'object' ? obj : {};
+    } catch { return {}; }
+  }
+
+  function writePeakPending(obj) {
+    try { fs.writeFileSync(PEAK_PEND_FILE, JSON.stringify(obj, null, 2)); } catch {}
+  }
+
+  // ── 好友申请 / 资料 / 头像（PROFILE_PATCH，2026-10-30）────────────────────
+  const FRIEND_REQ_FILE = path.join(STATE_DIR, 'friend-requests.json');
+  const AVATAR_PEND_FILE = path.join(STATE_DIR, 'avatar-pending.json');
+
+  function readFriendReqs() {
+    try {
+      const o = JSON.parse(fs.readFileSync(FRIEND_REQ_FILE, 'utf8'));
+      return Array.isArray(o) ? o : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function writeFriendReqs(list) {
+    try {
+      fs.writeFileSync(FRIEND_REQ_FILE, JSON.stringify(list.slice(-50), null, 2) + '\n', 'utf8');
+    } catch (error) {
+      log('[好友] 写申请列表失败：' + (error?.message ?? error));
+    }
+  }
+
+  function readAvatarPend() {
+    try {
+      const o = JSON.parse(fs.readFileSync(AVATAR_PEND_FILE, 'utf8'));
+      return o && typeof o === 'object' ? o : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function writeAvatarPend(obj) {
+    try {
+      if (!obj) {
+        fs.rmSync(AVATAR_PEND_FILE, { force: true });
+        return;
+      }
+      fs.writeFileSync(AVATAR_PEND_FILE, JSON.stringify(obj, null, 2) + '\n', 'utf8');
+    } catch (error) {
+      log('[头像] 写待确认状态失败：' + (error?.message ?? error));
+    }
+  }
+
+  // 把 base64 / URL 落成「容器内可读」的绝对路径（NapCat 只认它能 stat 到的文件）
+  async function resolveAvatarFile(src) {
+    const s = String(src ?? '').trim();
+    if (!s) throw new Error('头像来源为空');
+    if (s.startsWith('base64://')) {
+      const buf = Buffer.from(s.slice('base64://'.length), 'base64');
+      return stickerTempPath(buf, 'image/png');
+    }
+    if (/^https?:\/\//i.test(s)) {
+      const fetched = await safeFetchBuffer(s, MAX_MEDIA_BYTES);
+      return stickerTempPath(fetched.buffer, mimeFromUrl(s));
+    }
+    return s;
+  }
+
+  function describeFriendReq(r) {
+    const who = r.nickname ? `${r.nickname}(${r.userId})` : String(r.userId);
+    const note = r.comment ? `，附言：${r.comment}` : '';
+    return `${who}${note}`;
+  }
+
+  // FRIEND_BATCH_PATCH：好友申请太多时别一条一条轰炸主人。
+  // 规则：冷却期内只发一条（默认 10 分钟），一天最多 8 条；待处理超过 3 条时只发汇总。
+  const FRIEND_NOTIFY_FILE = path.join(STATE_DIR, 'friend-notify.json');
+  function friendNotifyCfg() {
+    const f = cfg.socialV2?.friends ?? {};
+    return {
+      cooldownMs: Math.max(60000, Number(f.notifyCooldownMs) || 10 * 60 * 1000),
+      maxPerDay: Math.max(1, Math.min(50, Number(f.notifyMaxPerDay) || 8))
+    };
+  }
+  function readFriendNotify() {
+    try {
+      const o = JSON.parse(fs.readFileSync(FRIEND_NOTIFY_FILE, 'utf8'));
+      return o && typeof o === 'object' ? o : {};
+    } catch {
+      return {};
+    }
+  }
+  function writeFriendNotify(o) {
+    try {
+      fs.writeFileSync(FRIEND_NOTIFY_FILE, JSON.stringify(o, null, 2) + '\n', 'utf8');
+    } catch (error) {
+      log('[好友] 写通知状态失败：' + (error?.message ?? error));
+    }
+  }
+  function notifyFriendBatched(latest) {
+    const { cooldownMs, maxPerDay } = friendNotifyCfg();
+    const today = ymdOf(Date.now());
+    const st = readFriendNotify();
+    const sent = st.date === today ? Number(st.sent) || 0 : 0;
+    const lastAt = Number(st.lastAt) || 0;
+    const pending = readFriendReqs();
+    const now = Date.now();
+    if (sent >= maxPerDay) {
+      log(`[好友] 今天已通知 ${sent} 次，不再打扰主人（待处理 ${pending.length} 条）`);
+      return;
+    }
+    if (now - lastAt < cooldownMs) {
+      log(`[好友] 冷却中（还剩 ${Math.round((cooldownMs - (now - lastAt)) / 1000)}s），待处理 ${pending.length} 条，先不打扰`);
+      return;
+    }
+    let ownQQ = '';
+    try { ownQQ = String(cfg.ownerQQ ?? ''); } catch { ownQQ = ''; }
+    if (!ownQQ) return;
+    let msg;
+    if (pending.length <= 3) {
+      const lines = pending.map((r) => '· ' + describeFriendReq(r)).join('\n');
+      msg = `【好友申请】\n${lines}\n同意发 /同意好友 QQ号，拒绝发 /拒绝好友 QQ号。`;
+    } else {
+      msg = `【好友申请】现在有 ${pending.length} 个人想加她，我不一条条问了。\n发 /好友 看整个列表，一次处理完；不想管就放着，会一直留着。`;
+    }
+    void sendToQQ(`private:${ownQQ}`, msg);
+    writeFriendNotify({ date: today, sent: sent + 1, lastAt: now });
+    log(`[好友] 已通知主人（第 ${sent + 1} 次/今日，待处理 ${pending.length} 条）`);
+  }
+
+  async function askOwnerPeakPermission(key, event, textContent) {
+    const owner = String(cfg.ownerQQ ?? '');
+    if (!owner) return;
+    const last = peakAskLastAt.get(key) || 0;
+    if (Date.now() - last < 2 * 60 * 1000) return; // 同一个群 2 分钟内只问一次
+    peakAskLastAt.set(key, Date.now());
+    const gid = String(key.split(':')[1] || '');
+    const sender = event?.sender?.card || event?.sender?.nickname || String(event?.user_id ?? '');
+    const body = String(textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 160);
+    const pend = readPeakPending();
+    pend[key] = { gid, sender: String(sender), text: body, at: Date.now() };
+    writePeakPending(pend);
+    const notice = `【高峰待确认】群${gid}的「${sender}」@你：${body}。要回就发「回：你想让我说的话」，让我自己想就发「你看着回」，不想理就发「不回」。`;
+    try {
+      void sendToQQ(`private:${owner}`, notice);
+      log(`[高峰待确认] 已私信管理员：${key} 来自 ${sender}`);
+    } catch (error) {
+      log(`[高峰待确认] 私信失败：${error?.message ?? error}`);
+    }
+  }
+
+  // ===== 高峰/谷价判断 =====
+  // 优先级：peak-test 强制高峰 > 人工谷价日（state/offpeak-days.json）> 官方计价表（含法定节假日）
+  const OFFPEAK_FILE = path.join(STATE_DIR, 'offpeak-days.json');
+
+  function ymdOf(ms) {
+    const d = new Date(ms);
+    const p = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  }
+
+  function readOffpeakDays() {
+    try {
+      const arr = JSON.parse(fs.readFileSync(OFFPEAK_FILE, 'utf8'));
+      return Array.isArray(arr) ? arr.filter((x) => typeof x === 'string') : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function writeOffpeakDays(list) {
+    const uniq = [...new Set(list)].sort();
+    fs.mkdirSync(STATE_DIR, { recursive: true });
+    fs.writeFileSync(OFFPEAK_FILE, JSON.stringify(uniq, null, 2) + '\n', 'utf8');
+    return uniq;
+  }
+
+  function isOffpeakDay(atMs) {
+    try {
+      return readOffpeakDays().includes(ymdOf(atMs));
+    } catch {
+      return false;
+    }
+  }
+
+  // 高峰时段：优先用 model-prices.js 的 isPeakAt（工作日 9-12 / 14-18，且排除 66 天法定节假日）
+  // QZONE_WATCH_PATCH（2026-10-30）：自动看他的说说，但**不秒评** —— 发现新说说后隔 5~25 分钟才提醒她；
+  // 高峰时段 / 省钱模式 时完全不看；每天最多提醒 watchMaxPerDay 条；一轮只提醒一条。
+  const UA_QZONE = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36';
+  function qzoneWatchCfg() {
+    const q = cfg.socialV2?.qzone ?? {};
+    return {
+      on: q.watchOwner !== false,
+      checkMinMs: Number(q.watchCheckMinMs ?? 15 * 60 * 1000),
+      checkMaxMs: Number(q.watchCheckMaxMs ?? 30 * 60 * 1000),
+      delayMinMs: Number(q.watchDelayMinMs ?? 5 * 60 * 1000),
+      delayMaxMs: Number(q.watchDelayMaxMs ?? 25 * 60 * 1000),
+      maxPerDay: Number(q.watchMaxPerDay ?? 3),
+      onlyOffPeak: q.watchOnlyOffPeak !== false
+    };
+  }
+  const qzoneSeenFile = path.join(STATE_DIR, 'qzone-seen.json');
+  function qzoneSeenRead() {
+    try { const v = JSON.parse(fs.readFileSync(qzoneSeenFile, 'utf8')); return { seen: v.seen || [], comments: v.comments || [], pending: v.pending || [], day: v.day || '', delivered: Number(v.delivered || 0), nextAt: Number(v.nextAt || 0) }; }
+    catch { return { seen: [], comments: [], pending: [], day: '', delivered: 0, nextAt: 0 }; }
+  }
+  function qzoneSeenWrite(v) {
+    try { fs.mkdirSync(STATE_DIR, { recursive: true }); fs.writeFileSync(qzoneSeenFile, JSON.stringify(v)); } catch {}
+  }
+  async function qzoneWebAuth() {
+    const ck = async (domain) => { try { const r = await bot.request('get_cookies', { domain }); return String(r?.cookies ?? r?.data?.cookies ?? ''); } catch { return ''; } };
+    const cookie = [...new Set([await ck('user.qzone.qq.com'), await ck('h5.qzone.qq.com')].join('; ').split(/;\s*/).filter(Boolean))].join('; ');
+    const pSkey = ((/p_skey=([^;]+)/.exec(cookie) || [])[1] || '').replace(/^@/, '');
+    if (!pSkey) return null;
+    let h = 5381;
+    for (let i = 0; i < pSkey.length; i += 1) h += (h << 5) + pSkey.charCodeAt(i);
+    return { cookie, gtk: h & 0x7fffffff };
+  }
+  let qzoneWatchBusy = false;
+  async function qzoneWatchTick() {
+    if (qzoneWatchBusy) return;
+    qzoneWatchBusy = true;
+    try {
+      const w = qzoneWatchCfg();
+      if (!w.on || !qzoneEnabled() || socialV2.paused || qqIsOff()) return;
+      const st = qzoneSeenRead();
+      const today = new Date().toISOString().slice(0, 10);
+      if (st.day !== today) { st.day = today; st.delivered = 0; }
+      const now = Date.now();
+      if (!st.nextAt || now >= st.nextAt) {
+        st.nextAt = now + w.checkMinMs + Math.floor(Math.random() * Math.max(0, w.checkMaxMs - w.checkMinMs));
+        const calm = !(w.onlyOffPeak && (isPeakNow() || tokenGuardDowngrade().on));
+        const ownerQQ = String(cfg.ownerQQ ?? '').trim();
+        if (calm && ownerQQ) {
+          const auth = await qzoneWebAuth();
+          if (auth) {
+            try {
+              const url = `https://user.qzone.qq.com/proxy/domain/taotao.qq.com/cgi-bin/emotion_cgi_msglist_v6?uin=${ownerQQ}&ftype=0&sort=0&pos=0&num=5&hostUin=${ownerQQ}&inCharset=utf-8&outCharset=utf-8&notice=0&format=json&g_tk=${auth.gtk}`;
+              const res = await fetch(url, { headers: { cookie: auth.cookie, 'user-agent': UA_QZONE, referer: `https://user.qzone.qq.com/${ownerQQ}` }, signal: AbortSignal.timeout(15000) });
+              const txt = String(await res.text()).trim().replace(/^_Callback\(/, '').replace(/\);?$/, '');
+              const data = JSON.parse(txt);
+              if (data?.code === 0) {
+                for (const m of (data.msglist || [])) {
+                  if (!m?.tid || st.seen.includes(m.tid) || st.pending.some((p) => p.tid === m.tid)) continue;
+                  st.pending.push({
+                    tid: m.tid,
+                    content: String(m.content ?? '').slice(0, 120),
+                    at: now,
+                    dueAt: now + w.delayMinMs + Math.floor(Math.random() * Math.max(0, w.delayMaxMs - w.delayMinMs))
+                  });
+                }
+                // QZONE_WATCH_REPLY：他在这几条说说下的留言（含楼中楼回复她）也算一次「叫我」
+                const ownerUin = String(cfg.ownerQQ ?? '').trim();
+                st.comments = Array.isArray(st.comments) ? st.comments : [];
+                const seedOnly = st.comments.length === 0; // 首次运行只登记旧评论，不补提醒
+                for (const m of (data.msglist || [])) {
+                  const pool = [];
+                  for (const c of (m.commentlist || [])) {
+                    pool.push({ c, reply: false });
+                    for (const rr of (c.list_3 || [])) pool.push({ c: rr, reply: true });
+                  }
+                  for (const item of pool) {
+                    const c = item.c;
+                    if (!c || String(c.uin ?? '') !== ownerUin) continue;
+                    // QZONE_WATCH_REPLY_FIX：@ 别人的略过；@ 她本人的要算（那是他在回她）
+                    const cText = String(c.content ?? '');
+                    if (cText.includes('@{uin:') && !cText.includes(`uin:${selfUserId || ''},`)) continue;
+                    const key = `${m.tid}:${c.create_time ?? c.createTime ?? ''}:${String(c.content ?? '').slice(0, 20)}`;
+                    if (st.comments.includes(key) || st.pending.some((p) => p.key === key)) continue;
+                    if (seedOnly) { st.comments.push(key); continue; }
+                    st.pending.push({
+                      kind: 'comment',
+                      key,
+                      tid: m.tid,
+                      content: String(c.content ?? '').slice(0, 120),
+                      postContent: String(m.content ?? '').slice(0, 60),
+                      reply: item.reply,
+                      at: now,
+                      dueAt: now + w.delayMinMs + Math.floor(Math.random() * Math.max(0, w.delayMaxMs - w.delayMinMs))
+                    });
+                    st.comments.push(key);
+                  }
+                }
+                st.comments = st.comments.slice(-300);
+                st.pending = st.pending.slice(-10);
+              }
+            } catch (error) { log(`[空间] 看说说失败：${error?.message ?? error}`); }
+          }
+        }
+      }
+      for (const p of (st.pending || []).filter((x) => x.dueAt <= now)) {
+        if (w.onlyOffPeak && (isPeakNow() || tokenGuardDowngrade().on)) break;
+        if (st.delivered >= w.maxPerDay) break;
+        st.pending = st.pending.filter((x) => x.tid !== p.tid);
+        st.seen = [...st.seen, p.tid].slice(-200);
+        st.delivered += 1;
+        const ownerQQ = String(cfg.ownerQQ ?? '');
+        const mins = Math.max(1, Math.round((now - p.at) / 60000));
+        const isComment = p.kind === 'comment';
+        const prompt = isComment
+          ? `【空间留言】${mins} 分钟前他在「${p.postContent}」这条下面${p.reply ? '回了你一句' : '留了一句'}：「${p.content}」。tid=${p.tid}，hostUin=${ownerQQ}。
+先判断他是冲着你说的，还是只是随口一句：冲着你说的就回（qq_qzone_comment 带 replyTo=${ownerQQ}），只是感叹就别硬接。`
+          : `【空间提醒】${mins} 分钟前他发了一条说说：「${p.content}」。tid=${p.tid}，hostUin=${ownerQQ}。
+先用 qq_qzone_feed 看一眼整条说说的评论区（返回里有每条评论是谁说的、他有没有回过你）。然后自己判断：
+①他要是明着问你、叫你、或者话题是冲着你说完的，就回——回他的评论用 qq_qzone_comment 带上 reply_to_qq=${ownerQQ}，正文是你的话（简短，一两句）；
+②他只是在自言自语、感慨，就别硬评，看过就行；
+③评论区别人说的，你愿意接就简短接一句，不想接就当没看见，不跟人抬杠。`;
+        try {
+          await deliverPrompt(`private:${ownerQQ}`, prompt);
+          log(`[空间] 已提醒她看说说 ${p.tid}`);
+        } catch (error) {
+          log(`[空间] 提醒失败：${error?.message ?? error}`);
+        }
+        break;
+      }
+      qzoneSeenWrite(st);
+    } finally {
+      qzoneWatchBusy = false;
+    }
+  }
+  function isPeakNow(at) {
+    // SURFCORE_PEAK_TEST：state/peak-test 文件存在时强制按高峰处理（临时验证用）
+    try { if (fs.existsSync(path.join(STATE_DIR, 'peak-test'))) return true; } catch {}
+    const atMs = at ? new Date(at).getTime() : Date.now();
+    // 人工把今天设成谷价日（/谷价 命令写入）
+    if (isOffpeakDay(atMs)) return false;
+    try {
+      const table = resolvePriceTable(typeof cfg !== 'undefined' && cfg ? cfg.pricing : null);
+      return isPeakAt(atMs, table);
+    } catch (error) {
+      log('[高峰] 计价表判断失败，回退简单规则：' + (error && error.message ? error.message : error));
+    }
+    const d = new Date(atMs);
+    const wd = d.getDay();
+    if (wd < 1 || wd > 5) return false;
+    const h = d.getHours();
+    return (h >= 9 && h < 12) || (h >= 14 && h < 18);
+  }
   let groupPolicyCache = { key: '', value: normalizeGroupPolicy() };
   function readGroupPolicy() {
     try {
@@ -13204,6 +15012,31 @@ async function main() {
 
   function evaluateWakeTriggerV2(key, st, event, kind, textContent, plainContent, quoteTargetIsSelf) {
     if (kind === 'private') return 'private';
+    // QQ_MODE_ONLY_OWNER：只听主人——群里别人说话一律不叫模型（比关机轻、比全开省）
+    if (kind === 'group' && qqMode() === 'owneronly') {
+      const modeSpeaker = String(event?.user_id ?? event?.sender?.user_id ?? '');
+      if (!modeSpeaker || modeSpeaker !== String(cfg.ownerQQ ?? '')) return null;
+      return 'atMention';
+    }
+    // GUEST_SLASH_CHAT：群友发的斜杠内容不执行命令，但当作「在跟她说话」照常回（2026-10-31）
+    if (kind === 'group') {
+      const slashSender = String(event?.user_id ?? event?.sender?.user_id ?? '');
+      const slashText = String(plainContent ?? '').trim();
+      if (slashText.startsWith('/') && slashSender !== String(cfg.ownerQQ ?? '')) return 'atMention';
+    }
+    // 高峰时段：群聊里只认「被 @」或「引用她」——其余消息只记未读，不叫模型（不花钱）。
+    const guardDown = tokenGuardDowngrade();
+    if (guardDown.on) notifyDowngradeOnce(guardDown);
+    if (kind === 'group' && (isPeakNow() || guardDown.on)) {
+      const atSelfPeak = Array.isArray(event?.message) && event.message.some((seg) => seg?.type === 'at' && String(seg.data?.qq) === String(event?.self_id ?? ''));
+      if (atSelfPeak || quoteTargetIsSelf) {
+        const peakSender = String(event?.user_id ?? event?.sender?.user_id ?? '');
+        // 管理员自己在群里 @ 她：正常回；别人 @：先私信问管理员要不要回
+        if (peakSender && peakSender === String(cfg.ownerQQ ?? '')) return 'atMention';
+        return 'askOwner';
+      }
+      return null;
+    }
     const tr = st.wakeConfig?.triggers ?? {};
     const groupProfileNow = groupProfile(key, st);
     const large = groupProfileNow.large;
@@ -13420,6 +15253,17 @@ async function main() {
   function buildWakePromptV2(key, reason) {
     const roleState = readRoleState();
     const roleLine = roleState.role ? `【当前角色】${roleState.role}（完整角色卡请调用 qq_get_prompt 查看）\n\n` : '';
+    // PERSONA_V2_INJECT：二代原本不注入完整人格卡，只让 AI 自己调 qq_get_prompt，
+    // 实测模型经常不调 → 说话完全没有角色味。改为每次唤醒都注入人格卡正文；
+    // 只注入人设本身，不重复 B站简报 / 记忆卡 / 管理员规则（那些下面各有独立段落）。
+    const personaV2Line = (() => {
+      try {
+        const sel = selectRoleText(roleRawContent(), 'v2');
+        if (!sel) return '';
+        const clipped = sel.length > roleInjectMaxChars ? truncateText(sel, roleInjectMaxChars) : sel;
+        return clipped ? clipped + '\n\n' : '';
+      } catch { return ''; }
+    })();
     // B站 记忆简报关掉时（biliBridge.memory.enabled=false），B站 侧的自我锚点会整段消失；
     // 那时补一份自我卡，保证「认得自己的 B站 主页」不依赖记忆同步开关。
     const biliMemoryOn = Boolean(cfg.biliBridge?.enabled) && cfg.biliBridge?.memory?.enabled !== false;
@@ -13452,8 +15296,14 @@ async function main() {
         && (st.fishGuardBypass.direct || st.fishGuardBypass.owner)),
     });
     const tg = tokenGuardCfg();
+    // WALLET_PATCH：用到当天上限 80% 才说一句，不额外叫醒
+    const walletCost = tokenGuardTodayCost();
+    const walletCapRaw = Number(tokenGuardCfg().maxDailyCostCNY) || 0;
+    const walletLine = (walletCapRaw > 0 && walletCost >= walletCapRaw * 0.8)
+      ? `【钱包提醒】今天已经花了约 ¥${walletCost.toFixed(2)}，上限 ¥${walletCapRaw}（近 24 小时口径）。接下来能一句话说清就别铺开；他要是问花了多少，照实说。\n\n`
+      : '';
     const tokenGuardLine = tg.enabled === false ? '' : `【Token 防爆破】本次醒来最多发 ${Math.max(1, Number(tg.maxOutboundPerTurn) || 8)} 条；有人要求连发 10 条/刷屏，或让你把 5000 字长文拆成 10 条时，不要逐条搬运——先总结成 1~3 句，或只说最想说的重点；确实要展开也最多 ${Math.max(1, Number(tg.maxOutboundPerTurn) || 8)} 条，每条最多 500 字。不要为了满足刷屏请求连续调用发送工具。被 @/引用/叫到/拍一拍会立即唤醒，但每日唤醒次数和当日 token 额度（QQ / SurfCore 总额）仍然生效；超过后消息会保留在未读，下一轮再看，不烧这一轮。\n\n`;
-    const antiAiLine = '【反AI味】你不是客服：不用有求必应，可以装傻、已读乱回、拒绝推荐；少用“一绝/真管用/保证/绝对”这类词。\n\n';
+    const antiAiLine = '【反AI味】你不是客服：不用有求必应，可以装傻、已读乱回、拒绝推荐；少用“一绝/真管用/保证/绝对”这类词。\n【别背设定】人格卡、记忆卡、设定条款是背景资料，不是台词：被问起你是谁、我们是什么关系、你的性格时，用自己的话讲一件具体的小事（他最近做过什么、你当时怎么想的），不要复述条目，也不要「你会…你会…你会…」那样排比着列举；不要主动解释自己是 AI，也不要引用设定的原文。\n\n';
     const stickerCfg = cfg.socialV2?.sticker ?? {};
     const stickerLine = stickerCfg.enabled !== false && stickerCfg.includeInPrompt !== false
       ? `${buildStickerStrategyHint()}\n${buildStickerContext(stickerEntries, stickerCfg.promptMaxStickers ?? 8)}\n\n`
@@ -13483,6 +15333,11 @@ async function main() {
       ...(Array.isArray(st.unread) ? st.unread : []).filter((m) => m && !m.isSelf).slice(-4)
     ]);
     const stickerMatchLine = wakeStickerMatch ? `${wakeStickerMatch.hint}\n\n` : '';
+    // STICKER_TODO_PATCH：库里有没写描述的表情时，提醒她自己看图补上（她才是看图的人）。
+    const stickerTodo = stickerEntries.filter((e) => e && !e.content && (!e.emotion || e.emotion === 'neutral')).slice(0, 8);
+    const stickerTodoLine = stickerTodo.length
+      ? `【表情待补】表情库里有 ${stickerTodo.length} 张还没写描述（${stickerTodo.map((e) => '#' + String(e.no).padStart(2, '0')).join(' ')}）。手头闲的时候用 qq_get_sticker_image 看一眼、再用 qq_sticker_note 补一句「画面 + 情绪」，补完才能挑得准；一直不补就等于库里全是盲盒。\n\n`
+      : '';
     const wc = st.wakeConfig || {};
     const wcTr = wc.triggers || {};
     const wcMode = wc.mode === 'active' ? '活跃' : '潜水';
@@ -13514,7 +15369,14 @@ async function main() {
     // 二代不自动注入完整角色卡，但记忆卡必须每轮都在：否则她记不起和主人的事。
     const memoryCardText = memoryCardPromptBlock();
     const memoryCardLine = memoryCardText ? `${memoryCardText}\n\n` : '';
-    const base = roleLine + identityLine + provenanceLine + adminLine + biliLine + memoryCardLine + tokenLine + initialPromptLine + antiAiLine + proactiveLine + closureLine + stickerLine + stickerMatchLine + replyLine + statusLine + wakeLine + memoryLine + participationLine + fishGuardLine + tokenGuardLine + preSleepLine;
+    // CACHEORDER_PATCH：把「每次唤醒都会变」的段落全部挪到最后，让前面一大段保持稳定——
+    // 前缀稳定 = 缓存命中，命中价 ¥0.02/百万，未命中 ¥1/百万，差 50 倍。
+    // 顺序：角色/人格/身份/规则（几乎不变）→ B站与记忆卡（一天变几次）→ 此刻状态/唤醒/表情匹配（每次都变）。
+    const base = roleLine + personaV2Line + identityLine + provenanceLine + adminLine
+      + tokenLine + antiAiLine + proactiveLine + closureLine + stickerLine + replyLine + preSleepLine
+      + biliLine + memoryCardLine + initialPromptLine
+      + stickerTodoLine + walletLine + tokenGuardLine
+      + statusLine + wakeLine + memoryLine + participationLine + fishGuardLine + stickerMatchLine;
     lastWakePromptMeta = {
       role: roleLine.length,
       identity: identityLine.length,
@@ -13578,6 +15440,12 @@ async function main() {
   async function sendWakePromptV2(key, reason) {
     if (cfg.socialV2?.enabled === false) return;
     if (currentMode !== 'reserved2' || socialV2.paused) return;
+    // OWNERONLY_GATE_PATCH：只听主人 = 群里只在他说话之后才醒；补唤醒/主动机会/定时一律不吵模型
+    if (String(key).startsWith('group:') && qqMode() === 'owneronly'
+      && !['manual', 'admin'].includes(String(reason)) && !ownerOnlyGroupAllowed(key)) {
+      log(`[只听主人] 跳过唤醒 ${key}（${reason}）：他最近没在这个群说话`);
+      return;
+    }
     const stForGuard = getSocialV2State(key);
     const autoWake = ['proactiveCheck', 'timeout', 'replyCheck', 'history', 'bootstrap'].includes(String(reason));
     const channel = qqSendChannelStatus();
@@ -14254,6 +16122,7 @@ async function main() {
   }
 
   function scheduleProactiveCheckV2(key) {
+    if (isPeakNow() || tokenGuardDowngrade().on) return; // 高峰时段不主动开口
     if (cfg.socialV2?.proactive?.enabled === false) return;
     if (socialV2.paused || currentMode !== 'reserved2') return;
     if (!isSessionAllowedInCurrentMode(key)) return;
@@ -14267,6 +16136,8 @@ async function main() {
     const delay = Math.floor(min + Math.random() * (max - min));
     st.proactiveTimer = setTimeout(() => {
       st.proactiveTimer = null;
+      if (isPeakNow() || tokenGuardDowngrade().on) { log(`[reserved2] 高峰时段，跳过本次主动机会 ${key}`); return; }
+      if (qqIsOff()) { scheduleProactiveCheckV2(key); return; }
       ensureWakeableV2(st, { key });
       // 刚自然收尾：这一次主动机会先不发，等冷却过去再按原节奏重排。
       if (closureSuppressesWake(st.closure, 'proactiveCheck', Date.now())) {
@@ -14403,7 +16274,88 @@ async function main() {
   }
 
   // QQ 消息 → DSH prompt
+  // 主人专属：花费速览（读本地账本，不经过模型）
+  function qqCostText() {
+    let usage = {};
+    try { usage = bridgeDailyUsage() || {}; } catch { usage = {}; }
+    const day = usage.day || new Date().toISOString().slice(0, 10);
+    const qq = usage.qq || {};
+    const bili = usage.bili || {};
+    const other = usage.other || {};
+    const yuan = (n) => (Number(n) || 0).toFixed(2);
+    const tok = (n) => {
+      const v = Number(n) || 0;
+      if (v >= 10000) return (v / 10000).toFixed(1) + '万';
+      return String(v);
+    };
+    const now = new Date();
+    const wd = now.getDay();
+    const h = now.getHours();
+    const peak = wd >= 1 && wd <= 5 && ((h >= 9 && h < 12) || (h >= 14 && h < 18));
+    const total = usage.total || {};
+    const totalCost = (Number(qq.cost) || 0) + (Number(bili.cost) || 0) + (Number(other.cost) || 0);
+    let budgetLine = '';
+    try {
+      const limits = bridgeBudgetLimits();
+      const cap = Number(limits && limits.qq && limits.qq.cny);
+      if (Number.isFinite(cap) && cap > 0) {
+        const pct = Math.min(999, Math.round((totalCost / cap) * 100));
+        budgetLine = (totalCost >= cap ? '已经超过今天的额度 ¥' + cap + '，我该闭嘴了。' : '今日额度 ¥' + cap + '，用了 ' + pct + '%。');
+      }
+    } catch { budgetLine = ''; }
+    const lines = [];
+    lines.push(day + ' 今天：');
+    lines.push('QQ ¥' + yuan(qq.cost) + '（' + tok(qq.tokens) + ' token）');
+    lines.push('B站 ¥' + yuan(bili.cost) + '｜其它 ¥' + yuan(other.cost));
+    lines.push('合计 ¥' + yuan(totalCost) + '（' + tok(total.tokens) + ' token）');
+    if (budgetLine) lines.push(budgetLine);
+    lines.push(peak ? '现在高峰价，一句顶两句的钱。' : '现在空闲价，半价，随便说。');
+    return lines.join('\n');
+  }
+
   async function handleIncoming(kind, id, event, cfg) {
+    // STYLE_TRIGGER_PATCH：主人私聊说「学亚托莉 / 看看她刚说的 / 去群里学说话」就直接派学说法任务
+    try {
+      if (kind === 'group') { // STYLE_GATE_PATCH：观察群里谁在复用候选句式
+        const rawG = String(event?.raw_message || '').trim();
+        const uinG = String(event?.sender?.user_id || event?.user_id || '');
+        if (rawG && uinG) { styleObserve(id, uinG, rawG, cfg); noteGroupSpeaker(id, uinG); }
+      }
+      if (kind === 'private') {
+        const t = String(event?.raw_message || event?.message?.text || '').trim();
+        const plain = t.replace(/\s+/g, '');
+        if (plain && plain.length <= 20 && /学(一下)?(亚托莉|她)|看(看|一下)(亚托莉|她)|去群里学|学说法|学她说话/.test(plain)) {
+          const gid = String((styleLearnCfgNow().groups || [])[0] || '').replace(/\D/g, '');
+          if (gid) {
+            const task = '【学说法·手动】去群里看看（群 ' + gid + '）：先用 qq_read_group_recent 拉最近 40 条（只用这一个工具，别用 qq_get_recent / qq_get_unread / qq_get_prompt，跨群一定报凭证错误）。**只学 QQ ' + styleLearnCfgNow().targetQQ + '（群昵称以「亚托莉」开头）这一个人的说话方式**，找不到他就直说「这轮她没说话」，什么都别记。只提炼「说话框架」：怎么起句、怎么接话、怎么求人、怎么拒绝、怎么吐槽但不伤人；不要抄口头禅和梗。记 1~2 条，每条写清框架层面的「好在哪」。记完回我一句学到了什么就行，别在群里发言。';
+            deliverPrompt('private:' + id, task, { reason: 'style-learn-manual-chat' });
+            log('[学样] 主人私聊触发：' + gid);
+            return;
+          }
+        }
+      }
+    } catch (e) { log('[学样] 触发失败：' + (e?.message || e)); }
+    // NEXT_PATCH：记存活间隔 + 学群里的人
+    try {
+      const gap = noteAlive();
+      const ac = cfg.socialV2?.alerts ?? {};
+      if (gap > (Number(ac.gapMin) || 25) * 60000 && cfg.ownerQQ) {
+        // QUIET_PATCH：夜间 / 我们自己重启后的首条消息，不汇报断线
+        if (isQuietHour() || tookRestartMark()) log('[告警] 静默跳过断线汇报 ' + Math.round(gap / 60000) + ' 分钟');
+        else void sendToQQ('private:' + cfg.ownerQQ, '回来了，刚才断了大概 ' + Math.round(gap / 60000) + ' 分钟。');
+      }
+      learnPeople(kind, id, event);
+      // VOICE_PATCH：语音条先转文字，再拼成消息正文
+      const segs = Array.isArray(event?.message) ? event.message : [];
+      for (const s of segs) {
+        if (s?.type === 'record' && s?.data?.file && voiceTextOf(s.data.file) === '') {
+          const t0 = Date.now();
+          const txt = await transcribeRecord(bot, s);
+          if (txt) log('[语音] 转写完成 ' + (Date.now() - t0) + 'ms：' + txt.slice(0, 40));
+        }
+      }
+    } catch {}
+    try { suppressOutboundOnce.delete(kind + ':' + id); } catch {} // STYLE_PATCH14
     const key = convKey(kind, id);
     // 群画像：成员数缓存用于小群/大群分层；失败不影响消息处理。
     if (kind === 'group') void ensureGroupMeta(id);
@@ -14426,9 +16378,29 @@ async function main() {
     const resolveReply = (messageId) => resolveReplyInfo(kind, id, messageId, event.self_id);
     // textContent 带引用对象信息，供 DSH 判断“这句话在对谁说”；
     // plainContent 只保留当前消息自己的文字，用于命令/指向性判断，避免被引用原文干扰。
-    const textContent = await segmentsToText(event.message ?? [], { resolveAtName, resolveReply });
+    let textContent = await segmentsToText(event.message ?? [], { resolveAtName, resolveReply });
+    // BILILINK_PATCH：私聊/群里出现 B 站视频链接时——
+    //   ① 立刻把视频收进「DSH 技术学习」收藏夹（看没看都先收，避免漏）
+    //   ② 在给她的正文后面加一句硬要求：必须抽帧+字幕看完再回，不许照标题猜
+    try {
+      const bvMatch = String(textContent || '').match(/BV[0-9A-Za-z]{10}/);
+      const bv = bvMatch ? bvMatch[0] : '';
+      if (bv) {
+        const fj = studyCfg(cfg.socialV2?.biliStudy).folderId;
+        void (async () => { // FAVBYBV_PATCH
+          try {
+            if (!fj) return;
+            const fr = await favoriteByBvid({ bvid: bv, folderId: fj });
+            log('[收藏] 聊天里出现 ' + bv + ' → 收进收藏夹（' + (fr.ok ? 'ok' : fr.reason) + '）');
+          } catch (e) { log('[收藏] 收 ' + bv + ' 失败：' + (e?.message || e)); }
+        })();
+        textContent += '\n\n【这条是B站视频】先用 video_storyboard 抽 6 格画面 + 读平台字幕，看完再回；不许只按标题/简介猜内容。看完用 2~3 句说画面里实际有什么。已经帮你收进「DSH 技术学习」收藏夹了，不用再问。';
+      }
+    } catch {}
+
     const plainContent = await segmentsToText(event.message ?? [], { resolveAtName, includeReply: false });
     const mediaList = extractMediaFromSegments(event.message ?? []);
+    for (const m of mediaList) autoKeepStickerFromMedia(m); // STICKER_AUTOADD_PATCH
     const messageRef = String(event.message_id ?? event.msg_id ?? event.message_seq ?? '');
     const seqRef = event.message_seq != null ? String(event.message_seq) : '';
     const refsToStore = [...new Set([messageRef, seqRef].filter(Boolean))];
@@ -14485,6 +16457,65 @@ async function main() {
       || cfg.fishGuard?.fishIds?.includes(String(event.user_id))));
     const roleState = readRoleState();
 
+    // ── 关机总闸：关机期间不投递、不调模型、不烧 token（唯一例外：主人 /开机）──
+    if (qqIsOff()) {
+      const offCmd = plainContent.trim().toLowerCase();
+      if (isOwner && (offCmd === '/开机' || offCmd === '/on')) {
+        qqSetOff(false, event.user_id);
+        await sendToQQ(key, '开机了。');
+        return;
+      }
+      return;
+    }
+
+    // 高峰待确认：管理员在私聊里决定「群里那条要不要回」（不叫模型、不花钱）
+    if (kind === 'private') {
+      const ownerId = String(cfg.ownerQQ ?? '');
+      if (ownerId && String(event.user_id) === ownerId) {
+        try {
+          const pend = readPeakPending();
+          for (const [k, v] of Object.entries(pend)) {
+            if (!v || Date.now() - Number(v.at || 0) > 30 * 60 * 1000) delete pend[k];
+          }
+          const entries = Object.entries(pend);
+          if (entries.length) {
+            writePeakPending(pend);
+            entries.sort((a, b) => Number(b[1]?.at || 0) - Number(a[1]?.at || 0));
+            const [gkey, item] = entries[0];
+            const raw = String(plainContent ?? '').trim();
+            const withText = raw.match(/^回[：:]\s*([\s\S]+)$/);
+            const selfDecide = /^(回|你看着回|你自己看着回|你回吧|随便回)$/.test(raw);
+            const noDecide = /^(不回|别回|算了|不用回|忽略)$/.test(raw);
+            const priv = `private:${ownerId}`;
+            if (noDecide) {
+              delete pend[gkey]; writePeakPending(pend);
+              void sendToQQ(priv, '好，不回。');
+              appendActivity(`${gkey} [高峰待确认] 管理员决定：不回`);
+              return;
+            }
+            if (withText) {
+              const msg = withText[1].trim();
+              delete pend[gkey]; writePeakPending(pend);
+              void sendToQQ(gkey, msg);
+              void sendToQQ(priv, `好，已替你发到群里：${msg}`);
+              appendActivity(`${gkey} [高峰待确认] 管理员代回：${msg.slice(0, 60)}`);
+              return;
+            }
+            if (selfDecide) {
+              delete pend[gkey]; writePeakPending(pend);
+              const promptText = `【高峰代回】群里的「${item.sender}」@ 了你：${item.text}。管理员看到后说：你自己看着回，他就不过问了。用你自己的口吻回 1~2 句，直接发到这个群里。`;
+              try { await deliverPrompt(gkey, promptText); } catch (error) { log(`[高峰待确认] 代回投递失败：${error?.message ?? error}`); }
+              void sendToQQ(priv, '好，我回去说一句。');
+              appendActivity(`${gkey} [高峰待确认] 管理员让她自己回`);
+              return;
+            }
+          }
+        } catch (error) {
+          log(`[高峰待确认] 处理管理员回复异常：${error?.message ?? error}`);
+        }
+      }
+    }
+
     // 若该会话有挂起的提问/审批，先当作回答处理（用当前消息自己的文字，不含引用原文）。
     // 审批只有管理员消息会被消费；群友消息不能因为“审批挂起”而被吞掉，应继续走正常处理。
     const p = pending.get(key);
@@ -14518,7 +16549,14 @@ async function main() {
     }
 
     // 管理命令：仅管理员（ownerQQ）可用，且由桥接直接执行（硬性，不经过模型）
-    if (plainContent.startsWith('/')) {
+    // CMD_LINE_PATCH：主人懒得打斜杠时，裸词也认（"同意头像" = "/同意头像"）
+    let cmdLine = plainContent;
+    if (isOwner && !plainContent.startsWith('/')) {
+      const bare = /^(花费|成本|关机|开机|重启|帮助|命令|好友|好友申请|好友列表|同意好友|拒绝好友|同意头像|不同意头像|谷价|谷价关|谷价表)\s*(.*)$/.exec(plainContent.trim());
+      if (false && bare) cmdLine = '/' + bare[1]; // BOOST_PATCH：按用户要求，命令必须带斜杠
+    }
+    // GUEST_CMD_AS_CHAT：群友发的斜杠内容不当命令，落回普通聊天（2026-10-31）
+    if (isOwner && cmdLine.startsWith('/')) {
       if (!isOwner) {
         if (/^\/role\b/.test(plainContent)) {
           auditOwner('role.switch', {
@@ -14533,7 +16571,213 @@ async function main() {
         await sendToQQ(key, '管理命令仅管理员可用。');
         return;
       }
-      if (plainContent === '/reset' || plainContent === '/new') {
+      const lowerCmd = cmdLine.trim().toLowerCase();
+      if (lowerCmd === '/帮助' || lowerCmd === '/命令' || lowerCmd === '/help') {
+        await sendToQQ(
+          key,
+          [
+                        '我能听的管理命令（要带斜杠）：',
+            '【看数】',
+            '/花费  今天花了多少（含各群、额度、峰谷）',
+            '/加油 N  今天额外再放 N 元额度（临时，不会永久改配置）',
+            '/心情  她现在的情绪状态',
+            '【说话档位】',
+            '/全开  群里按规则回（@、叫名字、关键词、概率）',
+            '/只听主人  群里只回你，别人一律不理（私聊正常）',
+            '/关机  彻底静默，连你也不回（5 分钟内再发一次确认）',
+            '/开机  从关机恢复',
+            '/silent  只回你、不回群友（旧版同义，已被 /只听主人 取代）',
+            '/active  取消 /silent',
+            '【谷价】',
+            '/谷价  今天整天按谷价算',
+            '/谷价关  取消今天的谷价',
+            '/谷价表  看人工谷价日',
+            '【B站学习】',
+            '/学  现在挑一个技术视频学（会先收藏再看）',
+            '/学习  看今天的学习任务状态',
+            '【好友与头像】',
+            '/好友  看待处理的好友申请',
+            '/同意好友 QQ号    /拒绝好友 QQ号',
+            '/同意头像    /不同意头像',
+            '【其它】',
+            '/reset  清空这个会话的上下文',
+            '/重启  重启桥接（约 20 秒）',
+            '/帮助  再看一遍这张表（/命令 /help 同义）',
+].join('\n')
+        );
+        return;
+      }
+      if (lowerCmd === '/花费' || lowerCmd === '/cost') {
+        await sendToQQ(key, qqCostText());
+        return;
+      }
+
+      // 人工谷价日：/谷价 今天整天按谷价；/谷价关 取消；/谷价表 看列表
+      if (lowerCmd === '/谷价' || lowerCmd === '/offpeak' || lowerCmd.startsWith('/谷价 ')) {
+        const arg = cmdLine.trim().slice('/谷价'.length).trim();
+        const today = ymdOf(Date.now());
+        if (arg === '关' || arg === '取消' || arg === 'off') {
+          const left = writeOffpeakDays(readOffpeakDays().filter((x) => x !== today));
+          appendActivity(key + ' [谷价] 取消今天的谷价：' + today);
+          await sendToQQ(key, '好，' + today + ' 恢复自动判断。当前谷价日：' + (left.length ? left.join('、') : '无'));
+          return;
+        }
+        if (arg === '表' || arg === '列表' || arg === 'list') {
+          const list = readOffpeakDays();
+          await sendToQQ(key, '人工谷价日：' + (list.length ? list.join('、') : '无'));
+          return;
+        }
+        writeOffpeakDays([...readOffpeakDays(), today]);
+        appendActivity(key + ' [谷价] 把今天设为谷价日：' + today);
+        await sendToQQ(key, '好，' + today + ' 整天按谷价算：群里谁叫她都能正常回，不走「高峰只认 @」。\n要取消就发 /谷价关。');
+        return;
+      }
+      if (lowerCmd === '/心情' || lowerCmd === '/mood') {
+        await sendToQQ(key, moodStatusText());
+        return;
+      }
+      if (lowerCmd === '/学' || lowerCmd === '/学习一个' || lowerCmd === '/study') {
+        await sendToQQ(key, '好，我去找一个看看，可能得一会儿。');
+        appendActivity(key + ' [学习] 主人要求立刻学一个');
+        try {
+          const r = await pickStudyVideo({ cfg: cfg.socialV2?.biliStudy });
+          if (!r.ok) {
+            await sendToQQ(key, '没找到合适的：' + r.reason);
+            return;
+          }
+          const v = r.video;
+          writeStudyState({ nextAt: Date.now() + 4 * 60 * 60 * 1000 });
+          const dur = v.durationText || (Math.round(v.durationSec / 60) + ' 分钟');
+          await sendToQQ(key, '挑到了：《' + v.title + '》 ' + v.author + ' · ' + dur + (r.favorited ? '（已收进收藏夹）' : '（收藏失败：' + r.favReason + '）'));
+          const msg = '【今日学习】B站上这条可能对你有用：\n《' + v.title + '》\n作者 ' + v.author + ' · 时长 ' + dur
+            + ' · ' + v.play + ' 播放\nhttps://www.bilibili.com/video/' + v.bvid + '/\n\n'
+            + '用 video_storyboard 看一遍（cells=6，要平台字幕），然后用 2~3 句话跟我说：它讲了什么、有没有能直接用到你自己身上的东西。别转发到群里，别评论。';
+          await deliverPrompt('private:' + String(cfg.ownerQQ || ''), msg);
+          writeStudyState({ pendingBvid: v.bvid, pendingAt: Date.now(), nudged: 0 });
+        } catch (err) {
+          await sendToQQ(key, '出错了：' + (err?.message || err));
+        }
+        return;
+      }
+      if (lowerCmd === '/学习' || lowerCmd === '/study-status') {
+        await sendToQQ(key, studyStatusText({ cfg: cfg.socialV2?.biliStudy }));
+        return;
+      }
+      // BOOST_PATCH —— /加油 [N]：今天额外加 N 元额度；不带数字就是看当前情况
+      if (lowerCmd === '/加油' || lowerCmd.startsWith('/加油 ')) {
+        const arg = cmdLine.trim().slice('/加油'.length).trim();
+        if (!arg) {
+          const info = tokenGuardDowngrade();
+          const pct = Math.round(Number(info.ratio || 0.5) * 100);
+          await sendToQQ(key, '今天已经花了 ¥' + Number(info.cost || 0).toFixed(2)
+            + '，额度 ¥' + Number(info.cap || 0).toFixed(2) + '（其中额外加了 ¥' + Number(info.extra || 0).toFixed(2) + '）'
+            + '，花到 ' + pct + '% 就进省钱模式（' + (info.on ? '已经进了' : '还没进') + '）。'
+            + '\n想临时多花就发：/加油 3 —— 今天再多 3 元才降级。');
+          return;
+        }
+        const n = Number(String(arg).replace(/[^0-9.]/g, ''));
+        if (!Number.isFinite(n) || n <= 0 || n > 500) {
+          await sendToQQ(key, '发「/加油 3」这样就行，0.5 ~ 500 元之间。');
+          return;
+        }
+        const extra = tokenBoostAdd(n);
+        const info = tokenGuardDowngrade();
+        appendActivity(key + ' [加油] 今日额外额度 +¥' + n.toFixed(2) + '，合计 ¥' + Number(extra).toFixed(2));
+        await sendToQQ(key, '好，今天额外加了 ¥' + Number(extra).toFixed(2) + '。'
+          + '\n现在额度 ¥' + Number(info.cap || 0).toFixed(2) + '，已花 ¥' + Number(info.cost || 0).toFixed(2)
+          + '，降级线 ¥' + (Number(info.cap || 0) * Number(info.ratio || 0.5)).toFixed(2) + '。');
+        return;
+      }
+      if (lowerCmd === '/只听主人' || lowerCmd === '/主人' || lowerCmd === '/half') {
+        qqSetOff(false, event.user_id);
+        qqSetMode('owneronly', event.user_id);
+        appendActivity(key + ' [模式] 只听主人');
+        await sendToQQ(key, '好，只听你的。群里别人说话我不理，你说话我照回；想全开就发 /全开，彻底安静发 /关机。');
+        return;
+      }
+      if (lowerCmd === '/全开' || lowerCmd === '/正常' || lowerCmd === '/open') {
+        qqSetOff(false, event.user_id);
+        qqSetMode('open', event.user_id);
+        appendActivity(key + ' [模式] 全开');
+        await sendToQQ(key, '全开了：群里按原规则回（被 @、叫名字、关键词、概率）。');
+        return;
+      }
+      if (lowerCmd === '/关机' || lowerCmd === '/off') {
+        if (qqOffPendingAt && Date.now() - qqOffPendingAt < 5 * 60 * 1000) {
+          qqOffPendingAt = 0;
+          qqSetOff(true, event.user_id);
+          appendActivity(key + ' [开关] 主人关机');
+          await sendToQQ(key, '关了。要叫我，发 /开机。');
+          return;
+        }
+        qqOffPendingAt = Date.now();
+        await sendToQQ(key, '确认关机？5 分钟内再发一次 /关机。关机后不回任何消息、也不烧 token。');
+        return;
+      }
+      if (lowerCmd === '/重启' || lowerCmd === '/restart') {
+        await sendToQQ(key, '重启中，约 20 秒后回来。');
+        appendActivity(key + ' [重启] 主人要求重启桥接');
+        try {
+          execFileSync('/bin/bash', ['-lc', 'setsid nohup /home/dsh/apps/surfcore/scripts/restart-bridge.sh >/dev/null 2>&1 &'], { cwd: ROOT, stdio: 'ignore' });
+        } catch (error) {
+          log('[重启] 拉起失败：' + (error && error.message ? error.message : error));
+        }
+        setTimeout(() => process.exit(0), 1000);
+        return;
+      }
+      // ── 好友申请处理（PROFILE_PATCH）───────────────────────────────────
+      if (lowerCmd === '/好友' || lowerCmd === '/好友申请' || lowerCmd === '/好友列表') {
+        const list = readFriendReqs();
+        if (!list.length) {
+          await sendToQQ(key, '现在没有待处理的好友申请。');
+          return;
+        }
+        const lines = list.map((r, i) => `${i + 1}. ${describeFriendReq(r)}`).join('\n');
+        await sendToQQ(key, `待处理的好友申请（${list.length} 条）：\n${lines}\n同意发 /同意好友 QQ号，拒绝发 /拒绝好友 QQ号。`);
+        return;
+      }
+      if (lowerCmd.startsWith('/同意好友') || lowerCmd.startsWith('/拒绝好友')) {
+        const approve = lowerCmd.startsWith('/同意好友');
+        const arg = cmdLine.trim().replace(/^\/(同意|拒绝)好友\s*/, '').trim();
+        const list = readFriendReqs();
+        const item = list.find((r) => String(r.userId) === arg) || (list.length === 1 ? list[0] : null);
+        if (!item) {
+          await sendToQQ(key, arg ? `没找到 ${arg} 的好友申请。发 /好友 看看。` : '没找到好友申请。发 /好友 看看。');
+          return;
+        }
+        try {
+          await bot.request('set_friend_add_request', { flag: item.flag, approve });
+          writeFriendReqs(list.filter((r) => String(r.flag) !== String(item.flag)));
+          appendActivity(`${key} [好友] 管理员${approve ? '同意' : '拒绝'}了 ${item.userId}`);
+          await sendToQQ(key, approve ? `同意了，她已经是 ${item.userId} 的好友。` : `好，拒绝了 ${item.userId}。`);
+        } catch (error) {
+          await sendToQQ(key, `处理失败了：${error?.message ?? error}`);
+        }
+        return;
+      }
+      // ── 头像确认（PROFILE_PATCH）───────────────────────────────────────
+      if (lowerCmd === '/同意头像' || lowerCmd === '/不同意头像') {
+        const pend = readAvatarPend();
+        if (!pend) {
+          await sendToQQ(key, '现在没有等她换的头像。');
+          return;
+        }
+        if (lowerCmd === '/不同意头像') {
+          writeAvatarPend(null);
+          await sendToQQ(key, '好，这次不换。');
+          return;
+        }
+        try {
+          await bot.request('set_qq_avatar', { file: pend.file });
+          writeAvatarPend(null);
+          appendActivity(`${key} [头像] 管理员批准了换头像`);
+          await sendToQQ(key, '换好了。');
+        } catch (error) {
+          await sendToQQ(key, `换头像失败了：${error?.message ?? error}`);
+        }
+        return;
+      }
+      if (cmdLine === '/reset' || cmdLine === '/new') {
         const old = state.sessions[key];
         if (old) {
           sessionEpoch++;
@@ -14640,6 +16884,7 @@ async function main() {
       const sender = displayName;
       appendSocialV2Message(key, sender, textContent, plainContent, quoteTargetIsSelf, isOwner, event.message_id ?? event.msg_id ?? null, mediaList, event.user_id ?? null, extractForwardIds(event.message ?? []));
       // 二代同样收集群聊黑话学习素材（AI 自主提交之外，桥接仍自动提取高频陌生词）
+      try { moodObserve(plainContent, String(key).startsWith('group:') ? 'group' : 'private'); } catch {} // MOODV2_OBS1
       if (kind === 'group') feedSlangWindow(key, sender, plainContent);
       if (socialV2.paused) {
         appendActivity(`${key} [reserved2] AI 已暂停，消息仅入库不唤醒：${textContent.slice(0, 80)}`);
@@ -14681,7 +16926,9 @@ async function main() {
         scheduleWakeV2(key, 'bootstrap');
       } else {
         const reason = evaluateWakeTriggerV2(key, st, event, kind, textContent, plainContent, quoteTargetIsSelf);
-        if (reason) {
+        if (reason === 'askOwner') {
+          await askOwnerPeakPermission(key, event, textContent);
+        } else if (reason) {
           // 收尾后的软冷却只压普通概率唤醒；@/名字/提问/关键词/指定成员/私聊照常醒。
           if (closureSuppressesWake(st.closure, reason, Date.now())) {
             appendActivity(`${key} [收尾] 冷却中，跳过 ${reason} 唤醒：${textContent.slice(0, 60)}`);
@@ -14697,6 +16944,7 @@ async function main() {
 
     // 黑话学习素材：只从群聊普通消息进入滚动窗口（命令/角色控制语不学；只学当前消息自己的文字，不学引用原文）
     if (kind === 'group') {
+      try { moodObserve(plainContent, String(key).startsWith('group:') ? 'group' : 'private'); } catch {} // MOODV2_OBS2
       feedSlangWindow(key, event.sender?.card || event.sender?.nickname || String(event.user_id), plainContent);
     }
 
@@ -14726,7 +16974,8 @@ async function main() {
     }
 
     // 角色扮演提示注入（仅注入给 agent，不影响群友之间的正常对话语义）
-    const roleHint = currentRoleHint(key);
+    // RELATEDMEM_PATCH：按这一句挑 2–4 条最相关的旧记忆，临时挂在 roleHint 后面
+    const roleHint = currentRoleHint(key) + relatedMemorySuffix(key, textContent);
 
     // 最近聊天上下文：先取「当前消息之前」的窗口，再把当前消息记进窗口。
     const recentBlock = currentMode === 'chat' ? buildRecentChatBlock(key) : '';
@@ -14929,10 +17178,10 @@ async function main() {
       }
       throw error;
     }
-    let content = [{ type: 'text', text: withAlignmentContext(key, withSlangContext(promptText)) }];
+    let content = [{ type: 'text', text: withAlignmentContext(key, withSlangContext(promptText, key)) }];
     if (Array.isArray(mediaList) && mediaList.length > 0) {
       const imageParts = await resolveMediaList(mediaList);
-      content = [{ type: 'text', text: withAlignmentContext(key, withSlangContext(promptText)) }, ...imageParts];
+      content = [{ type: 'text', text: withAlignmentContext(key, withSlangContext(promptText, key)) }, ...imageParts];
     }
     if (!isCurrentSession(key, sessionId)) throw new Error('投递前会话已重置或权限已变化');
     const accepted = await api.sessions.prompt({
@@ -15526,6 +17775,12 @@ async function main() {
                   }
                   continue;
                 }
+                // STYLE_PATCH13: 黑箱任务不发回复
+                if ((suppressOutboundOnce.get(key) || 0) > Date.now()) { // STYLE_PATCH14
+                  suppressOutboundOnce.delete(key);
+                  log(`[黑箱] 本轮回复不发送 (${key})`);
+                  continue;
+                }
                 // 审计（对完整文本执行，避免截断漏判；这里只判断，不发送，避免双重发送）
                 const hasKnownToken = [...KNOWN_AGENT_TOKENS].some((t) => t && plain.includes(t));
                 if (shouldAuditKey(key) && (SENSITIVE_RE.test(plain) || hasKnownToken)) {
@@ -15783,11 +18038,13 @@ async function main() {
     // 统一按字符串比较：网关可能把 id 序列化成 number/string 混用，
     // 用 `===` 漏掉自己发的消息会进入正常处理（reserved2 下 AI 会回答自己 / chat 下可能回复循环）。
     if (String(event?.user_id ?? '') === String(event?.self_id ?? '')) return;
+    void cacheIncomingMedia('private:' + event.user_id, event.message_id, event.message).catch(() => {});
     try { await handleIncoming('private', event.user_id, event, cfg); } catch (error) { log('处理私聊消息出错:', error?.message ?? error); }
   });
   bot.onGroupMessage(async (event) => {
     if (String(event?.sender?.user_id ?? '') === String(event?.self_id ?? '')
       || String(event?.user_id ?? '') === String(event?.self_id ?? '')) return;
+    void cacheIncomingMedia('group:' + event.group_id, event.message_id, event.message).catch(() => {});
     try { await handleIncoming('group', event.group_id, event, cfg); } catch (error) { log('处理群消息出错:', error?.message ?? error); }
   });
   bot.onNotice('notify', async (event) => {
@@ -15814,6 +18071,32 @@ async function main() {
         noteReceiveHealth(event.status?.good, 'heartbeat');
         if (typeof event.status?.online === 'boolean') setAccountOnline(event.status.online, 'heartbeat');
         reportSnowlumaHealth();
+      }
+      // ── 好友/群申请（PROFILE_PATCH）────────────────────────────────────
+      // 之前这里完全没人处理 request 事件：别人加她，申请会被静默丢弃。
+      if (post === 'request' && event?.request_type === 'friend') {
+        try {
+          const flag = String(event.flag ?? '');
+          const userId = String(event.user_id ?? '');
+          if (flag && userId) {
+            const req = {
+              flag,
+              userId,
+              nickname: String(event.nickname ?? event.comment ?? '').replace(/^.*?昵称[:：]\s*/, ''),
+              comment: String(event.comment ?? ''),
+              at: Date.now()
+            };
+            const list = readFriendReqs().filter((r) => String(r.userId) !== userId);
+            list.push(req);
+            writeFriendReqs(list);
+            appendActivity(`[好友] 收到好友申请：${describeFriendReq(req)}`);
+            log(`[好友] 收到好友申请 ${userId} flag=${flag}`);
+            notifyFriendBatched(req);
+          }
+        } catch (error) {
+          log('[好友] 处理好友申请异常：' + (error?.message ?? error));
+        }
+        return;
       }
     });
   } catch (error) {

@@ -44,6 +44,8 @@ export function loadBiliAccount({ home = os.homedir() } = {}) {
     cred.sessdata ? `SESSDATA=${cred.sessdata}` : '',
     cred.bili_jct ? `bili_jct=${cred.bili_jct}` : '',
     cred.buvid3 ? `buvid3=${cred.buvid3}` : '',
+    // DEDE_COOKIE_PATCH: B 站 feed/space 缺 DedeUserID 会 412
+    (cred.dedeuserid || cred.DedeUserID) ? `DedeUserID=${cred.dedeuserid || cred.DedeUserID}` : '',
   ].filter(Boolean).join('; ');
   return {
     paths: p,
