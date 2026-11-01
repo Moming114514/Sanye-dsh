@@ -67,7 +67,7 @@ docs/
 ```bash
 # 1) 基础环境：Node >= 22.13、DSH（DeepSeek Harness）、NapCat（QQ 协议端）
 # 2) 拉代码
-git clone https://github.com/Moming114514/sanye-dsh.git && cd sanye-dsh
+git clone <本仓库地址> && cd <仓库目录>
 npm install --omit=dev
 
 # 3) 配置：把 config.example.json 复制成 config.json 再改

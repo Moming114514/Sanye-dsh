@@ -1,4 +1,4 @@
-// 私聊钩子：认「学一下她/看看亚托莉」，普通闲聊不触发，超长不触发
+// 私聊钩子：认「学一下她/看看小助手」，普通闲聊不触发，超长不触发
 import { extOnPrivateMessage } from '../../src/ext/index.js';
 
 const cfg = { socialV2: { styleLearn: { groups: ['1000000001'], targetQQ: '2000000000', perRound: 2 } } };
@@ -9,7 +9,7 @@ const deliverPrompt = (key, text, opts) => got.push(`deliver:${key}:${opts?.reas
 let bad = 0;
 const ok = (cond, msg) => { if (!cond) { bad++; console.log('FAIL ' + msg); } };
 
-ok(extOnPrivateMessage({ id: '1000000000', text: '看看亚托莉刚才说了啥', cfg, log, deliverPrompt }) === true, '「看看亚托莉」命中');
+ok(extOnPrivateMessage({ id: '1000000000', text: '看看小助手刚才说了啥', cfg, log, deliverPrompt }) === true, '「看看小助手」命中');
 ok(extOnPrivateMessage({ id: '1000000000', text: '学一下她说话', cfg, log, deliverPrompt }) === true, '「学一下她」命中');
 ok(extOnPrivateMessage({ id: '1000000000', text: '今天天气不错', cfg, log, deliverPrompt }) === false, '普通闲聊不触发');
 ok(extOnPrivateMessage({ id: '1000000000', text: '学说法'.repeat(8), cfg, log, deliverPrompt }) === false, '超 20 字不触发');
