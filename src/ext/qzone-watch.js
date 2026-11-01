@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-export default function createQzoneWatch({ getCfg, log, stateDir, getBot, getDeliverPrompt, paused, helpers }) {
+export default function createQzoneWatch({ getSelfUserId = () => '', getCfg, log, stateDir, getBot, getDeliverPrompt, paused, helpers }) {
   // 自动看他的说说但不秒评：发现新说说后隔 5~25 分钟才提醒她；
   // 高峰时段 / 省钱模式 完全不看；每天最多 watchMaxPerDay 条；一轮只提醒一条。
 // QZONE_WATCH_PATCH（2026-10-30）：自动看他的说说，但**不秒评** —— 发现新说说后隔 5~25 分钟才提醒她；
@@ -87,7 +87,7 @@ async function qzoneWatchTick() {
                   if (!c || String(c.uin ?? '') !== ownerUin) continue;
                   // QZONE_WATCH_REPLY_FIX：@ 别人的略过；@ 她本人的要算（那是他在回她）
                   const cText = String(c.content ?? '');
-                  if (cText.includes('@{uin:') && !cText.includes(`uin:${selfUserId || ''},`)) continue;
+                  if (cText.includes('@{uin:') && !cText.includes(`uin:${String(getSelfUserId() || '')},`)) continue;
                   const key = `${m.tid}:${c.create_time ?? c.createTime ?? ''}:${String(c.content ?? '').slice(0, 20)}`;
                   if (st.comments.includes(key) || st.pending.some((p) => p.key === key)) continue;
                   if (seedOnly) { st.comments.push(key); continue; }

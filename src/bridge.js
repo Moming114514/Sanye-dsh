@@ -4515,7 +4515,7 @@ async function main() {
       })();
       // STYLE_PATCH4: 学说法相关端点允许本机回环进程免控制台令牌（MCP 子进程与本服务同机）
       const loopbackStyleApi = /^(127\.0\.0\.1|::1|::ffff:127\.0\.0\.1)$/.test(String(req.socket?.remoteAddress || ''))
-        && /^\/api\/socialV2\/(style-note|style-list|style-candidate|group-recent|loop|person)$/.test(url.pathname);
+        && /^\/api\/socialV2\/(style-note|style-list|style-candidate|group-recent|loop|person|tech-notes|impression)$/.test(url.pathname); // EXTAUTH_PATCH2
       if (consoleToken && !tokenMatches && !loopbackStyleApi) {
         if (req.method === 'GET' && url.pathname === '/') {
           res.writeHead(401, { 'content-type': 'text/html; charset=utf-8', ...SECURITY_HEADERS });
@@ -4563,6 +4563,8 @@ async function main() {
             || url.pathname === '/api/socialV2/grouprate' /* GROUPRATE_PATCH */
             || url.pathname === '/api/socialV2/safetalk' /* GROUPRATE_PATCH */
             || url.pathname === '/api/socialV2/loop'
+            || url.pathname === '/api/socialV2/tech-notes' /* EXTAUTH_PATCH：扩展工具的本地写，同 style-note 口径 */
+            || url.pathname === '/api/socialV2/impression' /* EXTAUTH_PATCH */
             || url.pathname === '/api/socialV2/person';
           if (!tokenlessAgentAllowed) {
             sendJson({ ok: false, error: '未授权：该接口的智能体调用必须携带有效的会话令牌' }, 403);
@@ -14176,8 +14178,9 @@ async function main() {
     getBot: () => bot,
     getDeliverPrompt: () => deliverPrompt,
     paused: () => socialV2.paused,
-    helpers: { qzoneEnabled, qqIsOff, isPeakNow, tokenGuardDowngrade }
-  });
+    helpers: { qzoneEnabled, qqIsOff, isPeakNow, tokenGuardDowngrade },
+    getSelfUserId: () => selfUserId,
+});
   function isPeakNow(at) {
     // SURFCORE_PEAK_TEST：state/peak-test 文件存在时强制按高峰处理（临时验证用）
     try { if (fs.existsSync(path.join(STATE_DIR, 'peak-test'))) return true; } catch {}
@@ -15568,7 +15571,17 @@ async function main() {
       if (gap > (Number(ac.gapMin) || 25) * 60000 && cfg.ownerQQ) {
         // QUIET_PATCH：夜间 / 我们自己重启后的首条消息，不汇报断线
         if (isQuietHour() || tookRestartMark()) log('[告警] 静默跳过断线汇报 ' + Math.round(gap / 60000) + ' 分钟');
-        else void sendToQQ('private:' + cfg.ownerQQ, '回来了，刚才断了大概 ' + Math.round(gap / 60000) + ' 分钟。');
+        else if (gap >= 20 * 60 * 1000) { // GAPQUIET_PATCH：短断线不打扰，一天最多报一次
+          try {
+            const gf = path.join(STATE_DIR, 'gap-report.json');
+            const gd = new Date(); const gk = `${gd.getFullYear()}-${String(gd.getMonth() + 1).padStart(2, '0')}-${String(gd.getDate()).padStart(2, '0')}`;
+            let last = null; try { last = JSON.parse(fs.readFileSync(gf, 'utf8')); } catch {}
+            if (!last || last.day !== gk) {
+              fs.writeFileSync(gf, JSON.stringify({ day: gk, at: Date.now(), gapMin: Math.round(gap / 60000) }));
+              void sendToQQ('private:' + cfg.ownerQQ, '回来了，刚才断了大概 ' + Math.round(gap / 60000) + ' 分钟。');
+            }
+          } catch (e) { log('[断线] 汇报失败：' + (e && e.message ? e.message : e)); }
+        }
       }
       learnPeople(kind, id, event);
       // VOICE_PATCH：语音条先转文字，再拼成消息正文
