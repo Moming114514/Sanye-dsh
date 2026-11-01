@@ -7781,7 +7781,7 @@ async function main() {
             const gid = String(body?.group || groups[0] || '').replace(/\D/g, '');
             if (!gid) { sendJson({ ok: false, error: '没有可用的群' }, 400); return; }
             if (!cfg.ownerQQ) { sendJson({ ok: false, error: '没配置 ownerQQ' }, 400); return; }
-            const task = '【学说法·手动】去群里看看（群 ' + gid + '）：先用 qq_read_group_recent 拉最近 25 条（就用这一个工具；不要用 qq_get_recent / qq_get_unread / qq_get_prompt，那几个只能看当前会话，跨群一定报凭证错误，不是工具坏了）。重点看一个人：**QQ 2000000000**，群昵称以「亚托莉」三个字开头（后面还可能有别的字）。按 QQ 号认最准；找不到他就只记通用框架，别硬认人。只提炼「说话框架」：怎么起句、怎么接话、怎么求人、怎么拒绝、怎么吐槽但不伤人；**不要抄口头禅和梗**，也别整段模仿——她的说话方式以她自己为主，别人只是参考。记 1~2 条就够，写「好在哪」时要写框架层面的原因（例：先用一句软话把事说清，再给结论）。她得是温柔、善良、单纯的：脏话、攻击、阴阳怪气、贬低别人一律不学。'
+            const task = '【学说法·手动】去群里看看（群 ' + gid + '）：第一步筛人——调 qq_read_group_recent，参数 count=60、uin=2000000000，只把她的消息拉回来；再看最近 25 条（就用这一个工具；不要用 qq_get_recent / qq_get_unread / qq_get_prompt，那几个只能看当前会话，跨群一定报凭证错误，不是工具坏了）。重点看一个人：**QQ 2000000000**，群昵称以「亚托莉」三个字开头（后面还可能有别的字）。按 QQ 号认最准；找不到他就只记通用框架，别硬认人。只提炼「说话框架」：怎么起句、怎么接话、怎么求人、怎么拒绝、怎么吐槽但不伤人；**不要抄口头禅和梗**，也别整段模仿——她的说话方式以她自己为主，别人只是参考。记 1~2 条就够，写「好在哪」时要写框架层面的原因（例：先用一句软话把事说清，再给结论）。她得是温柔、善良、单纯的：脏话、攻击、阴阳怪气、贬低别人一律不学。'
               + '记完不用改人格卡，也别在群里发言，回来跟我说一句学到的要点。';
             deliverPrompt('private:' + cfg.ownerQQ, task, { reason: 'style-learn-manual' });
             log('[学样] 手动触发：' + gid);
@@ -7806,12 +7806,15 @@ async function main() {
             if (extDispatchRoute(url.pathname, { body, cfg, log, sendJson })) return;
             if (!v2ToolEnabled('readGroup')) return sendJson({ ok: false, error: 'readGroup 已关闭' }, 403);
             const gid = String(body?.group || '').replace(/\D/g, '');
-            const cnt = Math.max(5, Math.min(40, Number(body?.count) || 20));
+            const cnt = Math.max(5, Math.min(60, Number(body?.count) || 20)); // GROUP_UIN_FILTER：上限抬到 60，筛人时窗口才够
+            const onlyUin = String(body?.uin || '').replace(/\D/g, ''); // GROUP_UIN_FILTER
             if (!gid) return sendJson({ ok: false, error: 'group 不能为空' }, 400);
             const r = await bot.request('get_group_msg_history', { group_id: Number(gid), count: cnt });
             const msgs = Array.isArray(r?.data?.messages) ? r.data.messages : (Array.isArray(r?.messages) ? r.messages : []);
             const lines = [];
+            const scanned = msgs.length;
             for (const m of msgs) {
+              if (onlyUin && String(m?.sender?.user_id || '') !== onlyUin) continue; // GROUP_UIN_FILTER
               const whoBase = String(m?.sender?.card || m?.sender?.nickname || m?.sender?.user_id || '?'); // STYLE_PATCH11
               const uid = m?.sender?.user_id;
               const who = uid ? whoBase + '（' + uid + '）' : whoBase;
@@ -7826,7 +7829,7 @@ async function main() {
               const body2 = parts.join('').replace(/\s+/g, ' ').trim().slice(0, 160);
               if (body2) lines.push(who + '：' + body2);
             }
-            return sendJson({ ok: true, group: gid, count: lines.length, lines: lines.slice(-cnt) });
+            return sendJson({ ok: true, group: gid, count: lines.length, scanned, uin: onlyUin || '', lines: lines.slice(-cnt) });
           } catch (e) {
             return sendJson({ ok: false, error: String(e?.message || e) }, 500);
           }
