@@ -4,7 +4,7 @@ import fs from 'node:fs';
 
 const RELMEM_STOP = new Set(['一个', '什么', '我们', '你们', '他们', '这个', '那个', '现在', '就是', '还是', '可以', '没有', '知道', '觉得', '时候', '今天', '明天', '真的', '不是', '自己', '因为', '所以', '但是', '如果', '这样', '那样', '一点', '有点', '已经', '东西', '事情', '问题', '然后', '还有', '这里', '那里', '怎么', '这么', '那么', '一起', '一样', '不会', '不能']);
 
-const cache = { key: '', records: [], df: new Map(), total: 0 };
+const cache = { key: '', records: [], df: new Map(), postings: new Map(), total: 0 }; // INVERTED_INDEX_PATCH
 
 export function relmemGrams(s) {
   const text = String(s || '').toLowerCase().replace(/[\s\p{P}\p{S}]+/gu, ' ').trim();
@@ -27,24 +27,31 @@ export function relmemGrams(s) {
 function index(paths) {
   try {
     const file = paths?.json;
-    if (!file) return { key: '', records: [], df: new Map(), total: 0 };
+    if (!file) return { key: '', records: [], df: new Map(), postings: new Map(), total: 0 };
     const st = fs.statSync(file);
     const key = `${st.mtimeMs}:${st.size}`;
     if (cache.key === key) return cache;
     const card = JSON.parse(fs.readFileSync(file, 'utf8'));
     const records = (card.records || []).filter((r) => r && !r.forgottenAt && !r.displayOnly && (r.text || r.title)); // 只展示的不参与召回
     const df = new Map();
-    for (const r of records) {
+    const postings = new Map();
+    records.forEach((r, i) => {
       const set = new Set(relmemGrams(`${r.title || ''} ${r.text || ''}`));
-      for (const g of set) df.set(g, (df.get(g) || 0) + 1);
-    }
+      for (const g of set) {
+        df.set(g, (df.get(g) || 0) + 1);
+        let arr = postings.get(g);
+        if (!arr) { arr = []; postings.set(g, arr); }
+        arr.push(i);
+      }
+    });
     cache.key = key;
     cache.records = records;
     cache.df = df;
+    cache.postings = postings;
     cache.total = records.length;
     return cache;
   } catch {
-    return { key: '', records: [], df: new Map(), total: 0 };
+    return { key: '', records: [], df: new Map(), postings: new Map(), total: 0 };
   }
 }
 
@@ -66,17 +73,25 @@ export function relatedMemoryBlock(text, { cfg, paths } = {}) {
   if (!qg.length) return '';
   const needHits = Math.min(minHits, qg.length);
   const n = Math.max(1, idx.total);
+  // INVERTED_INDEX_PATCH：先用倒排拿到候选（只有命中 >= needHits 的记忆才可能进结果），
+  // 再对候选算完整分。原来每条记忆都要重新切一遍 gram，2000 条以上会明显拖慢每轮注入。
+  const hits = new Map();
+  for (const g of qg) {
+    const arr = idx.postings.get(g);
+    if (!arr) continue;
+    for (const i of arr) hits.set(i, (hits.get(i) || 0) + 1);
+  }
   const scored = [];
-  for (const r of idx.records) {
-    const hay = new Set(relmemGrams(`${r.title || ''} ${r.text || ''}`));
+  for (const [i, hit] of hits) {
+    if (hit < needHits) continue;
+    const r = idx.records[i];
+    if (!r) continue;
     let score = 0;
-    let hit = 0;
+    const hay = new Set(relmemGrams(`${r.title || ''} ${r.text || ''}`));
     for (const g of qg) {
       if (!hay.has(g)) continue;
-      hit += 1;
       score += Math.log(1 + n / (idx.df.get(g) || 1));
     }
-    if (hit < needHits) continue;
     score += (Number(r.importance) || 0) / 250;
     if (r.pinned) score += 0.3;
     const last = Date.parse(r.lastSeenAt || r.createdAt || '') || 0;
