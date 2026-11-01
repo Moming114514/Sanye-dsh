@@ -99,6 +99,7 @@
 | 想看什么 | 去哪 |
 |---|---|
 | 我到底改了什么（给人看） | [`docs/MY-BUILD.md`](docs/MY-BUILD.md) |
+| **常见问题：能用吗 / 我的隐私 / 花多少钱 / SnowLuma** | [`docs/FAQ.md`](docs/FAQ.md) |
 | 让 AI 抄我的实现（给模型看） | [`docs/LEARN-FROM-ME.md`](docs/LEARN-FROM-ME.md) |
 | **日常运维：出事 5 分钟定位** | [`docs/OPERATIONS.md`](docs/OPERATIONS.md) |
 | 升级上游怎么合、冲突怎么取舍 | [`docs/UPGRADE.md`](docs/UPGRADE.md) |
