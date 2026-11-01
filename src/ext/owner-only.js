@@ -28,6 +28,10 @@ export default {
   // 唤醒闸门：返回 { allow:false } 就不叫醒模型
   wakeGate({ key, reason, cfg, mode }) {
     if (!String(key || '').startsWith('group:')) return { allow: true };
+    if (mode === 'privateonly') {
+      if (['manual', 'admin'].includes(String(reason))) return { allow: true };
+      return { allow: false, reason: `[只跟我私聊] 跳过群唤醒 ${key}（${reason}）` };
+    }
     if (mode !== 'owneronly') return { allow: true };
     if (['manual', 'admin'].includes(String(reason))) return { allow: true };
     if (ownerOnlyGroupAllowed(key, cfg)) return { allow: true };

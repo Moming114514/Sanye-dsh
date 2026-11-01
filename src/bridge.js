@@ -176,14 +176,15 @@ function qqMode() {
   if (qqIsOff()) return 'off';
   try {
     const mode = JSON.parse(fs.readFileSync(QQ_MODE_FILE, 'utf8') || '{}').mode;
-    return mode === 'owneronly' ? 'owneronly' : 'open';
+    // PRIVATEONLY_PATCH：只跟我私聊（群里完全不接话，调试时用）
+    return mode === 'owneronly' || mode === 'privateonly' ? mode : 'open';
   } catch {
     return 'open';
   }
 }
 
 function qqSetMode(mode, by) {
-  const next = mode === 'owneronly' ? 'owneronly' : 'open';
+  const next = mode === 'owneronly' || mode === 'privateonly' ? mode : 'open';
   try {
     fs.mkdirSync(STATE_DIR, { recursive: true });
     fs.writeFileSync(QQ_MODE_FILE, JSON.stringify({ mode: next, by: String(by == null ? '' : by), at: new Date().toISOString() }, null, 2));
@@ -14226,6 +14227,8 @@ async function main() {
   function evaluateWakeTriggerV2(key, st, event, kind, textContent, plainContent, quoteTargetIsSelf) {
     if (kind === 'private') return 'private';
     // QQ_MODE_ONLY_OWNER：只听主人——群里别人说话一律不叫模型（比关机轻、比全开省）
+    // PRIVATEONLY_PATCH：只跟我私聊——群里任何消息都不叫模型
+    if (kind === 'group' && qqMode() === 'privateonly') return null;
     if (kind === 'group' && qqMode() === 'owneronly') {
       const modeSpeaker = String(event?.user_id ?? event?.sender?.user_id ?? '');
       if (!modeSpeaker || modeSpeaker !== String(cfg.ownerQQ ?? '')) return null;
