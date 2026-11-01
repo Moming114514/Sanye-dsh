@@ -62,6 +62,7 @@ import {
 import { fuzzyRecallFiles } from './recall-vec.js'; // RECALL_FUZZY_PATCH
 import { extDispatchRoute, extPromptBlocks, extStateKey, extWakeGate, extAfterSend, extOnGroupMessage, extOnPrivateMessage } from './ext/index.js'; // EXT_PATCH
 import createQzoneWatch from './ext/qzone-watch.js'; // QZONE_WATCH_EXT
+import { fetchQzoneFeed, commentQzone, sendQzone, deleteQzone, qzoneEnabled as qzoneEnabledOf } from './ext/qzone.js'; // QZONE_EXT
 import { createReminders } from './ext/reminders.js'; // REMINDERS_EXT
 import { relatedMemoryBlock, relatedMemorySuffix } from './ext/related-memory.js'; // RELATEDMEM_EXT
 import { stickerTodoLine } from './ext/stickers.js'; // STICKER_EXT
@@ -1953,18 +1954,8 @@ async function main() {
     return cfg.socialV2?.sticker?.enabled !== false;
   }
 
-  // QQ 空间说说（QZONE_PATCH）
-  function qzoneEnabled() {
-    return cfg.socialV2?.qzone?.enabled !== false;
-  }
-
-  function qzoneUgcRight(value) {
-    const allowed = [1, 4, 16, 64, 128];
-    const n = Number(value);
-    if (allowed.includes(n)) return n;
-    const d = Number(cfg.socialV2?.qzone?.defaultUgcRight);
-    return allowed.includes(d) ? d : 64;
-  }
+  // QQ 空间（QZONE_PATCH → src/ext/qzone.js）：只留薄包装，给 qzone-watch 注入用
+  function qzoneEnabled() { return qzoneEnabledOf(cfg); }
 
   function saveStickerStoreSafe() {
     if (!stickerStoreWritable) return; // 读失败时绝不回写，避免把「损坏」当成「空库」落盘
@@ -7881,215 +7872,18 @@ async function main() {
           const qtoken = String(req.headers['x-agent-token'] ?? qbody.token ?? '').trim();
           if (!qtoken || !isLiveAgentToken(qtoken)) { sendJson({ ok: false, error: 'agent token 无效' }, 403); return; }
           if (socialV2.paused) { sendJson({ ok: false, error: 'AI 已暂停，当前不允许执行该操作' }, 403); return; }
+          // QZONE_FEED_PATCH → src/ext/qzone.js（M2 第十四步）：p_skey→g_tk、_Callback 剥壳、@ 回复都搬过去了
           try {
-            const ck = async (domain) => { try { const r = await bot.request('get_cookies', { domain }); return String(r?.cookies ?? r?.data?.cookies ?? ''); } catch { return ''; } };
-            const qCookie = [...new Set([await ck('user.qzone.qq.com'), await ck('h5.qzone.qq.com')].join('; ').split(/;\s*/).filter(Boolean))].join('; ');
-            const pSkeyRaw = ((/p_skey=([^;]+)/.exec(qCookie) || [])[1] || '').replace(/^@/, '');
-            if (!pSkeyRaw) { sendJson({ ok: false, error: '拿不到 QQ 空间登录态（缺 p_skey），可能 QQ 没登录' }, 502); return; }
-            let qh = 5381;
-            for (let qi = 0; qi < pSkeyRaw.length; qi += 1) qh += (qh << 5) + pSkeyRaw.charCodeAt(qi);
-            const qGtk = qh & 0x7fffffff;
-            const qUnwrap = (t) => { const s = String(t).trim().replace(/^_Callback\(/, '').replace(/\);?$/, ''); try { return JSON.parse(s); } catch { return null; } };
-            const qUa = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36';
-            const qOwner = String(cfg.ownerQQ ?? '').trim();
-            if (url.pathname === '/api/socialV2/qzone-feed') {
-              const uin = String(qbody.uin ?? qOwner).trim() || qOwner;
-              const num = Math.min(Math.max(Number(qbody.num ?? 10) || 10, 1), 20);
-              const feedUrl = `https://user.qzone.qq.com/proxy/domain/taotao.qq.com/cgi-bin/emotion_cgi_msglist_v6?uin=${uin}&ftype=0&sort=0&pos=0&num=${num}&hostUin=${uin}&inCharset=utf-8&outCharset=utf-8&notice=0&format=json&g_tk=${qGtk}`;
-              const qres = await fetch(feedUrl, {
-                headers: { cookie: qCookie, 'user-agent': qUa, referer: `https://user.qzone.qq.com/${uin}` },
-                signal: AbortSignal.timeout(15000)
-              });
-              const qdata = qUnwrap(await qres.text());
-              if (!qdata || qdata.code !== 0) { sendJson({ ok: false, error: `空间返回 ${qdata?.code ?? qres.status}` }, 502); return; }
-              const qitems = (qdata.msglist || []).map((m) => ({
-                tid: m.tid,
-                content: String(m.content ?? ''),
-                created: m.createTime ?? m.created_time ?? null,
-                comments: (m.commentlist || []).map((c) => ({
-                  name: String(c.name ?? ''),
-                  uin: String(c.uin ?? ''),
-                  commentId: String(c.tid ?? ''),
-                  isOwner: String(c.uin ?? '') === qOwner,
-                  content: String(c.content ?? ''),
-                  replies: (c.list_3 || []).map((r) => ({ name: String(r.name ?? ''), uin: String(r.uin ?? ''), content: String(r.content ?? '') })),
-                  replyCount: Number(c.reply_num ?? 0)
-                })),
-                imageCount: (m.pic || []).length
-              }));
-              sendJson({ ok: true, uin, count: qitems.length, items: qitems });
-              return;
-            }
-            // qzone-comment
-            const content = String(qbody.content ?? '').trim();
-            if (!content) { sendJson({ ok: false, error: 'content 不能为空' }, 400); return; }
-            if (content.length > 200) { sendJson({ ok: false, error: '评论过长（上限 200 字）' }, 400); return; }
-            const hostUin = String(qbody.hostUin ?? qbody.uin ?? qOwner).trim() || qOwner;
-            const qTid = String(qbody.tid ?? '').trim();
-            if (!qTid) { sendJson({ ok: false, error: 'tid 不能为空（先用 qq_qzone_feed 拿列表）' }, 400); return; }
-            // QZONE_REPLY_PATCH：要「回复」某个人时，正文前加 @ 提及（网页端同款写法，会显示成 @昵称 + 内容）
-            const replyUin = String(qbody.replyTo ?? qbody.reply_to_qq ?? '').trim();
-            const replyNick = String(qbody.replyNick ?? qbody.reply_to_nick ?? '').trim();
-            const cContent = replyUin
-              ? `@{uin:${replyUin},nick:${replyNick || replyUin},who:1,auto:1}${content}`
-              : content;
-            const form = new URLSearchParams({
-              topicId: `${hostUin}_${qTid}`, content: cContent, hostUin, uin: String(selfUserId || ''),
-              feedsType: '100', inSame: '1', format: 'json', plat: 'qzone', source: 'ic',
-              qzreferrer: `https://user.qzone.qq.com/${hostUin}`
-            });
-            const cres = await fetch(`https://user.qzone.qq.com/proxy/domain/taotao.qzone.qq.com/cgi-bin/emotion_cgi_re_feeds?g_tk=${qGtk}`, {
-              method: 'POST',
-              headers: { cookie: qCookie, 'user-agent': qUa, referer: `https://user.qzone.qq.com/${hostUin}`, 'content-type': 'application/x-www-form-urlencoded' },
-              body: form,
-              signal: AbortSignal.timeout(15000)
-            });
-            const cdata = qUnwrap(await cres.text());
-            if (!cdata || cdata.code !== 0) { sendJson({ ok: false, error: `评论失败 ${cdata?.code ?? cres.status}` }, 502); return; }
-            log(`[qzone] 已评论 ${hostUin} 的说说 ${qTid}${replyUin ? `（回复 ${replyUin}）` : ''}`);
-            sendJson({ ok: true, hostUin, tid: qTid, content, replyTo: replyUin || null });
-            return;
+            const out = url.pathname === '/api/socialV2/qzone-feed'
+              ? await fetchQzoneFeed({ cfg, bot, body: qbody })
+              : await commentQzone({ cfg, bot, body: qbody, selfUserId });
+            if (out.log) log(out.log);
+            sendJson(out.payload, out.code);
           } catch (error) {
             sendJson({ ok: false, error: `空间操作失败：${error?.message ?? error}` }, 500);
-            return;
           }
-        }
-        if (req.method === 'POST' && (url.pathname === '/api/socialV2/profile' || url.pathname === '/api/socialV2/avatar' || url.pathname === '/api/socialV2/friend-request')) {
-          if (currentMode !== 'reserved2') { sendJson({ ok: false, error: '该接口仅 reserved2 模式可用' }, 403); return; }
-          const body = await readBody();
-          const token = String(req.headers['x-agent-token'] ?? body.token ?? '').trim();
-          if (!token || !isLiveAgentToken(token)) { sendJson({ ok: false, error: 'agent token 无效' }, 403); return; }
-          if (socialV2.paused) { sendJson({ ok: false, error: 'AI 已暂停，当前不允许执行该操作' }, 403); return; }
-          try {
-            if (url.pathname === '/api/socialV2/profile') {
-              if (!v2ToolEnabled('setProfile')) { sendJson({ ok: false, error: '工具未启用：qq_set_profile' }, 403); return; }
-              const nickname = String(body.nickname ?? '').trim();
-              const signature = String(body.signature ?? '').trim();
-              if (!nickname && !signature) { sendJson({ ok: false, error: 'nickname 与 signature 至少填一个' }, 400); return; }
-              if (nickname.length > 24) { sendJson({ ok: false, error: '昵称过长（上限 24 字）' }, 400); return; }
-              if (signature.length > 80) { sendJson({ ok: false, error: '签名过长（上限 80 字）' }, 400); return; }
-              const payload = {};
-              if (nickname) payload.nickname = nickname;
-              if (signature) payload.personal_note = signature;
-              const res = await bot.request('set_qq_profile', payload);
-              if (nickname) { try { selfDisplayName = nickname; selfNickname = nickname.toLowerCase(); } catch { /* 只影响 @ 识别，失败不致命 */ } }
-              log(`[资料] 已改资料 nickname=${nickname || '(不变)'} signature=${signature ? '有' : '(不变)'}`);
-              sendJson({ ok: true, nickname: nickname || null, signature: signature || null, raw: res });
-              return;
-            }
-            if (url.pathname === '/api/socialV2/avatar') {
-              if (!v2ToolEnabled('setAvatar')) { sendJson({ ok: false, error: '工具未启用：qq_set_avatar' }, 403); return; }
-              let src = String(body.src ?? body.url ?? body.base64 ?? '').trim();
-              let file = '';
-              if (!src) {
-                // FRIEND_BATCH_PATCH：不接链接也行 —— 用这个会话里最近的一张图
-                const aimKey = String(body.key ?? '').trim();
-                const km = /^(group|private):(\d+)$/.exec(aimKey);
-                if (!km) { sendJson({ ok: false, error: '不给 src 时请给 key（group:群号 / private:QQ号），用最近那张图当头像' }, 400); return; }
-                const hist = await fetchOneBotHistory(km[1], Number(km[2]), 30);
-                // AVATAR_LASTIMG_PATCH：fetchOneBotHistory 返回的是**消息数组**（或 null），不是 { messages } ——
-                // 旧写法 hist?.messages / hist?.data?.messages 永远取空，于是永远报「会话里没有图片」。
-                const msgs = Array.isArray(hist) ? hist
-                  : (Array.isArray(hist?.messages) ? hist.messages
-                    : (Array.isArray(hist?.data?.messages) ? hist.data.messages : []));
-                let picked = null;
-                for (let i = msgs.length - 1; i >= 0 && !picked; i -= 1) {
-                  const segs = Array.isArray(msgs[i]?.message) ? msgs[i].message : [];
-                  picked = extractMediaFromSegments(segs).find((m) => m.kind === 'image' || m.kind === 'sticker') || null;
-                }
-                if (!picked) { sendJson({ ok: false, error: '这个会话最近没有图片，让他先发一张' }, 404); return; }
-                const got = await fetchOneBotImage(picked);
-                file = stickerTempPath(got.buffer, got.mimeType);
-                src = 'fromLastImage';
-              } else {
-                file = await resolveAvatarFile(src);
-              }
-              writeAvatarPend({ file, src: src.slice(0, 200), at: Date.now(), by: 'agent' });
-              let ownQQ = '';
-              try { ownQQ = String(cfg.ownerQQ ?? ''); } catch { ownQQ = ''; }
-              if (ownQQ) {
-                void sendToQQ(`private:${ownQQ}`, '她想换头像，等你点头。\n同意发 /同意头像，不同意发 /不同意头像。');
-              }
-              appendActivity('[头像] 她提交了新头像，等管理员批准');
-              log('[头像] 已记录待批准头像，已通知管理员');
-              sendJson({ ok: true, pending: true, message: '已提交给管理员批准，他同意后才会真正换' });
-              return;
-            }
-            // /api/socialV2/friend-request
-            if (!v2ToolEnabled('friends')) { sendJson({ ok: false, error: '工具未启用：qq_handle_friend_request' }, 403); return; }
-            const argQQ = String(body.userId ?? body.qq ?? '').trim();
-            const argFlag = String(body.flag ?? '').trim();
-            const list = readFriendReqs();
-            const item = (argFlag ? list.find((r) => String(r.flag) === argFlag) : null)
-              || (argQQ ? list.find((r) => String(r.userId) === argQQ) : null)
-              || (argQQ || argFlag ? null : (list.length === 1 ? list[0] : null));
-            if (!item) { sendJson({ ok: false, error: '没找到这条好友申请（先用 qq_list_friend_requests 看列表）' }, 404); return; }
-            const approve = body.approve !== false && String(body.approve) !== 'false';
-            const remark = String(body.remark ?? '').trim();
-            const payload = { flag: item.flag, approve };
-            if (remark) payload.remark = remark;
-            const res = await bot.request('set_friend_add_request', payload);
-            writeFriendReqs(list.filter((r) => String(r.flag) !== String(item.flag)));
-            log(`[好友] ${approve ? '已同意' : '已拒绝'} ${item.userId}`);
-            sendJson({ ok: true, userId: item.userId, approve, raw: res });
-            return;
-          } catch (error) {
-            log(`[资料] 操作失败：${error?.message ?? error}`);
-            sendJson({ ok: false, error: `操作失败：${error?.message ?? error}` }, 500);
-            return;
-          }
-        }
-
-        if (req.method === 'GET' && url.pathname === '/api/socialV2/friend-requests') {
-          const token = String(url.searchParams.get('token') ?? req.headers['x-agent-token'] ?? '').trim();
-          if (token && !isLiveAgentToken(token)) { sendJson({ ok: false, error: 'agent token 无效' }, 403); return; }
-          const list = readFriendReqs().map((r) => ({ userId: r.userId, nickname: r.nickname, comment: r.comment, at: r.at }));
-          sendJson({ ok: true, count: list.length, requests: list });
           return;
         }
-
-        // ── QQ 空间说说（QZONE_PATCH，2026-10-30）─────────────────────────────────
-        if (req.method === 'POST' && (url.pathname === '/api/send/qzone' || url.pathname === '/api/send/qzone-delete')) {
-          if (currentMode !== 'reserved2') { sendJson({ ok: false, error: '该接口仅 reserved2 模式可用' }, 403); return; }
-          const body = await readBody();
-          const token = String(req.headers['x-agent-token'] ?? body.token ?? '').trim();
-          if (!token || !isLiveAgentToken(token)) { sendJson({ ok: false, error: 'agent token 无效' }, 403); return; }
-          if (!qzoneEnabled()) { sendJson({ ok: false, error: '说说功能已关闭' }, 403); return; }
-          if (!v2ToolEnabled('sendQzone')) { sendJson({ ok: false, error: '工具未启用：qq_send_qzone_msg' }, 403); return; }
-          if (socialV2.paused) { sendJson({ ok: false, error: 'AI 已暂停，当前不允许执行发送工具' }, 403); return; }
-          try {
-            if (url.pathname === '/api/send/qzone-delete') {
-              const tid = String(body.tid ?? '').trim();
-              if (!tid) { sendJson({ ok: false, error: 'tid 不能为空' }, 400); return; }
-              const res = await bot.request('delete_qzone_msg', { tid });
-              log(`[qzone] 删除说说 tid=${tid}`);
-              sendJson({ ok: true, tid, raw: res });
-              return;
-            }
-            const content = String(body.content ?? '').trim();
-            if (!content) { sendJson({ ok: false, error: 'content 不能为空' }, 400); return; }
-            if (content.length > 1500) { sendJson({ ok: false, error: '正文过长（上限 1500 字）' }, 400); return; }
-            const images = Array.isArray(body.images) ? body.images.map((x) => String(x)).filter(Boolean).slice(0, 9) : [];
-            const ugcRight = qzoneUgcRight(body.ugcRight);
-            const targetUins = Array.isArray(body.targetUins) ? body.targetUins.map((x) => String(x)).filter(Boolean) : [];
-            if ((ugcRight === 16 || ugcRight === 128) && !targetUins.length) {
-              sendJson({ ok: false, error: 'ugcRight 16/128 需要 targetUins' }, 400);
-              return;
-            }
-            const payload = { content, images, ugc_right: ugcRight };
-            if (targetUins.length) payload.target_uins = targetUins;
-            const res = await bot.request('send_qzone_msg', payload);
-            const tid = String(res?.data?.tid ?? res?.tid ?? '');
-            log(`[qzone] 已发说说 ugc_right=${ugcRight} 图片=${images.length} tid=${tid || '（未返回）'}`);
-            sendJson({ ok: true, tid, ugcRight, images: images.length });
-            return;
-          } catch (error) {
-            log(`[qzone] 失败：${error?.message ?? error}`);
-            sendJson({ ok: false, error: `说说操作失败：${error?.message ?? error}` }, 500);
-            return;
-          }
-        }
-
         if (req.method === 'POST' && url.pathname === '/api/socialV2/send-sticker') {
           if (!stickerEnabled()) { sendJson({ ok: false, error: '表情包体系已关闭' }, 403); return; }
           const body = await readBody();
