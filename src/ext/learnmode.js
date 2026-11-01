@@ -1,6 +1,7 @@
 // 学习模式：对某个群「只看不聊」——她自己不接话，学说法照样能进去学。
 // 与静音的区别：静音是「整个会话先不理」，学习模式是「留着看、不发言」，专门给学说法用。
 // 与模式（全开/只听主人/只跟我私聊/关机）正交：模式管全局，学习模式管单个群。
+// 例外：主人（ownerQQ）在群里 @ 她时照常回——他自己知道开了学习模式，只是想叫她出来说两句。
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -47,6 +48,15 @@ export function isLearnGroup(gid) {
   return loadGroups().has(String(gid || '').replace(/\D/g, ''));
 }
 
+// 群里最后说话的人（判断某个 @ 是不是主人发的）；只存内存，重启就清
+const lastSpeaker = new Map();
+export function noteLearnSpeaker(key, uin) {
+  try {
+    if (!String(key || '').startsWith('group:')) return;
+    lastSpeaker.set(String(key), { uin: String(uin == null ? '' : uin), at: Date.now() });
+  } catch {}
+}
+
 export function learnGroups() {
   return [...loadGroups()];
 }
@@ -65,8 +75,13 @@ export default {
     }
   },
 
+  // 群消息进来先记下说话人（不做任何拦阻）
+  onGroupMessage({ key, uin }) {
+    noteLearnSpeaker(key, uin);
+  },
+
   // 唤醒闸门：学习模式里的群，只有「学说法」这类任务放行，普通接话一律不醒
-  wakeGate({ key, reason }) {
+  wakeGate({ key, reason, cfg }) {
     const k = String(key || '');
     const why = String(reason || '');
     if (!k.startsWith('group:')) return true;
@@ -74,6 +89,15 @@ export default {
     if (/style-learn/.test(why)) return true;
     const gid = k.slice('group:'.length).replace(/\D/g, '');
     if (!isLearnGroup(gid)) return true;
+    // 主人 @ 她：放行（他知道这个群开着学习模式，只是想叫她出来）
+    if (/atMention|mention/i.test(why)) {
+      const rec = lastSpeaker.get(k);
+      const owner = String(cfg?.ownerQQ ?? cfg?.owner?.qq ?? '');
+      if (rec && owner && String(rec.uin) === owner && Date.now() - Number(rec.at || 0) < 10 * 60 * 1000) {
+        return true;
+      }
+      return { allow: false, reason: `[学习模式] 跳过唤醒 ${k}（${why}）：不是主人 @ 的，群里只看不聊` };
+    }
     return { allow: false, reason: `[学习模式] 跳过唤醒 ${k}（${why}）：这个群现在只看不聊` };
   },
 
