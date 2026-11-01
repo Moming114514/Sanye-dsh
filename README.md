@@ -12,6 +12,11 @@
 > and refactors 100+ inline patches into 6 hooks + 29 extension modules with a re-runnable
 > verification baseline.*
 
+
+> **定位**：这是一份**参考实现**——「怎么把别人的 QQ 机器人改到能长期用」，**不是开箱即用的产品**。要自己装 NapCat/OneBot + DSH + Node 22，并手写 `config.json` 与人格卡。
+> **支持范围**：**Linux 优先**（Debian 12 实测）。Windows 与 SnowLuma 桌面版未验证；`scripts/`、systemd、`runuser`、`ps` 都是 Linux 写法。
+> 想做什么还没做、为什么、代价多大：见 [`docs/V2-ROADMAP.md`](docs/V2-ROADMAP.md)。
+
 ---
 
 ## 一眼看懂：我解决的 5 个问题
