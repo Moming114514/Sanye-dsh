@@ -9,7 +9,7 @@ const deliverPrompt = (key, text, opts) => got.push(`deliver:${key}:${opts?.reas
 let bad = 0;
 const ok = (cond, msg) => { if (!cond) { bad++; console.log('FAIL ' + msg); } };
 
-ok(extOnPrivateMessage({ id: '1000000000', text: '看看小助手刚才说了啥', cfg, log, deliverPrompt }) === true, '「看看小助手」命中');
+ok(extOnPrivateMessage({ id: '1000000000', text: '看看她刚才说了啥', cfg, log, deliverPrompt }) === true, '「看看她」命中');
 ok(extOnPrivateMessage({ id: '1000000000', text: '学一下她说话', cfg, log, deliverPrompt }) === true, '「学一下她」命中');
 ok(extOnPrivateMessage({ id: '1000000000', text: '今天天气不错', cfg, log, deliverPrompt }) === false, '普通闲聊不触发');
 ok(extOnPrivateMessage({ id: '1000000000', text: '学说法'.repeat(8), cfg, log, deliverPrompt }) === false, '超 20 字不触发');
