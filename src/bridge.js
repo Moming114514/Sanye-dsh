@@ -1754,7 +1754,27 @@ function extractMediaFromSegments(segments) {
   return media;
 }
 
+let __allowSig = 0; // ALLOW_HOT_PATCH：面板写 config.json 后不用重启就能生效
+function refreshAllowFromDisk(cfg) {
+  try {
+    const file = path.join(ROOT, 'config.json');
+    const st = fs.statSync(file);
+    const sig = `${st.mtimeMs}:${st.size}`;
+    if (sig === __allowSig) return;
+    __allowSig = sig;
+    const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (!raw || typeof raw !== 'object') return;
+    if (raw.allow && typeof raw.allow === 'object') cfg.allow = raw.allow;
+    if (raw.deny && typeof raw.deny === 'object') cfg.deny = raw.deny;
+    if (typeof raw.allowAllWhenEmpty === 'boolean') cfg.allowAllWhenEmpty = raw.allowAllWhenEmpty;
+    log(`[白名单] 已热更新：群 ${(cfg.allow?.groups || []).length} 个 / 私聊 ${(cfg.allow?.private || []).length} 个`);
+  } catch (error) {
+    log(`[白名单] 热更新失败（继续用内存里的）：${error?.message ?? error}`);
+  }
+}
+
 function allowed(kind, id, cfg) {
+  refreshAllowFromDisk(cfg);
   // OneBot 事件里的 id 可能是数字也可能是字符串（int64 序列化差异），统一转字符串比较。
   // 配置字段兼容单数（group/private）与复数（groups/privates）两种写法。
   const s = String(id);
@@ -7843,11 +7863,11 @@ async function main() {
             if (!isLiveAgentToken(token) && !consoleOk && !localOk) return sendJson({ ok: false, error: 'agent token 无效' }, 403);
             // EXT_PATCH：扩展路由先分发（style-list / 技术笔记 / 印象库等各自负责）
             if (url.pathname === '/api/socialV2/style-list') {
-              if (extDispatchRoute(url.pathname, { body: {}, cfg, log, sendJson })) return;
+              if (extDispatchRoute(url.pathname, { body: {}, cfg, log, sendJson, economyOn: tokenGuardDowngrade().on })) return;
             }
             const body = await readBody();
             // EXT_PATCH：扩展路由统一在这里分发（技术笔记等），命中即由扩展自行响应
-            if (extDispatchRoute(url.pathname, { body, cfg, log, sendJson })) return;
+            if (extDispatchRoute(url.pathname, { body, cfg, log, sendJson, economyOn: tokenGuardDowngrade().on })) return;
             if (!v2ToolEnabled('readGroup')) return sendJson({ ok: false, error: 'readGroup 已关闭' }, 403);
             const gid = String(body?.group || '').replace(/\D/g, '');
             const cnt = Math.max(5, Math.min(60, Number(body?.count) || 20)); // GROUP_UIN_FILTER：上限抬到 60，筛人时窗口才够
