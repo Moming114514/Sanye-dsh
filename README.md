@@ -89,6 +89,10 @@
 
 ---
 
+## 通道兼容（SnowLuma / NapCat / 其它 OneBot）
+
+桥接本身就是 `@snowluma/sdk` + OneBot v11，**换通道不用改代码**，只需把 `snowluma.wsUrl/httpUrl` 指向你的实现。哪些功能在哪个通道可用、需要注意什么：见 [`docs/CHANNEL-COMPAT.md`](docs/CHANNEL-COMPAT.md)。
+
 ## 想抄的话
 
 | 你想知道 | 看这个 |

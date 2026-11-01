@@ -63,6 +63,7 @@ import { scopedMemoryText } from './ext/memory-scope.js'; // MEMSCOPE_PATCH
 import { fuzzyRecallFiles } from './recall-vec.js'; // RECALL_FUZZY_PATCH
 import { extDispatchRoute, extPromptBlocks, extStateKey, extWakeGate, extAfterSend, extOnGroupMessage, extOnPrivateMessage } from './ext/index.js'; // EXT_PATCH
 import createQzoneWatch from './ext/qzone-watch.js'; // QZONE_WATCH_EXT
+import { createChannel } from './ext/channel.js'; // CHANNEL_CAPS_PATCH
 import { fetchQzoneFeed, commentQzone, sendQzone, deleteQzone, qzoneEnabled as qzoneEnabledOf } from './ext/qzone.js'; // QZONE_EXT
 import { pickLastMedia, stickerFrames } from './ext/sticker-frames.js'; // VIEW_STICKER_EXT
 import { createProfile } from './ext/profile.js'; // PROFILE_EXT
@@ -14205,7 +14206,10 @@ async function main() {
 
   // 高峰时段：优先用 model-prices.js 的 isPeakAt（工作日 9-12 / 14-18，且排除 66 天法定节假日）
   // QQ 空间自动看说说（已迁入 src/ext/qzone-watch.js，QZONE_WATCH_EXT）
+  // CHANNEL_CAPS_PATCH：探测当前 OneBot 实现支持哪些扩展 API（NapCat / SnowLuma / 其它）
+  const channel = createChannel({ getBot: () => bot, log, stateDir: STATE_DIR });
   const qzoneWatch = createQzoneWatch({
+    getCaps: () => channel.data().caps,
     getCfg: () => cfg,
     log,
     stateDir: STATE_DIR,
@@ -17400,6 +17404,7 @@ async function main() {
     snowlumaHealth.connected = true;
     snowlumaHealth.everConnected = true;
     log(`SnowLuma 已连接：${connectedUrl}`);
+    setTimeout(() => { void channel.probe(); }, 3000); // CHANNEL_CAPS_PATCH：连上后探测通道能力
     notifySendChannelUp();
     // 「已连接」只说明与 SnowLuma 的 WebSocket 通了，**不说明 QQ 侧收得到消息** ——
     // 这个区别见 startSnowlumaWatch 的说明。这里顺手把上游健康快照刷一次。

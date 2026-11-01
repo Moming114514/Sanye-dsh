@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-export default function createQzoneWatch({ getSelfUserId = () => '', getCfg, log, stateDir, getBot, getDeliverPrompt, paused, helpers }) {
+export default function createQzoneWatch({ getSelfUserId = () => '', getCfg, log, stateDir, getBot, getDeliverPrompt, paused, helpers, getCaps = () => null }) {
   // 自动看他的说说但不秒评：发现新说说后隔 5~25 分钟才提醒她；
   // 高峰时段 / 省钱模式 完全不看；每天最多 watchMaxPerDay 条；一轮只提醒一条。
 // QZONE_WATCH_PATCH（2026-10-30）：自动看他的说说，但**不秒评** —— 发现新说说后隔 5~25 分钟才提醒她；
@@ -12,6 +12,7 @@ export default function createQzoneWatch({ getSelfUserId = () => '', getCfg, log
 const UA_QZONE = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36';
 function qzoneWatchCfg() {
   const q = getCfg().socialV2?.qzone ?? {};
+  let qzoneCookieWarned = false; // CHANNEL_CAPS_PATCH
   return {
     on: q.watchOwner !== false,
     checkMinMs: Number(q.watchCheckMinMs ?? 15 * 60 * 1000),
@@ -41,6 +42,14 @@ async function qzoneWebAuth() {
 }
 let qzoneWatchBusy = false;
 async function qzoneWatchTick() {
+  // CHANNEL_CAPS_PATCH：通道不提供 get_cookies 时，自动看说说直接停用，不刷报错
+  if (getCaps()?.cookies === false) {
+    if (!qzoneCookieWarned) {
+      qzoneCookieWarned = true;
+      log('[空间] 当前通道不支持 get_cookies，自动看说说已停用');
+    }
+    return;
+  }
   if (qzoneWatchBusy) return;
   qzoneWatchBusy = true;
   try {
