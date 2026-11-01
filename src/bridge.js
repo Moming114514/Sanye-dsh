@@ -4559,6 +4559,8 @@ async function main() {
             || url.pathname === '/api/socialV2/style-list'
             || url.pathname === '/api/socialV2/style-note'
             || url.pathname === '/api/socialV2/learnmode' /* LEARNMODE_PATCH */
+            || url.pathname === '/api/socialV2/grouprate' /* GROUPRATE_PATCH */
+            || url.pathname === '/api/socialV2/safetalk' /* GROUPRATE_PATCH */
             || url.pathname === '/api/socialV2/loop'
             || url.pathname === '/api/socialV2/person';
           if (!tokenlessAgentAllowed) {
@@ -7792,7 +7794,7 @@ async function main() {
           }
           return;
         }
-        if (url.pathname === '/api/socialV2/style-note' || url.pathname === '/api/socialV2/style-list' || url.pathname === '/api/socialV2/style-candidate' /* STYLE_GATE_PATCH */ || url.pathname === '/api/socialV2/group-recent' || url.pathname === '/api/socialV2/loop' || url.pathname === '/api/socialV2/person' || url.pathname === '/api/socialV2/impression' /* IMPR_EXT */ || url.pathname === '/api/socialV2/tech-notes' /* TECHNOTES_PATCH */ || url.pathname === '/api/socialV2/mute' /* MUTE_PATCH */ || url.pathname === '/api/socialV2/learnmode' /* LEARNMODE_PATCH */) { // STYLE_PATCH LOOPS_PATCH NEXT_PATCH
+        if (url.pathname === '/api/socialV2/style-note' || url.pathname === '/api/socialV2/style-list' || url.pathname === '/api/socialV2/style-candidate' /* STYLE_GATE_PATCH */ || url.pathname === '/api/socialV2/group-recent' || url.pathname === '/api/socialV2/loop' || url.pathname === '/api/socialV2/person' || url.pathname === '/api/socialV2/impression' /* IMPR_EXT */ || url.pathname === '/api/socialV2/tech-notes' /* TECHNOTES_PATCH */ || url.pathname === '/api/socialV2/mute' /* MUTE_PATCH */ || url.pathname === '/api/socialV2/learnmode' /* LEARNMODE_PATCH */ || url.pathname === '/api/socialV2/grouprate' /* GROUPRATE_PATCH */ || url.pathname === '/api/socialV2/safetalk' /* GROUPRATE_PATCH */) { // STYLE_PATCH LOOPS_PATCH NEXT_PATCH
           try {
             const token = String(req.headers['x-agent-token'] || '');
             const consoleOk = String(req.headers['x-console-token'] || '') === String(cfg.consoleToken || '');
