@@ -5,3 +5,8 @@ backups/
 *.log
 .cache/
 tmp/
+
+# 线上配置（含令牌/QQ 号）不入库
+config.json
+config.json.*
+!config.example.json
