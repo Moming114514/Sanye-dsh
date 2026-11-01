@@ -60,7 +60,8 @@ import { createBiliMemory } from './bili-memory.js';
 import {
   appendMemoryInboxEvent, looksNoteworthyMessage, resolveMemoryCardPaths, loadMemoryCard, saveMemoryCardOutputs, touchMemories } from './memory-card.js';
 import { fuzzyRecallFiles } from './recall-vec.js'; // RECALL_FUZZY_PATCH
-import { extDispatchRoute, extPromptBlocks, extStateKey } from './ext/index.js'; // EXT_PATCH
+import { extDispatchRoute, extPromptBlocks, extStateKey, extWakeGate, extAfterSend, extOnGroupMessage } from './ext/index.js'; // EXT_PATCH
+import { analyzePromise } from './ext/promises.js'; // PROMISE_EXT
 import {
   activeMemoryPaths, activePersonaFile, activePlatformStateDir, characterPaths, readCurrentCharacter,
   readPersonaLayerText,
@@ -179,24 +180,6 @@ function qqSetMode(mode, by) {
   } catch (error) {
     log('[模式] 写状态失败：' + (error && error.message ? error.message : error));
   }
-}
-
-// ── OWNERONLY_GATE_PATCH ─────────────────────────────────────────────────────
-// 「只听主人」原来只拦了群消息触发的那一条路（evaluateWakeTriggerV2），
-// 补唤醒、主动机会、睡眠到期、回复检查这些定时唤醒照样会叫醒群里的她。
-// 这里记下每个群最后一次说话的人：open 时不管，owneronly 时群唤醒一律要求「他最近说过话」。
-const lastGroupSpeaker = new Map();
-function noteGroupSpeaker(key, uin) {
-  try {
-    if (!String(key || '').startsWith('group:')) return;
-    lastGroupSpeaker.set(String(key), { uin: String(uin == null ? '' : uin), at: Date.now() });
-  } catch {}
-}
-function ownerOnlyGroupAllowed(key) {
-  const rec = lastGroupSpeaker.get(String(key));
-  if (!rec) return false;
-  if (Date.now() - Number(rec.at || 0) > 6 * 60 * 60 * 1000) return false;
-  return rec.uin === String(cfg.ownerQQ ?? '');
 }
 
 const STATE_FILE = path.join(STATE_DIR, 'sessions.json');
@@ -4716,15 +4699,8 @@ async function main() {
         if (req.method === 'GET' && url.pathname === '/api/debug/promise') { // PROMISE_PATCH
           const want = String(url.searchParams.get('token') || '');
           if (!want || want !== String(cfg.consoleToken || '')) { sendJson({ ok: false, error: '令牌无效' }, 403); return; }
-          const s = String(url.searchParams.get('text') || '').replace(/\s+/g, ' ').trim();
-          const hitWhen = PROMISE_RE_WHEN.test(s);
-          const hitAct = PROMISE_RE_ACT.test(s);
-          const selfPromise = /(我|咱)(去|先|这就|回头)?(帮你|给你|替你)/.test(s);
-          const selfSubject = /(我|咱|帮你|给你|替你)/.test(s);
-          const done = PROMISE_DONE.test(s);
-          const will = !done && s.length >= 5 && s.length <= 200 && ((hitWhen && hitAct && selfSubject) || selfPromise);
-          const sent = will ? String(s.split(/[。！？!?\n]/).map((x) => x.trim()).filter(Boolean).find((x) => PROMISE_RE_WHEN.test(x) || /(帮你|给你|替你)/.test(x)) || s).slice(0, 60) : '';
-          sendJson({ ok: true, text: s, will, when: hitWhen, act: hitAct, selfPromise, done, captured: sent });
+          const a = analyzePromise(url.searchParams.get('text') || '');
+          sendJson({ ok: true, text: a.text, will: a.will, when: a.when, act: a.act, selfPromise: a.selfPromise, done: a.done, captured: a.captured });
           return;
         }
         if (req.method === 'GET' && url.pathname === '/api/debug/related') { // RELATEDMEM_PATCH
@@ -7015,7 +6991,7 @@ async function main() {
             saveSocialV2State();
             log(`[reserved2] 工具统一发送 ${key}: 成功 ${sentMessages.length}/${messages.length} 条`);
             appendActivity(`${key} [reserved2] 工具统一发送：成功 ${sentMessages.length}/${messages.length} 条`);
-            try { notePromisesFromReply(key, messages); } catch {} // PROMISE_PATCH
+            try { extAfterSend({ key, messages, sentMessages, cfg }); } catch (e) { log('[ext] 发送后回调失败：' + String(e?.message || e).slice(0, 120)); } // EXT_PATCH
             if (sentMessages.length > 0) scheduleReplyCheckV2(key);
             const burstHint = messages.length >= 3 ? '你已经连发了多条，确认是必要的吗？真人很少一口气补完。' : undefined;
             const spaceWarn = findCjkSpaceWarning(messages);
@@ -13539,36 +13515,6 @@ async function main() {
     }
   }
 
-  // ── PROMISE_PATCH：从她自己刚发的话里识别“欠下的事”，自动进 loops（欠事层）──
-  const PROMISE_RE_WHEN = /(明天|后天|下次|回头|等会|一会儿|晚点|过会|周末|这两天|今晚|等下|稍后|待会)/;
-  const PROMISE_RE_ACT = /(查|找|弄|做|发|看|问|告诉你|给你|帮你|找给|发你|整理|写|画|下)/;
-  const PROMISE_DONE = /(弄好了|弄完了|查到了|找到了|做好了|发你了|给你了|处理好了|写好了|都搞定了)/;
-  function notePromisesFromReply(key, messages) {
-    try {
-      if (cfg.socialV2?.loops?.autoCapture === false) return;
-      const texts = Array.isArray(messages) ? messages : [];
-      for (const t of texts) {
-        // PROMISE_PATCH2：引号里是转述别人的话，不是在承诺；描述「你是…的人」也不是承诺
-        const s = String(t ?? '').replace(/[「『“"]([^」』”"]{0,80})[」』”"]/g, ' ').replace(/\s+/g, ' ').trim();
-        if (s.length < 5 || s.length > 200) continue;
-        if (/你是|那个人|你说的|就是那个/.test(s)) continue;
-        if (PROMISE_DONE.test(s)) continue;
-        const hitWhen = PROMISE_RE_WHEN.test(s);
-        const hitAct = PROMISE_RE_ACT.test(s);
-        const selfPromise = /(我|咱)(去|先|这就|回头)?(帮你|给你|替你)/.test(s);
-        const selfSubject = /(我|咱|帮你|给你|替你)/.test(s);
-        if (!(hitWhen && hitAct && selfSubject) && !selfPromise) continue;
-        const sent = s.split(/[。！？!?\n]/).map((x) => x.trim()).filter(Boolean).find((x) => PROMISE_RE_WHEN.test(x) || /(帮你|给你|替你)/.test(x));
-        const text = String(sent || s).slice(0, 60).trim();
-        if (text.length < 5) continue;
-        const out = addLoop({ text, by: '自己', raw: cfg });
-        if (out?.ok) log(`[欠事] 捕获：${text}`);
-      }
-    } catch (e) {
-      log('[欠事] 捕获失败:', e?.message ?? e);
-    }
-  }
-
   function memoryCardPromptBlock() {
     try {
       const stat = fs.statSync(MEMORY_CARD_PATHS.promptQq);
@@ -15409,10 +15355,10 @@ async function main() {
   async function sendWakePromptV2(key, reason) {
     if (cfg.socialV2?.enabled === false) return;
     if (currentMode !== 'reserved2' || socialV2.paused) return;
-    // OWNERONLY_GATE_PATCH：只听主人 = 群里只在他说话之后才醒；补唤醒/主动机会/定时一律不吵模型
-    if (String(key).startsWith('group:') && qqMode() === 'owneronly'
-      && !['manual', 'admin'].includes(String(reason)) && !ownerOnlyGroupAllowed(key)) {
-      log(`[只听主人] 跳过唤醒 ${key}（${reason}）：他最近没在这个群说话`);
+    // EXT_PATCH：唤醒闸门交给扩展（只听主人等规则在 src/ext/*.js 里）
+    const wakeGate = extWakeGate({ key: String(key), reason: String(reason), cfg, mode: qqMode() });
+    if (wakeGate && wakeGate.allow === false) {
+      log(wakeGate.reason || `[ext] 跳过唤醒 ${key}（${reason}）`);
       return;
     }
     const stForGuard = getSocialV2State(key);
@@ -16288,7 +16234,7 @@ async function main() {
       if (kind === 'group') { // STYLE_GATE_PATCH：观察群里谁在复用候选句式
         const rawG = String(event?.raw_message || '').trim();
         const uinG = String(event?.sender?.user_id || event?.user_id || '');
-        if (rawG && uinG) { styleObserve(id, uinG, rawG, cfg); noteGroupSpeaker(id, uinG); }
+        if (rawG && uinG) { styleObserve(id, uinG, rawG, cfg); extOnGroupMessage({ key: id, uin: uinG, text: rawG, cfg }); }
       }
       if (kind === 'private') {
         const t = String(event?.raw_message || event?.message?.text || '').trim();

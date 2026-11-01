@@ -4,9 +4,11 @@
 // 唤醒闸门与发送后回调的钩子随后续迁移接入。新增功能 = ext/ 下新建模块 + EXTENSIONS 加一行。
 import techNotes from './tech-notes.js';
 import impressions from './impressions.js';
+import ownerOnly from './owner-only.js';
+import promises from './promises.js';
 
 // 注册顺序 = 提示词注入顺序（印象在前、技术笔记在后，与原内联顺序一致）
-const EXTENSIONS = [impressions, techNotes].filter(Boolean);
+const EXTENSIONS = [ownerOnly, promises, impressions, techNotes].filter(Boolean);
 
 export function extList() {
   return EXTENSIONS;
@@ -52,4 +54,38 @@ export function extStateKey() {
     try { parts.push(String(ext.stateKey() ?? '')); } catch { parts.push(''); }
   }
   return parts.join(',');
+}
+
+/** 群消息入口：谁在说话（只听主人/学说法都要用）。 */
+export function extOnGroupMessage(ctx) {
+  for (const ext of EXTENSIONS) {
+    if (typeof ext.onGroupMessage !== 'function') continue;
+    try { ext.onGroupMessage(ctx); } catch (error) {
+      console.error(`[ext:${ext.id}] onGroupMessage 失败：${String(error?.message || error)}`);
+    }
+  }
+}
+
+/** 唤醒闸门：任一扩展返回 { allow:false } 即拦下（不给模型烧 token）。 */
+export function extWakeGate(ctx) {
+  for (const ext of EXTENSIONS) {
+    if (typeof ext.wakeGate !== 'function') continue;
+    try {
+      const r = ext.wakeGate(ctx);
+      if (r && r.allow === false) return r;
+    } catch (error) {
+      console.error(`[ext:${ext.id}] wakeGate 失败：${String(error?.message || error)}`);
+    }
+  }
+  return { allow: true };
+}
+
+/** 发送成功后：欠事捕获、学说法观察等。 */
+export function extAfterSend(ctx) {
+  for (const ext of EXTENSIONS) {
+    if (typeof ext.afterSend !== 'function') continue;
+    try { ext.afterSend(ctx); } catch (error) {
+      console.error(`[ext:${ext.id}] afterSend 失败：${String(error?.message || error)}`);
+    }
+  }
 }
