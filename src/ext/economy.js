@@ -37,6 +37,7 @@ function readAll() {
     const raw = JSON.parse(fs.readFileSync(FILE, 'utf8'));
     data = {
       mode: MODES[raw?.mode] ? raw.mode : 'auto',
+      replyAt: raw?.replyAt !== false,
       groups: raw?.groups && typeof raw.groups === 'object' ? raw.groups : {},
     };
   } catch {}
@@ -73,6 +74,13 @@ export function setEcoMode(mode) {
   return { mode: d.mode };
 }
 
+export function setEcoReplyAt(flag) {
+  const d = readAll();
+  d.replyAt = !!flag;
+  writeAll(d);
+  return { replyAt: d.replyAt };
+}
+
 export function setEcoGroup(gid, on) {
   const g = clean(gid);
   if (!g) throw new Error('群号不对');
@@ -87,6 +95,7 @@ export function ecoState(autoOn) {
   const d = readAll();
   return {
     mode: d.mode,
+    replyAt: d.replyAt !== false,
     modes: MODES,
     autoOn: !!autoOn,
     groups: Object.entries(d.groups).map(([gid, v]) => ({ gid, on: v === 'on' })),
@@ -111,7 +120,13 @@ export default {
     if (why === 'manual' || why === 'admin' || /style-learn/.test(why)) return true;
     const gid = k.slice('group:'.length);
     if (!ecoForGroup(gid, economyOn)) return true;
-    if (/atMention|mention/i.test(why)) return true; // @ 她照常回
+    if (/atMention|mention/i.test(why)) {
+      // 省钱时还回不回 @：总开关在面板上
+      if (readAll().replyAt === false) {
+        return { allow: false, reason: `[省钱] 跳过唤醒 ${k}（${why}）：省钱模式设了完全不发，只等手动` };
+      }
+      return true;
+    }
     return { allow: false, reason: `[省钱] 跳过唤醒 ${k}（${why}）：省钱模式只回 @ 和手动指令` };
   },
   routes: [
@@ -124,6 +139,11 @@ export default {
           if (action === 'set') {
             const r = setEcoMode(String(body?.mode || 'auto'));
             log(`[省钱] 全局模式 → ${r.mode}`);
+            return sendJson({ ok: true, ...ecoState(economyOn) });
+          }
+          if (action === 'setreply') {
+            const r = setEcoReplyAt(body?.replyAt !== false);
+            log(`[省钱] 省钱时回 @ → ${r.replyAt ? '回' : '不回'}`);
             return sendJson({ ok: true, ...ecoState(economyOn) });
           }
           if (action === 'group') {

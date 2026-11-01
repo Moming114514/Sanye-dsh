@@ -1924,6 +1924,23 @@ function pageSafe() {
     h('div', { class: 'rg-hint', style: 'margin-top:6px' }, (econ.modes || {})[econ.mode]?.hint || ''),
     h('div', { class: 'muted', style: 'font-size:12px;margin-top:4px' },
       '按花费自动降级：' + (econ.autoOn ? '已触发（花到降级线）' : '未触发')),
+    h('div', { style: 'display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap' },
+      h('b', { style: 'font-size:13px' }, '省钱时：'),
+      h('div', { class: 'rg-seg' },
+        h('button', {
+          class: 'btn' + (econ.replyAt !== false ? '' : ' ghost'),
+          onclick: () => setEco({ action: 'setreply', replyAt: true }),
+        }, '还回 @'),
+        h('button', {
+          class: 'btn' + (econ.replyAt === false ? '' : ' ghost'),
+          onclick: () => setEco({ action: 'setreply', replyAt: false }),
+        }, '完全不发'),
+      ),
+      h('span', { class: 'muted', style: 'font-size:12px' },
+        econ.replyAt === false
+          ? '省钱期间一个人在群里 @ 她也不回，只认你手动让她说话'
+          : '省钱期间有人 @ 她、你手动让她说话，她照常回'),
+    ),
   ));
 
   // 群频率
