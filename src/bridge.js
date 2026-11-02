@@ -16121,6 +16121,26 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
         await sendToQQ(key, off ? ('好，' + label + '先不接话了（' + target + '）。你 @ 她、或手动叫她，她还是回。\n取消：/恢复 ' + (rest || '本群')) : ('好，' + target + ' 恢复接话。'));
         return;
       }
+      // STATUS_CMD_PATCH：一行看清状态
+      if (lowerCmd === '/状态' || lowerCmd === '/status' || lowerCmd === '/s') {
+        const fs3 = await import('node:fs');
+        let muted = [];
+        try {
+          const r = JSON.parse(fs3.readFileSync('/home/dsh/.dsh/surfcore/state/muted-keys.json', 'utf8'));
+          muted = Object.keys(r.items || {}).filter((x) => r.items[x] !== false);
+        } catch {}
+        const costNum = (typeof tokenGuardTodayCost === 'function') ? tokenGuardTodayCost() : 0;
+        const cap = Number(cfg?.socialV2?.tokenGuard?.maxDailyCostCNY || 0);
+        const paused = !!cfg?.socialV2?.paused;
+        const up = Math.round(process.uptime() / 360) / 10;
+        await sendToQQ(key, ['【状态】',
+          '开关：' + (paused ? '全局暂停（回不了话）' : '正常'),
+          '今天：¥' + costNum.toFixed(2) + (cap ? ' / 上限 ¥' + cap : ''),
+          '静音：' + (muted.length ? muted.join('、') : '无'),
+          '桥接：pid ' + process.pid + ' · 已跑 ' + up + ' 小时',
+        ].join('\n'));
+        return;
+      }
       if (lowerCmd === '/花费' || lowerCmd === '/cost') {
         await sendToQQ(key, qqCostText());
         return;
