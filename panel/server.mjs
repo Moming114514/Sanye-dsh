@@ -332,6 +332,9 @@ function memoryMap() {
     forgotten: recs.filter((r) => r.forgotten).length,
     cap: { records: Number(mc.maxRecords) || 1500, pinned: Number(mc.maxPinned) || 20 },
     sizes, byClarity, byTag, weeks, older: olderCount, pairs, records: recs,
+    // MOOD_IN_MEM_PATCH：心情存在 state/mood.json（桥接写的），面板以前没读，所以一直显示「没有数据」
+    mood: (readJSON(path.join(STATE, 'mood.json'), {}) || {}).values || {},
+    moodAt: (readJSON(path.join(STATE, 'mood.json'), {}) || {}).lastTickAt || null,
   };
 }
 
@@ -755,7 +758,7 @@ const server = http.createServer(async (req, res) => {
       }
       return send(res, 200, { ok: true, items: out, self: PORT });
     }
-    if (p === '/api/access') {
+    if (p === '/api/access' && req.method === 'GET') { // ACCESS_METHOD_PATCH：不加方法判断会吞掉 POST（表现为「提示成功但没写进去」）
       if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
       const cfg = readJSON(CFG_PATH, {}) || {};
       const groups = [...new Set((cfg.allow?.groups || []).map(String))];
@@ -966,6 +969,25 @@ const server = http.createServer(async (req, res) => {
         });
         if (!rec) return send(res, 404, { ok: false, error: '没有这条记忆' });
         return send(res, 200, { ok: true, id: rec.id, displayOnly: !!rec.displayOnly });
+      }
+      if (p === '/api/mem/merge-auto') {
+        if (body.confirm !== true) return send(res, 400, { ok: false, error: '要合并记忆必须带 confirm: true（这个动作会改动记忆卡）' }); // MERGE_CONFIRM_PATCH
+        const map = memoryMap();
+        const want = Math.max(1, Math.min(5, Number(body.max) || 2));
+        const picks = (map.pairs || []).filter((x) => x.sim >= 0.72).slice(0, want);
+        if (!picks.length) return send(res, 200, { ok: true, merged: 0, msg: '没有足够相似的，先不用合' });
+        let merged = 0;
+        for (const pair of picks) {
+          const keep = pair.a, drop = pair.b;
+          const extra = String(drop.text || '').trim();
+          if (extra && !String(keep.text || '').includes(extra)) {
+            keep.text = (String(keep.text || '') + '\n（还记着一条相近的：' + extra.slice(0, 200) + '）').slice(0, 1200);
+          }
+          merged += 1;
+          try { mutateMem(String(drop.id), (r) => { r.forgottenAt = new Date().toISOString(); r.clarity = 'faded'; r.mergedInto = keep.id; }); } catch {}
+          try { mutateMem(String(keep.id), (r) => { r.text = keep.text; r.importance = Math.max(Number(r.importance) || 0, Number(drop.importance) || 0); }); } catch {}
+        }
+        return send(res, 200, { ok: true, merged });
       }
       if (p === '/api/mem/merge') {
         const f = memCardFile();
