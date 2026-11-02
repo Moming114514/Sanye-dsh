@@ -16104,7 +16104,31 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
         if (!rest || /^(本群|此群|这个群|当前群|这群)$/.test(rest)) target = key;
         else if (/^(我|私聊|本会话|这个)$/.test(rest)) target = key;
         else {
+          // MUTE_BY_NAME_PATCH：支持用群名/昵称，而不是只认号码
           const m2 = rest.match(/(\d{5,12})/);
+          if (!m2) {
+            try {
+              const fs3 = await import('node:fs');
+              const nm = JSON.parse(fs3.readFileSync('/home/dsh/.dsh/surfcore/state/names.json', 'utf8'));
+              const want = rest.replace(/\s+/g, '');
+              const gHit = Object.entries(nm.groups || {}).find(([, v]) => String(v && v.name || '').includes(want));
+              const pHit = Object.entries(nm.users || {}).find(([, v]) => String(v && v.name || '').includes(want));
+              if (gHit) {
+                const items0 = readMute();
+                if (off) items0['group:' + gHit[0]] = { at: new Date().toISOString() }; else delete items0['group:' + gHit[0]];
+                writeMute(items0);
+                await sendToQQ(key, (off ? '好，' : '好，') + (gHit[1].name || gHit[0]) + (off ? ' 先不接话了。你 @ 她仍会回。' : ' 恢复接话。') + '\n（' + 'group:' + gHit[0] + '）');
+                return;
+              }
+              if (pHit) {
+                const items0 = readMute();
+                if (off) items0['private:' + pHit[0]] = { at: new Date().toISOString() }; else delete items0['private:' + pHit[0]];
+                writeMute(items0);
+                await sendToQQ(key, (off ? '好，' : '好，') + (pHit[1].name || pHit[0]) + (off ? ' 的私聊先不接了。' : ' 的私聊恢复接话。'));
+                return;
+              }
+            } catch {}
+          }
           if (!m2) { await sendToQQ(key, '用法：/静音 本群（在群里发）· /静音 群号 · /静音 QQ号 · /静音列表'); return; }
           const id = m2[1];
           const gs = new Set();
@@ -16917,6 +16941,11 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
       scheduleWakeV2(key, 'bootstrap');
     } else if (st.wakeConfig?.triggers?.poke) {
       scheduleWakeV2(key, 'poke');
+    } else if (kind === 'private' && targetIsSelf && cfg?.socialV2?.pokeLite !== false) {
+      // POKE_LITE_PATCH：私聊被戳一下，给个轻反馈（不调模型、不花钱）
+      const pool = ['？', '在的在的', '戳我干嘛', '嗯？', '怎么啦'];
+      const reply = pool[Math.floor(Math.random() * pool.length)];
+      setTimeout(() => { sendToQQ(key, reply).catch(() => {}); }, 700 + Math.random() * 900);
     }
   }
 
