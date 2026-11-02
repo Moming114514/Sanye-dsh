@@ -92,6 +92,7 @@ import { moodObserve, moodLine, moodTick, moodDiaryTick, moodStatusText, moodPub
 import { pickStudyVideo, studyStatusText, studyCfg, readStudyState, writeStudyState, hasWatched, addToFolder, favoriteByBvid } from './bili-study.js';
 
 import { createStyleLearn } from './ext/style-learn.js'; // STYLE_LEARN_EXT
+import createGithubLearn from './ext/github-learn.js'; // GITHUB_LEARN_EXT
 import { loopsBlock, loopsMeta, addLoop, doneLoop, listLoops } from './loops-lib.js'; // LOOPS_PATCH
 import { parseDue, dueReminders, markReminded, learnPeople, notePerson, peopleBlock, noteAlive, lastEventAgo, alertState, setAlert, reportState, markReported, fmtReport } from './next-lib.js'; // NEXT_PATCH
 import { transcribeRecord, voiceTextOf } from './voice-lib.js'; // VOICE_PATCH // BILISTUDY_PATCH BILISTUDY_PATCH2
@@ -13630,6 +13631,15 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
   const styleLearnCfgNow = () => styleLearn.styleLearnCfgNow();
   try { setInterval(() => { void styleLearn.tick(); }, 60 * 1000); } catch {}
   try { setInterval(() => { styleLearn.tickCandidates(); }, 30 * 60 * 1000); } catch {}
+
+  // GITHUB_LEARN_EXT：每周从 GitHub 高星项目学 3 条做法（替代 B 站视频）
+  const githubLearn = createGithubLearn({
+    cfg: () => cfg,
+    log,
+    deliverPrompt: (text, opts) => deliverPrompt('private:' + String(cfg.ownerQQ || ''), text, opts),
+  });
+  try { setInterval(() => { void githubLearn.tick(); }, 30 * 60 * 1000); } catch {}
+  log('[GitHub学] 已启动：每周挑一个高星仓库学 3 条做法');
 
   // MOOD_DIARY_TICK：把当天心情的主色调写进日记（一天一条，零模型开销）
   async function moodDiaryTick() {
