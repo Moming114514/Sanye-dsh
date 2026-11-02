@@ -2,6 +2,8 @@
 
 > 由 `node scripts/gen-index.mjs` 生成，别手改。查东西先看这里，再去对应文件。
 
+> 相关：架构取舍看 `docs/DECISIONS.md`；按天改动看 `docs/CHANGES-BY-DAY.md`。
+
 ## 扩展模块（src/ext/*.js）
 
 | 模块 | 说明（首行注释） |
