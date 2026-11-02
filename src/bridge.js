@@ -16122,6 +16122,31 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
         await sendToQQ(key, off ? ('好，' + label + '先不接话了（' + target + '）。你 @ 她、或手动叫她，她还是回。\n取消：/恢复 ' + (rest || '本群')) : ('好，' + target + ' 恢复接话。'));
         return;
       }
+      // KW_CMD_PATCH：严格的本地关键词（不调模型、仅主人私聊），只认明确说法
+      if (!cmdLine.startsWith('/') && key.startsWith('private:')) {
+        const t0 = cmdLine.trim();
+        if (/^(今天)?(花了多少|花多少钱|花费|用了多少钱)$/.test(t0)) {
+          await sendToQQ(key, qqCostText());
+          return;
+        }
+        if (/^(她)?(现在)?(什么状态|状态|还好吗|怎么样了)$/.test(t0)) {
+          const fs4 = await import('node:fs');
+          let muted2 = [];
+          try {
+            const r = JSON.parse(fs4.readFileSync('/home/dsh/.dsh/surfcore/state/muted-keys.json', 'utf8'));
+            muted2 = Object.keys(r.items || {}).filter((x) => r.items[x] !== false);
+          } catch {}
+          const c2 = (typeof tokenGuardTodayCost === 'function') ? tokenGuardTodayCost() : 0;
+          const cap2 = Number(cfg?.socialV2?.tokenGuard?.maxDailyCostCNY || 0);
+          await sendToQQ(key, ['【状态】',
+            '开关：' + (cfg?.socialV2?.paused ? '全局暂停' : '正常'),
+            '今天：¥' + c2.toFixed(2) + (cap2 ? ' / 上限 ¥' + cap2 : ''),
+            '静音：' + (muted2.length ? muted2.join('、') : '无'),
+            '桥接：pid ' + process.pid,
+          ].join('\n'));
+          return;
+        }
+      }
       // STATUS_CMD_PATCH：一行看清状态
       if (['/状态', '/status', '/s'].includes(cmdLine.trim().split(/\s+/)[0].toLowerCase())) {
         const fs3 = await import('node:fs');
