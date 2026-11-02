@@ -15728,6 +15728,21 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
     lines.push('B站 ¥' + yuan(bili.cost) + '｜其它 ¥' + yuan(other.cost));
     lines.push('合计 ¥' + yuan(totalCost) + '（' + tok(total.tokens) + ' token）');
     if (budgetLine) lines.push(budgetLine);
+    // COSTTEXT_PATCH：加进度、降级状态、按速度预估、剩余额度
+    try {
+      const limits = bridgeBudgetLimits();
+      const cap = Number(limits && limits.qq && limits.qq.cny) || 0;
+      const down = (() => { try { return tokenGuardDowngrade(); } catch { return null; } })();
+      if (cap > 0) {
+        const pct = Math.min(999, Math.round((totalCost / cap) * 100));
+        const left = Math.max(0, cap - totalCost);
+        lines.push(`进度 ${pct}%｜剩 ¥${left.toFixed(2)}｜${down && down.on ? '省钱模式：只回 @' : '正常：谁叫都应'}`);
+        const hnow = now.getHours() + now.getMinutes() / 60;
+        const hours = Math.max(0.5, hnow);
+        const est = (totalCost / hours) * 24;
+        lines.push(`按这速度今天约 ¥${est.toFixed(2)}`);
+      }
+    } catch {}
     lines.push(peak ? '现在高峰价，一句顶两句的钱。' : '现在空闲价，半价，随便说。');
     return lines.join('\n');
   }
@@ -15995,38 +16010,115 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
       }
       const lowerCmd = cmdLine.trim().toLowerCase();
       if (lowerCmd === '/帮助' || lowerCmd === '/命令' || lowerCmd === '/help') {
-        await sendToQQ(
-          key,
-          [
-                        '我能听的管理命令（要带斜杠）：',
-            '【看数】',
-            '/花费  今天花了多少（含各群、额度、峰谷）',
-            '/加油 N  今天额外再放 N 元额度（临时，不会永久改配置）',
-            '/心情  她现在的情绪状态',
-            '【说话档位】',
-            '/全开  群里按规则回（@、叫名字、关键词、概率）',
-            '/只听主人  群里只回你，别人一律不理（私聊正常）',
-            '/关机  彻底静默，连你也不回（5 分钟内再发一次确认）',
-            '/开机  从关机恢复',
-            '/silent  只回你、不回群友（旧版同义，已被 /只听主人 取代）',
-            '/active  取消 /silent',
-            '【谷价】',
-            '/谷价  今天整天按谷价算',
-            '/谷价关  取消今天的谷价',
-            '/谷价表  看人工谷价日',
-            '【B站学习】',
-            '/学  现在挑一个技术视频学（会先收藏再看）',
-            '/学习  看今天的学习任务状态',
-            '【好友与头像】',
-            '/好友  看待处理的好友申请',
-            '/同意好友 QQ号    /拒绝好友 QQ号',
-            '/同意头像    /不同意头像',
-            '【其它】',
-            '/reset  清空这个会话的上下文',
-            '/重启  重启桥接（约 20 秒）',
-            '/帮助  再看一遍这张表（/命令 /help 同义）',
-].join('\n')
-        );
+        // MUTE_CMD_PATCH：分页 + 按主题 + 单条查询
+        const _raw = cmdLine.trim();
+        const _first = _raw.split(/\s+/)[0] || '';
+        const harg = _raw.slice(_first.length).trim().toLowerCase();
+        const P = {
+          common: [
+            ['/花费', '今天花了多少（额度、峰谷、各群）'],
+            ['/心情', '她现在的情绪'],
+            ['/静音 本群', '让这个群不接话（你 @ 她还回）'],
+            ['/恢复 本群', '取消静音'],
+            ['/静音列表', '看现在关了哪些'],
+            ['/全开', '群里按规则回'],
+            ['/只听主人', '群里只回你'],
+            ['/关机', '彻底静默（5 分钟内再发一次确认）'],
+            ['/开机', '从关机恢复'],
+            ['/帮助 2', '下一页：群与人'],
+          ],
+          group: [
+            ['/好友', '看待处理的好友申请'],
+            ['/同意好友 QQ号', '通过好友'],
+            ['/拒绝好友 QQ号', '拒绝好友'],
+            ['/同意头像', '允许她换头像'],
+            ['/不同意头像', '拒绝换头像'],
+            ['/静音 QQ号', '这个人私聊不接话'],
+            ['/恢复 QQ号', '恢复'],
+            ['/学', '现在就学一个技术视频'],
+            ['/学习', '今天的学习任务状态'],
+            ['/帮助 3', '下一页：其它'],
+          ],
+          misc: [
+            ['/加油 N', '今天临时加 N 元额度'],
+            ['/谷价', '今天整天按谷价算'],
+            ['/谷价关', '取消今天的谷价'],
+            ['/谷价表', '看人工谷价日'],
+            ['/reset', '清空这个会话的上下文'],
+            ['/重启', '重启桥接（约 20 秒）'],
+            ['/silent', '只回你、不回群友（旧版，等同 /只听主人）'],
+            ['/active', '取消 /silent'],
+            ['/帮助 1', '回到第一页'],
+          ],
+        };
+        const TOPIC = {
+          花费: ['common'], 开关: ['common'], 静音: ['common', 'group'],
+          群: ['group'], 学: ['group'], 工具: ['misc'], 其它: ['misc'],
+        };
+        const ALL = [...P.common, ...P.group, ...P.misc];
+        const topic = Object.keys(TOPIC).find((k) => harg === k);
+        if (topic) {
+          const rows = [...new Set(TOPIC[topic])].flatMap((k) => P[k]);
+          await sendToQQ(key, '【' + topic + '】\n' + rows.map((r) => r[0] + ' — ' + r[1]).join('\n') + '\n\n/帮助 看全部');
+          return;
+        }
+        const exact = ALL.find((r) => r[0].split(' ')[0] === harg || r[0] === harg);
+        if (harg && !['1', '2', '3'].includes(harg)) {
+          if (exact) {
+            await sendToQQ(key, exact[0] + '\n' + exact[1]);
+          } else {
+            await sendToQQ(key, '没找到这个命令。发 /帮助 看全部，或 /帮助 开关 /帮助 花费 /帮助 学。');
+          }
+          return;
+        }
+        const page = harg === '2' ? 'group' : harg === '3' ? 'misc' : 'common';
+        const no = page === 'common' ? 1 : page === 'group' ? 2 : 3;
+        const title = page === 'common' ? '常用' : page === 'group' ? '群与人' : '其它';
+        const next = no === 1 ? '\n\n/帮助 2 下一页 · /帮助 开关 按主题' : no === 2 ? '\n\n/帮助 3 下一页 · /帮助 1 上一页' : '\n\n/帮助 1 回到第一页';
+        await sendToQQ(key, '【帮助 ' + no + '/3 · ' + title + '】（要带斜杠）\n' + P[page].map((r) => r[0] + ' — ' + r[1]).join('\n') + next);
+        return;
+      }
+      // MUTE_CMD_PATCH：/静音 /恢复 /静音列表（支持「本群」不输号）
+      if (lowerCmd === '/静音' || lowerCmd === '/mute' || lowerCmd === '/恢复' || lowerCmd === '/unmute' || lowerCmd === '/静音列表' || lowerCmd === '/muted') {
+        const MUTE_FILE = '/home/dsh/.dsh/surfcore/state/muted-keys.json';
+        const fs2 = await import('node:fs');
+        const readMute = () => {
+          try { const r = JSON.parse(fs2.readFileSync(MUTE_FILE, 'utf8')); return r && r.items ? r.items : {}; } catch { return {}; }
+        };
+        const writeMute = (items) => {
+          fs2.mkdirSync('/home/dsh/.dsh/surfcore/state', { recursive: true });
+          const tmp = MUTE_FILE + '.tmp';
+          fs2.writeFileSync(tmp, JSON.stringify({ items }, null, 1));
+          fs2.renameSync(tmp, MUTE_FILE);
+        };
+        if (lowerCmd === '/静音列表' || lowerCmd === '/muted') {
+          const items = readMute();
+          const ks = Object.keys(items).filter((x) => items[x] !== false);
+          await sendToQQ(key, ks.length ? '现在不接话的会话：\n' + ks.join('\n') + '\n\n恢复：/恢复 群号 或 /恢复 本群' : '没有被静音的群或人。');
+          return;
+        }
+        const off = lowerCmd === '/静音' || lowerCmd === '/mute';
+        const rest = cmdLine.trim().slice(cmdLine.trim().split(/\s+/)[0].length).trim();
+        let target = '';
+        if (!rest || /^(本群|此群|这个群|当前群|这群)$/.test(rest)) target = key;
+        else if (/^(我|私聊|本会话|这个)$/.test(rest)) target = key;
+        else {
+          const m2 = rest.match(/(\d{5,12})/);
+          if (!m2) { await sendToQQ(key, '用法：/静音 本群（在群里发）· /静音 群号 · /静音 QQ号 · /静音列表'); return; }
+          const id = m2[1];
+          const gs = new Set();
+          try {
+            for (const g of (cfg?.socialV2?.access?.groups || cfg?.socialV2?.allowedGroups || [])) gs.add(String(g));
+            for (const k2 of Object.keys(cfg?.socialV2?.groupRate || {})) gs.add(String(k2));
+          } catch {}
+          target = gs.has(id) ? 'group:' + id : 'private:' + id;
+        }
+        const items = readMute();
+        if (off) items[target] = { at: new Date().toISOString() };
+        else delete items[target];
+        writeMute(items);
+        const label = target.startsWith('group:') ? '这个群' : '这个人';
+        await sendToQQ(key, off ? ('好，' + label + '先不接话了（' + target + '）。你 @ 她、或手动叫她，她还是回。\n取消：/恢复 ' + (rest || '本群')) : ('好，' + target + ' 恢复接话。'));
         return;
       }
       if (lowerCmd === '/花费' || lowerCmd === '/cost') {
