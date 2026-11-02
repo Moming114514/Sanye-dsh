@@ -121,7 +121,7 @@ async function qzoneWatchTick() {
       }
     }
     for (const p of (st.pending || []).filter((x) => x.dueAt <= now)) {
-      if (w.onlyOffPeak && (isPeakNow() || tokenGuardDowngrade().on)) break;
+      if (w.onlyOffPeak && (helpers.isPeakNow() || helpers.tokenGuardDowngrade().on)) break; // QZPEAK_FIX：helpers 里的方法，别裸调
       if (st.delivered >= w.maxPerDay) break;
       st.pending = st.pending.filter((x) => x.tid !== p.tid);
       st.seen = [...st.seen, p.tid].slice(-200);

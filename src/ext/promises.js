@@ -45,9 +45,10 @@ export default {
 
   afterSend({ messages, cfg, log }) {
     if (cfg?.socialV2?.loops?.autoCapture === false) return;
+    const say = typeof log === 'function' ? log : () => {}; // AFTERSEND_LOG_FIX：分发器没给 log 时别炸
     for (const text of detectPromises(messages)) {
       const r = addLoop({ text, by: '自己', raw: cfg });
-      if (r?.ok) log(`[欠事] 捕获：${text}`);
+      if (r?.ok) say(`[欠事] 捕获：${text}`);
     }
   },
 };
