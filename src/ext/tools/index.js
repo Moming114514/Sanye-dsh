@@ -6,8 +6,9 @@ import techNote from './tech-note.js';
 import person from './person.js';
 import style from './style.js';
 import readGroup from './read-group.js';
+import ownerTeach from './owner-teach.js'; // OWNERTEACH_PATCH
 
-const TOOLS = [loop, impression, techNote, person, style, readGroup].filter(Boolean);
+const TOOLS = [loop, impression, techNote, person, style, readGroup, ownerTeach].filter(Boolean);
 
 export function extToolList() {
   return TOOLS.map((t) => ({ name: t.name, flag: t.flag }));

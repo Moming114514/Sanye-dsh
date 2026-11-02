@@ -21,9 +21,10 @@ import learnmode from './learnmode.js'; // 学习模式（只看不聊）
 import groupRate from './group-rate.js'; // 群发言频率
 import safeTalk from './safe-talk.js'; // 敏感话题守门
 import economy from './economy.js'; // 省钱模式（少说话，可按群）
+import ownerTeach from './owner-teach.js'; // 主人教的说法（OWNERTEACH_PATCH）
 
 // 注册顺序 = 提示词注入顺序（印象在前、技术笔记在后，与原内联顺序一致）
-const EXTENSIONS = [ownerOnly, mute, learnmode, economy, groupRate, safeTalk, promises, impressions, techNotes, style, loops, stickers].filter(Boolean);
+const EXTENSIONS = [ownerOnly, mute, learnmode, economy, groupRate, safeTalk, promises, impressions, ownerTeach, techNotes, style, loops, stickers].filter(Boolean);
 
 export function extList() {
   return EXTENSIONS;
