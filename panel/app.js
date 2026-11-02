@@ -509,34 +509,93 @@ function pageCost() {
     ));
   }
 
-  // ④ 明细
-  const ent = (c.recent || []).slice(0, 20);
-  wrap.append(card('最近的花费明细',
-    h('div', { style: 'display:flex;gap:8px;justify-content:flex-end;margin-bottom:6px' },
-      h('button', {
-        class: 'btn ghost', style: 'padding:5px 12px;font-size:12px',
-        onclick: async () => {
-          try {
-            const r = await fetch('/api/cost.csv', { headers: { 'x-her-token': TOKEN } });
-            const blob = await r.blob();
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = 'cost-' + new Date().toISOString().slice(0, 10) + '.csv';
-            a.click();
-            URL.revokeObjectURL(a.href);
-            toast('导出好了');
-          } catch (e) { toast('导出失败：' + e.message); }
-        },
-      }, '导出 CSV')),
-    ent.length ? h('table', { class: 'tbl' },
-      h('thead', {}, h('tr', {}, h('th', {}, '时间'), h('th', {}, '会话'), h('th', {}, '轮/步'), h('th', { class: 'num' }, '上下文 token'), h('th', { class: 'num' }, '花费'))),
-      h('tbody', {}, ...ent.map((e) => h('tr', {},
-        h('td', { class: 'muted', style: 'font-size:12px' }, new Date(e.time || e.t || e.at || 0).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })),
-        h('td', { style: 'font-size:12.5px' }, String(e.key || e.sid || '?').replace('private:', '私聊 ').replace('group:', '群 ')),
-        h('td', { class: 'muted', style: 'font-size:12px' }, `${e.turn ?? '-'} / ${e.step ?? '-'}`),
-        h('td', { class: 'num muted' }, Number(e.tokens || e.total || 0).toLocaleString()),
-        h('td', { class: 'num', style: (e.cost || 0) > 0.3 ? 'color:#ff8a8a;font-weight:600' : '' }, fmtCny(e.cost)),
-      )))) : h('div', { class: 'muted' }, '还没有明细'),
+  // ④ 明细（GROUP_BY_TURN：按「一次回复」聚合，点开看每一步）
+  const stepList = (c.recent || []).slice(0, 200);
+  const gmap = new Map();
+  const glist = [];
+  stepList.forEach((e) => {
+    const key = String(e.key || e.sid || '?');
+    const gid = key + '#' + String(e.turn ?? '');
+    let g = gmap.get(gid);
+    if (!g) {
+      g = { key: key, turn: e.turn, t: Number(e.time || e.t || e.at || 0), steps: [], cost: 0, tokens: 0, miss: 0 };
+      gmap.set(gid, g);
+      glist.push(g);
+    }
+    g.steps.push(e);
+    g.cost += Number(e.cost || 0);
+    g.tokens += Number(e.tokens || e.total || 0);
+    g.miss += Number(e.cacheMiss || 0);
+    const tt = Number(e.time || e.t || e.at || 0);
+    if (tt && (!g.t || tt < g.t)) g.t = tt;
+  });
+  const gshown = glist.slice(0, 12);
+  const sessName = (k) => String(k || '?').replace('private:', '私聊 ').replace('group:', '群 ');
+  const fmtHM = (t) => new Date(t).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+
+  const mkDetail = (g) => {
+    const body = h('tbody', {});
+    g.steps.forEach((s) => {
+      body.append(h('tr', {},
+        h('td', { class: 'muted' }, String(s.step ?? '-')),
+        h('td', { class: 'num muted' }, Number(s.tokens || s.total || 0).toLocaleString()),
+        h('td', { class: 'num muted' }, Number(s.cacheHit || 0).toLocaleString()),
+        h('td', { class: 'num muted' }, Number(s.cacheMiss || 0).toLocaleString()),
+        h('td', { class: 'num muted' }, Number(s.output || 0).toLocaleString()),
+        h('td', { class: 'num' }, fmtCny(s.cost)),
+      ));
+    });
+    const inner = h('table', { class: 'tbl', style: 'margin:2px 0 8px' });
+    inner.append(h('thead', {}, h('tr', {},
+      h('th', {}, '步'), h('th', { class: 'num' }, '上下文'), h('th', { class: 'num' }, '命中'),
+      h('th', { class: 'num' }, '未命中'), h('th', { class: 'num' }, '输出'), h('th', { class: 'num' }, '花费'))));
+    inner.append(body);
+    const td = h('td', { colspan: 6, style: 'padding:0 0 0 18px' });
+    td.append(inner);
+    return h('tr', { style: 'display:none' }, td);
+  };
+
+  const csvBtn = h('button', {
+    class: 'btn ghost', style: 'padding:5px 12px;font-size:12px',
+    onclick: async () => {
+      try {
+        const r = await fetch('/api/cost.csv', { headers: { 'x-her-token': TOKEN } });
+        const blob = await r.blob();
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'cost-' + new Date().toISOString().slice(0, 10) + '.csv';
+        a.click();
+        URL.revokeObjectURL(a.href);
+        toast('导出好了');
+      } catch (e) { toast('导出失败：' + e.message); }
+    },
+  }, '导出 CSV（每步原始数据）');
+
+  const gtbody = h('tbody', {});
+  gshown.forEach((g) => {
+    const detail = mkDetail(g);
+    const row = h('tr', { style: 'cursor:pointer' },
+      h('td', { class: 'muted', style: 'font-size:12px' }, fmtHM(g.t)),
+      h('td', { style: 'font-size:12.5px' }, sessName(g.key)),
+      h('td', { class: 'muted', style: 'font-size:12px' }, String(g.turn ?? '-')),
+      h('td', { class: 'num muted' }, g.steps.length + ' 步 ▾'),
+      h('td', { class: 'num muted' }, g.miss.toLocaleString()),
+      h('td', { class: 'num', style: g.cost > 0.3 ? 'color:#ff8a8a;font-weight:600' : '' }, fmtCny(g.cost)),
+    );
+    row.onclick = () => { detail.style.display = detail.style.display === 'none' ? '' : 'none'; };
+    gtbody.append(row);
+    gtbody.append(detail);
+  });
+
+  const gtable = h('table', { class: 'tbl' });
+  gtable.append(h('thead', {}, h('tr', {},
+    h('th', {}, '时间'), h('th', {}, '会话'), h('th', {}, '轮'),
+    h('th', { class: 'num' }, '步数'), h('th', { class: 'num' }, '新内容 token'), h('th', { class: 'num' }, '这次回复合计'))));
+  gtable.append(gtbody);
+
+  wrap.append(card('最近的花费明细（一次回复 = 说一次话，点开看每一步）',
+    h('div', { style: 'display:flex;gap:8px;justify-content:flex-end;margin-bottom:6px' }, csvBtn),
+    gshown.length ? gtable : h('div', { class: 'muted' }, '还没有明细'),
   ));
 
   // ⑤ 进程
@@ -647,7 +706,7 @@ function pageStyle() { // STYLE_GATE_PATCH
     const qq = ($('#stl-qq')?.value || '').trim();
     const gs = ($('#stl-groups')?.value || '').split(/[,，\s]+/).map((x) => x.replace(/\D/g, '')).filter(Boolean);
     try {
-      await api('/api/style', { method: 'POST', body: { action: 'setcfg', targetQQ: qq, groups: gs } });
+      await api('/api/style', { method: 'POST', body: { action: 'setcfg', targetQQ: qq, groups: gs, exemptEconomy: !!($('#stl-exempt')?.checked) } });
       toast('已写入配置，点「重启桥接」才生效');
       state.style = await api('/api/style');
       rerender();
@@ -663,6 +722,8 @@ function pageStyle() { // STYLE_GATE_PATCH
       h('input', { type: 'text', id: 'stl-qq', value: scfg.targetQQ || '', style: 'width:150px' }),
       h('span', { class: 'muted', style: 'font-size:12px' }, '在哪学（群号，逗号分隔）'),
       h('input', { type: 'text', id: 'stl-groups', value: (scfg.groups || []).join(', '), style: 'width:210px' }),
+      h('span', { class: 'muted', style: 'font-size:12px' }, '省钱模式也照学'),
+      h('input', { type: 'checkbox', id: 'stl-exempt', checked: scfg.exemptEconomy !== false }),
       h('button', { class: 'btn', onclick: saveStyleCfg }, '保存'),
       h('button', { class: 'btn ghost', onclick: async () => {
         try { await api('/api/bridge/restart', { method: 'POST', body: {} }); toast('正在重启桥接，约 10 秒'); }
@@ -671,7 +732,7 @@ function pageStyle() { // STYLE_GATE_PATCH
     ),
     h('div', { class: 'muted', style: 'font-size:12px;margin-top:8px' },
       '当前：' + (scfg.targetQQ ? ('只学 QQ ' + scfg.targetQQ) : '未设置') + ' · 群 ' + ((scfg.groups || []).join('、') || '未设置')
-      + ' · 严格过滤' + (scfg.strictTarget ? '开' : '关') + ' · 每天 ' + ((scfg.rounds || []).length) + ' 轮，每轮 ' + (scfg.perRound ?? 2) + ' 条'),
+      + ' · 严格过滤' + (scfg.strictTarget ? '开' : '关') + ' · 省钱模式也照学' + (scfg.exemptEconomy === false ? '关' : '开') + ' · 每天 ' + ((scfg.rounds || []).length) + ' 轮，每轮 ' + (scfg.perRound ?? 2) + ' 条'),
   ));
 
   const section = (title, list, kind, hint) => h('div', { class: 'card', style: 'margin-top:12px' },

@@ -19,7 +19,7 @@ const PAGES = [
   { id: 'diag', title: '排障', render: pageDiag },
 ];
 
-const MOOD_CN = { calm: '平静', happy: '开心', curious: '好奇', focused: '专注', excited: '兴奋', tired: '有点累', annoyed: '有点烦', down: '低落', fear: '不安', disgust: '厌恶', surprise: '惊讶', hurt: '受伤', sulk: '闹别扭', proud: '小得意', gloomy: '闷闷的', anxious: '焦躁', numb: '发木', lonely: '孤单', flutter: '心动', love: '喜欢', shy: '害羞', content: '满足', bored: '无聊', grateful: '感激', guilty: '内疚', hopeful: '期待', irritated: '烦躁', jealous: '吃醋', playful: '俏皮', relaxed: '放松', sad: '难过', sleepy: '困' };
+const MOOD_CN = { calm: '平静', happy: '开心', curious: '好奇', focused: '专注', excited: '兴奋', tired: '有点累', annoyed: '有点烦', down: '低落', fear: '不安', disgust: '厌恶', surprise: '惊讶', hurt: '受伤', sulk: '闹别扭', proud: '小得意', gloomy: '闷闷的', anxious: '焦躁', numb: '发木', lonely: '孤单', flutter: '心动', love: '喜欢', shy: '害羞', content: '满足', bored: '无聊', grateful: '感激', guilty: '内疚', hopeful: '期待', irritated: '烦躁', jealous: '吃醋', playful: '俏皮', relaxed: '放松', sad: '难过', sleepy: '困', awkward: '尴尬', burnout: '累死了', checkedout: '心不在这', conflict: '心里打架', coy: '别扭的甜', cracked: '绷不住了', disappointed: '失望', guilt: '有点愧疚', hyper: '上头', nostalgia: '怀念', shame: '羞耻', sympathy: '心疼' }; // MOOD_CN_FULL
 
 let TOKEN = localStorage.getItem('her.token') || '';
 // 允许启动器用 #t=<口令> 直接带进来（本地 127.0.0.1 使用，读完即从地址栏抹掉）
@@ -46,6 +46,15 @@ function h(tag, attrs = {}, ...kids) {
   }
   for (const k of kids.flat()) if (k != null && k !== false) el.append(k.nodeType ? k : document.createTextNode(String(k)));
   return el;
+}
+function loopWhen(x) { // LOOP_TIME_FMT：欠事的时间原来是原始毫秒
+  const raw = x.due || x.at || x.atMs || '';
+  if (!raw) return '';
+  const n = typeof raw === 'number' ? raw : (/^\d+$/.test(String(raw)) ? Number(raw) : NaN);
+  if (!Number.isFinite(n)) return String(raw);
+  const d = new Date(n);
+  const pad = (v) => String(v).padStart(2, '0');
+  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 function toast(msg, ms = 2600) {
   const t = $('#toast'); t.textContent = msg; t.classList.add('show');
@@ -489,10 +498,10 @@ function pageCost() {
 
   // ③.5 长周期（来自每日快照，不受账本淘汰影响）
   if ((c.history || []).length >= 2) {
-    const h = c.history;
-    const mx = Math.max(...h.map((x) => x.total?.cost || 0), 0.0001);
-    wrap.append(card(`长周期（每天合计，已记录 ${h.length} 天）`,
-      h('div', { class: 'spark' }, ...h.map((x) => h('div', {
+    const hist = c.history; // COST_H_SHADOW_FIX：这里原来叫 h，把全局的 h() 建元素函数遮蔽了，整页报「h is not a function」
+    const mx = Math.max(...hist.map((x) => x.total?.cost || 0), 0.0001);
+    wrap.append(card(`长周期（每天合计，已记录 ${hist.length} 天）`,
+      h('div', { class: 'spark' }, ...hist.map((x) => h('div', {
         class: 'spark-bar',
         title: `${x.day} ¥${(x.total?.cost || 0).toFixed(3)} · ${(x.total?.tokens || 0).toLocaleString()} tok`,
         style: `height:${Math.max(6, ((x.total?.cost || 0) / mx) * 100)}%`,
@@ -500,34 +509,93 @@ function pageCost() {
     ));
   }
 
-  // ④ 明细
-  const ent = (c.recent || []).slice(0, 20);
-  wrap.append(card('最近的花费明细',
-    h('div', { style: 'display:flex;gap:8px;justify-content:flex-end;margin-bottom:6px' },
-      h('button', {
-        class: 'btn ghost', style: 'padding:5px 12px;font-size:12px',
-        onclick: async () => {
-          try {
-            const r = await fetch('/api/cost.csv', { headers: { 'x-her-token': TOKEN } });
-            const blob = await r.blob();
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = 'cost-' + new Date().toISOString().slice(0, 10) + '.csv';
-            a.click();
-            URL.revokeObjectURL(a.href);
-            toast('导出好了');
-          } catch (e) { toast('导出失败：' + e.message); }
-        },
-      }, '导出 CSV')),
-    ent.length ? h('table', { class: 'tbl' },
-      h('thead', {}, h('tr', {}, h('th', {}, '时间'), h('th', {}, '会话'), h('th', {}, '轮/步'), h('th', { class: 'num' }, '上下文 token'), h('th', { class: 'num' }, '花费'))),
-      h('tbody', {}, ...ent.map((e) => h('tr', {},
-        h('td', { class: 'muted', style: 'font-size:12px' }, new Date(e.time || e.t || e.at || 0).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })),
-        h('td', { style: 'font-size:12.5px' }, String(e.key || e.sid || '?').replace('private:', '私聊 ').replace('group:', '群 ')),
-        h('td', { class: 'muted', style: 'font-size:12px' }, `${e.turn ?? '-'} / ${e.step ?? '-'}`),
-        h('td', { class: 'num muted' }, Number(e.tokens || e.total || 0).toLocaleString()),
-        h('td', { class: 'num', style: (e.cost || 0) > 0.3 ? 'color:#ff8a8a;font-weight:600' : '' }, fmtCny(e.cost)),
-      )))) : h('div', { class: 'muted' }, '还没有明细'),
+  // ④ 明细（GROUP_BY_TURN：按「一次回复」聚合，点开看每一步）
+  const stepList = (c.recent || []).slice(0, 200);
+  const gmap = new Map();
+  const glist = [];
+  stepList.forEach((e) => {
+    const key = String(e.key || e.sid || '?');
+    const gid = key + '#' + String(e.turn ?? '');
+    let g = gmap.get(gid);
+    if (!g) {
+      g = { key: key, turn: e.turn, t: Number(e.time || e.t || e.at || 0), steps: [], cost: 0, tokens: 0, miss: 0 };
+      gmap.set(gid, g);
+      glist.push(g);
+    }
+    g.steps.push(e);
+    g.cost += Number(e.cost || 0);
+    g.tokens += Number(e.tokens || e.total || 0);
+    g.miss += Number(e.cacheMiss || 0);
+    const tt = Number(e.time || e.t || e.at || 0);
+    if (tt && (!g.t || tt < g.t)) g.t = tt;
+  });
+  const gshown = glist.slice(0, 12);
+  const sessName = (k) => String(k || '?').replace('private:', '私聊 ').replace('group:', '群 ');
+  const fmtHM = (t) => new Date(t).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+
+  const mkDetail = (g) => {
+    const body = h('tbody', {});
+    g.steps.forEach((s) => {
+      body.append(h('tr', {},
+        h('td', { class: 'muted' }, String(s.step ?? '-')),
+        h('td', { class: 'num muted' }, Number(s.tokens || s.total || 0).toLocaleString()),
+        h('td', { class: 'num muted' }, Number(s.cacheHit || 0).toLocaleString()),
+        h('td', { class: 'num muted' }, Number(s.cacheMiss || 0).toLocaleString()),
+        h('td', { class: 'num muted' }, Number(s.output || 0).toLocaleString()),
+        h('td', { class: 'num' }, fmtCny(s.cost)),
+      ));
+    });
+    const inner = h('table', { class: 'tbl', style: 'margin:2px 0 8px' });
+    inner.append(h('thead', {}, h('tr', {},
+      h('th', {}, '步'), h('th', { class: 'num' }, '上下文'), h('th', { class: 'num' }, '命中'),
+      h('th', { class: 'num' }, '未命中'), h('th', { class: 'num' }, '输出'), h('th', { class: 'num' }, '花费'))));
+    inner.append(body);
+    const td = h('td', { colspan: 6, style: 'padding:0 0 0 18px' });
+    td.append(inner);
+    return h('tr', { style: 'display:none' }, td);
+  };
+
+  const csvBtn = h('button', {
+    class: 'btn ghost', style: 'padding:5px 12px;font-size:12px',
+    onclick: async () => {
+      try {
+        const r = await fetch('/api/cost.csv', { headers: { 'x-her-token': TOKEN } });
+        const blob = await r.blob();
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'cost-' + new Date().toISOString().slice(0, 10) + '.csv';
+        a.click();
+        URL.revokeObjectURL(a.href);
+        toast('导出好了');
+      } catch (e) { toast('导出失败：' + e.message); }
+    },
+  }, '导出 CSV（每步原始数据）');
+
+  const gtbody = h('tbody', {});
+  gshown.forEach((g) => {
+    const detail = mkDetail(g);
+    const row = h('tr', { style: 'cursor:pointer' },
+      h('td', { class: 'muted', style: 'font-size:12px' }, fmtHM(g.t)),
+      h('td', { style: 'font-size:12.5px' }, sessName(g.key)),
+      h('td', { class: 'muted', style: 'font-size:12px' }, String(g.turn ?? '-')),
+      h('td', { class: 'num muted' }, g.steps.length + ' 步 ▾'),
+      h('td', { class: 'num muted' }, g.miss.toLocaleString()),
+      h('td', { class: 'num', style: g.cost > 0.3 ? 'color:#ff8a8a;font-weight:600' : '' }, fmtCny(g.cost)),
+    );
+    row.onclick = () => { detail.style.display = detail.style.display === 'none' ? '' : 'none'; };
+    gtbody.append(row);
+    gtbody.append(detail);
+  });
+
+  const gtable = h('table', { class: 'tbl' });
+  gtable.append(h('thead', {}, h('tr', {},
+    h('th', {}, '时间'), h('th', {}, '会话'), h('th', {}, '轮'),
+    h('th', { class: 'num' }, '步数'), h('th', { class: 'num' }, '新内容 token'), h('th', { class: 'num' }, '这次回复合计'))));
+  gtable.append(gtbody);
+
+  wrap.append(card('最近的花费明细（一次回复 = 说一次话，点开看每一步）',
+    h('div', { style: 'display:flex;gap:8px;justify-content:flex-end;margin-bottom:6px' }, csvBtn),
+    gshown.length ? gtable : h('div', { class: 'muted' }, '还没有明细'),
   ));
 
   // ⑤ 进程
@@ -638,7 +706,7 @@ function pageStyle() { // STYLE_GATE_PATCH
     const qq = ($('#stl-qq')?.value || '').trim();
     const gs = ($('#stl-groups')?.value || '').split(/[,，\s]+/).map((x) => x.replace(/\D/g, '')).filter(Boolean);
     try {
-      await api('/api/style', { method: 'POST', body: { action: 'setcfg', targetQQ: qq, groups: gs } });
+      await api('/api/style', { method: 'POST', body: { action: 'setcfg', targetQQ: qq, groups: gs, exemptEconomy: !!($('#stl-exempt')?.checked) } });
       toast('已写入配置，点「重启桥接」才生效');
       state.style = await api('/api/style');
       rerender();
@@ -654,6 +722,8 @@ function pageStyle() { // STYLE_GATE_PATCH
       h('input', { type: 'text', id: 'stl-qq', value: scfg.targetQQ || '', style: 'width:150px' }),
       h('span', { class: 'muted', style: 'font-size:12px' }, '在哪学（群号，逗号分隔）'),
       h('input', { type: 'text', id: 'stl-groups', value: (scfg.groups || []).join(', '), style: 'width:210px' }),
+      h('span', { class: 'muted', style: 'font-size:12px' }, '省钱模式也照学'),
+      h('input', { type: 'checkbox', id: 'stl-exempt', checked: scfg.exemptEconomy !== false }),
       h('button', { class: 'btn', onclick: saveStyleCfg }, '保存'),
       h('button', { class: 'btn ghost', onclick: async () => {
         try { await api('/api/bridge/restart', { method: 'POST', body: {} }); toast('正在重启桥接，约 10 秒'); }
@@ -662,7 +732,7 @@ function pageStyle() { // STYLE_GATE_PATCH
     ),
     h('div', { class: 'muted', style: 'font-size:12px;margin-top:8px' },
       '当前：' + (scfg.targetQQ ? ('只学 QQ ' + scfg.targetQQ) : '未设置') + ' · 群 ' + ((scfg.groups || []).join('、') || '未设置')
-      + ' · 严格过滤' + (scfg.strictTarget ? '开' : '关') + ' · 每天 ' + ((scfg.rounds || []).length) + ' 轮，每轮 ' + (scfg.perRound ?? 2) + ' 条'),
+      + ' · 严格过滤' + (scfg.strictTarget ? '开' : '关') + ' · 省钱模式也照学' + (scfg.exemptEconomy === false ? '关' : '开') + ' · 每天 ' + ((scfg.rounds || []).length) + ' 轮，每轮 ' + (scfg.perRound ?? 2) + ' 条'),
   ));
 
   const section = (title, list, kind, hint) => h('div', { class: 'card', style: 'margin-top:12px' },
@@ -715,7 +785,9 @@ function pageMemory() {
   wrap.append(h('div', { class: 'card', style: 'margin-top:14px' },
     h('h3', {}, '欠着的事'),
     ...(d.loops || []).length
-      ? d.loops.map((x) => h('div', { class: 'kv' }, h('span', {}, String(x.text || x.id || JSON.stringify(x)).slice(0, 80)), h('span', { class: 'muted' }, x.due || x.at || '')))
+      ? d.loops.map((x) => h('div', { class: 'kv' },
+          h('span', {}, String(x.text || x.id || JSON.stringify(x)).slice(0, 80)),
+          h('span', { class: 'muted' }, loopWhen(x))))
       : [h('div', { class: 'muted' }, '没有欠着的事')],
   ));
   return wrap;

@@ -92,7 +92,11 @@ function awaitingRestart() {
     try { base = JSON.parse(snap.raw); } catch { base = snap.config || null; }
   }
   const items = base ? deepDiff(base, now) : [];
-  return { ok: true, count: items.length, items: items.slice(0, 20), at: snap.at };
+  // HOT_KEYS：这些键桥接是热更新的（ALLOW_HOT_PATCH），改了立刻生效，不该再提示「重启后生效」
+  const HOT_KEYS = /^(allow|deny|allowAllWhenEmpty)(\.|$)/;
+  const live = items.filter((x) => HOT_KEYS.test(String(x.path || '')));
+  const pendingItems = items.filter((x) => !HOT_KEYS.test(String(x.path || '')));
+  return { ok: true, count: pendingItems.length, items: pendingItems.slice(0, 20), appliedLive: live.length, at: snap.at };
 }
 
 const getPath = (o, p) => p.split('.').reduce((a, k) => (a == null ? undefined : a[k]), o);
@@ -719,6 +723,7 @@ const server = http.createServer(async (req, res) => {
             const gs = body.groups.map((x) => String(x).replace(/\D/g, '')).filter(Boolean);
             cfg.socialV2.styleLearn.groups = gs;
           }
+          if (typeof body.exemptEconomy === 'boolean') cfg.socialV2.styleLearn.exemptEconomy = body.exemptEconomy; // STYLE_EXEMPT_PATCH
           writeCfg(cfg);
           return send(res, 200, { ok: true, note: '已写入 config.json，重启桥接后生效' });
         }
@@ -734,6 +739,7 @@ const server = http.createServer(async (req, res) => {
           targetQQ: String(sl.targetQQ || ''),
           groups: (sl.groups || []).map(String),
           strictTarget: sl.strictTarget !== false,
+          exemptEconomy: sl.exemptEconomy !== false,
           rounds: sl.rounds || [],
           perRound: sl.perRound ?? 2,
         },
