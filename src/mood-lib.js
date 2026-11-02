@@ -11,7 +11,7 @@ const CHAR_FILE = path.join(DATA_DIR, 'characters', 'current.json');
 
 // ── 33 种心情：基线、行为提示、分层 ─────────────────────────────
 export const MOODS = [
-  { id: 'calm', zh: '平静', base: 45, hint: '句子短而干净（例：好了，看一眼）' },
+  { id: 'calm', zh: '平静', base: 40, hint: '正常说话，不用刻意简短；平静不等于没反应，可以有一两句自己的态度（例：嗯……我看看，问题应该在这儿）' },
   { id: 'happy', zh: '开心', base: 30, hint: '语气轻快，可用一个感叹号或叠词（例：好啦好啦／成了！）' },
   { id: 'curious', zh: '好奇', base: 28, hint: '多追问一句（例：那你当时怎么弄的？）' },
   { id: 'focused', zh: '专注', base: 30, hint: '少寒暄，直接给步骤，不铺陈' },
@@ -226,7 +226,7 @@ export function moodLine(text = '', kind = 'private') {
     ? `，掺着一点${blendIds.map((id) => MOOD_BY_ID[id]?.zh).filter(Boolean).join('、')}`
     : '';
   const since = Math.max(1, Math.round((Date.now() - (st.since || Date.now())) / 3600000));
-  let line = `【今天的感觉】${m.zh}${blendText}（${since} 小时了）。${m.hint}。不用说出心情、别拿它当话题；判断和干活不受影响${kind === 'group' ? '；群里收着点，亲密不到极端就行' : ''}。`;
+  let line = `【今天的感觉】${m.zh}${blendText}（${since} 小时了）。${m.hint}。不用说出心情、别拿它当话题，但心情要用语气体现出来——一个词、一个叹词、一个反问都算，多一两个字就够；判断和干活不受影响${kind === 'group' ? '；群里收着点，亲密不到极端就行' : ''}。`;
   if (DISTRESS_RE.test(String(text || ''))) {
     line += `\n他这句话可能很重：不许打趣、不许用角色口吻敷衍，认真接住，先问一句他现在还好吗。`;
   }

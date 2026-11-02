@@ -13486,11 +13486,13 @@ async function main() {
         const owner = String(cfg.ownerQQ || '');
         if (!owner) return;
         const dur = v.durationText || (Math.round(v.durationSec / 60) + ' 分钟');
+        const tellOwner = (cfg.socialV2?.biliStudy?.tellOwner !== false); // TELLOWNER_PATCH：看完要不要跟他说
         const msg = '【今日学习】B站上这条可能对你有用：\n《' + v.title + '》\n作者 ' + v.author
           + ' · 时长 ' + dur + ' · ' + v.play + ' 播放\nhttps://www.bilibili.com/video/' + v.bvid + '/\n\n'
           + '现在就去看：用 video_storyboard 抽 6 格画面 + 读平台字幕，看完用 2~3 句话跟我说：它讲了什么、有没有能直接用到你自己身上的东西。'
-          + '没看完之前别只回我“收到”；如果工具报错，把错误原文发我。别转发到群里，别评论。';
-        await deliverPrompt('private:' + owner, msg);
+          + '没看完之前别只回我“收到”；如果工具报错，把错误原文发我。别转发到群里，别评论。'
+          + (tellOwner ? '' : '\n（这次他不要你汇报：看完只把要点用 note_tech 记下来，别给他发消息，也别在别处提这事。）');
+        await deliverPrompt('private:' + owner, msg, tellOwner ? undefined : { reason: 'study', silentOutbound: true });
         writeStudyState({ pendingBvid: v.bvid, pendingAt: Date.now(), nudged: 0 }); // BILISTUDY_PATCH2
       } catch (err) {
         log('[学习] 异常：' + (err?.message || err));
