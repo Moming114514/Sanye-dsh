@@ -16009,7 +16009,7 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
         return;
       }
       const lowerCmd = cmdLine.trim().toLowerCase();
-      if (lowerCmd === '/帮助' || lowerCmd === '/命令' || lowerCmd === '/help') {
+      if (['/帮助', '/命令', '/help'].includes(cmdLine.trim().split(/\s+/)[0].toLowerCase())) {
         // MUTE_CMD_PATCH：分页 + 按主题 + 单条查询
         const _raw = cmdLine.trim();
         const _first = _raw.split(/\s+/)[0] || '';
@@ -16079,7 +16079,8 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
         return;
       }
       // MUTE_CMD_PATCH：/静音 /恢复 /静音列表（支持「本群」不输号）
-      if (lowerCmd === '/静音' || lowerCmd === '/mute' || lowerCmd === '/恢复' || lowerCmd === '/unmute' || lowerCmd === '/静音列表' || lowerCmd === '/muted') {
+      if (['/静音', '/mute', '/恢复', '/unmute', '/静音列表', '/muted'].includes(cmdLine.trim().split(/\s+/)[0].toLowerCase())) {
+        const _c0 = cmdLine.trim().split(/\s+/)[0].toLowerCase();
         const MUTE_FILE = '/home/dsh/.dsh/surfcore/state/muted-keys.json';
         const fs2 = await import('node:fs');
         const readMute = () => {
@@ -16091,13 +16092,13 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
           fs2.writeFileSync(tmp, JSON.stringify({ items }, null, 1));
           fs2.renameSync(tmp, MUTE_FILE);
         };
-        if (lowerCmd === '/静音列表' || lowerCmd === '/muted') {
+        if (_c0 === '/静音列表' || _c0 === '/muted') {
           const items = readMute();
           const ks = Object.keys(items).filter((x) => items[x] !== false);
           await sendToQQ(key, ks.length ? '现在不接话的会话：\n' + ks.join('\n') + '\n\n恢复：/恢复 群号 或 /恢复 本群' : '没有被静音的群或人。');
           return;
         }
-        const off = lowerCmd === '/静音' || lowerCmd === '/mute';
+        const off = _c0 === '/静音' || _c0 === '/mute';
         const rest = cmdLine.trim().slice(cmdLine.trim().split(/\s+/)[0].length).trim();
         let target = '';
         if (!rest || /^(本群|此群|这个群|当前群|这群)$/.test(rest)) target = key;
@@ -16122,7 +16123,7 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
         return;
       }
       // STATUS_CMD_PATCH：一行看清状态
-      if (lowerCmd === '/状态' || lowerCmd === '/status' || lowerCmd === '/s') {
+      if (['/状态', '/status', '/s'].includes(cmdLine.trim().split(/\s+/)[0].toLowerCase())) {
         const fs3 = await import('node:fs');
         let muted = [];
         try {
