@@ -8,7 +8,7 @@ export default {
     return {
       shape: {
         group: z.string().describe('群号'),
-        count: z.number().optional().describe('拉多少条，默认 20，最多 60'),
+        count: z.number().optional().describe('拉多少条，默认 20，最多 500（拉 300 条通常能覆盖最近一两天）'),
         uin: z.string().optional().describe('只看这个 QQ 号说的话（例如学说法时填被学习的那个 QQ）。不填就是所有人'),
       },
       async handler({ group, count, uin }) {

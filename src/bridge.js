@@ -7871,7 +7871,7 @@ async function main() {
             if (extDispatchRoute(url.pathname, { body, cfg, log, sendJson, economyOn: tokenGuardDowngrade().on })) return;
             if (!v2ToolEnabled('readGroup')) return sendJson({ ok: false, error: 'readGroup 已关闭' }, 403);
             const gid = String(body?.group || '').replace(/\D/g, '');
-            const cnt = Math.max(5, Math.min(60, Number(body?.count) || 20)); // GROUP_UIN_FILTER：上限抬到 60，筛人时窗口才够
+            const cnt = Math.max(5, Math.min(500, Number(body?.count) || 20)); // WIDEWINDOW_PATCH：NapCat 一次能给几百条（实测 492 条≈14 小时），窗口越大越能翻到旧消息
             const onlyUin = String(body?.uin || '').replace(/\D/g, ''); // GROUP_UIN_FILTER
             if (!gid) return sendJson({ ok: false, error: 'group 不能为空' }, 400);
             const r = await bot.request('get_group_msg_history', { group_id: Number(gid), count: cnt });

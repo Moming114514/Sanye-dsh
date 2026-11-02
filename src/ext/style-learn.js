@@ -65,7 +65,7 @@ export function createStyleLearn({ getCfg, log, deliverPrompt, stateDir, isPeakN
       const doneKey = day + '#' + round;
       if (st?.done && st.done[doneKey]) return;
       if (isPeakNow()) { log('[学样] 跳过（高峰时段）：' + doneKey); return; }
-      if (tokenGuardDowngrade().on) { log('[学样] 跳过（省钱模式）：' + doneKey); return; }
+      if (c.exemptEconomy === false && tokenGuardDowngrade().on) { log('[学样] 跳过（省钱模式）：' + doneKey); return; } // STYLE_EXEMPT_PATCH：默认省钱模式也照学
       if (!cfg.ownerQQ) return;
       const gid = c.groups[Math.floor(Math.random() * c.groups.length)];
       const doneMap = Object.assign({}, st && st.done ? st.done : {}, { [doneKey]: true });
