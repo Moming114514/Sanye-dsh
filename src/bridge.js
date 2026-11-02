@@ -4617,6 +4617,8 @@ async function main() {
             || url.pathname === '/api/socialV2/learnmode' /* LEARNMODE_PATCH */
             || url.pathname === '/api/socialV2/grouprate' /* GROUPRATE_PATCH */
             || url.pathname === '/api/socialV2/economy' /* GROUPRATE_PATCH */
+            || url.pathname === '/api/socialV2/attention' /* ATTENTION_PATCH */
+            || url.pathname === '/api/socialV2/names' /* NAMES_PATCH */
             || url.pathname === '/api/socialV2/owner-teach' /* OWNERTEACH_PATCH */
         // ECONOMY_PATCH
             || url.pathname === '/api/socialV2/safetalk' /* GROUPRATE_PATCH */
@@ -7856,7 +7858,7 @@ async function main() {
           }
           return;
         }
-        if (url.pathname === '/api/socialV2/style-note' || url.pathname === '/api/socialV2/style-list' || url.pathname === '/api/socialV2/style-candidate' /* STYLE_GATE_PATCH */ || url.pathname === '/api/socialV2/group-recent' || url.pathname === '/api/socialV2/loop' || url.pathname === '/api/socialV2/person' || url.pathname === '/api/socialV2/impression' /* IMPR_EXT */ || url.pathname === '/api/socialV2/tech-notes' /* TECHNOTES_PATCH */ || url.pathname === '/api/socialV2/mute' /* MUTE_PATCH */ || url.pathname === '/api/socialV2/learnmode' /* LEARNMODE_PATCH */ || url.pathname === '/api/socialV2/grouprate' /* GROUPRATE_PATCH */ || url.pathname === '/api/socialV2/economy' /* ECONOMY_PATCH */ || url.pathname === '/api/socialV2/safetalk' /* GROUPRATE_PATCH */ || url.pathname === '/api/socialV2/owner-teach' /* OWNERTEACH_PATCH */) { // STYLE_PATCH LOOPS_PATCH NEXT_PATCH
+        if (url.pathname === '/api/socialV2/style-note' || url.pathname === '/api/socialV2/style-list' || url.pathname === '/api/socialV2/style-candidate' /* STYLE_GATE_PATCH */ || url.pathname === '/api/socialV2/group-recent' || url.pathname === '/api/socialV2/loop' || url.pathname === '/api/socialV2/person' || url.pathname === '/api/socialV2/impression' /* IMPR_EXT */ || url.pathname === '/api/socialV2/tech-notes' /* TECHNOTES_PATCH */ || url.pathname === '/api/socialV2/mute' /* MUTE_PATCH */ || url.pathname === '/api/socialV2/learnmode' /* LEARNMODE_PATCH */ || url.pathname === '/api/socialV2/grouprate' /* GROUPRATE_PATCH */ || url.pathname === '/api/socialV2/economy' /* ECONOMY_PATCH */ || url.pathname === '/api/socialV2/attention' /* ATTENTION_PATCH */ || url.pathname === '/api/socialV2/names' /* NAMES_PATCH */ || url.pathname === '/api/socialV2/safetalk' /* GROUPRATE_PATCH */ || url.pathname === '/api/socialV2/owner-teach' /* OWNERTEACH_PATCH */) { // STYLE_PATCH LOOPS_PATCH NEXT_PATCH
           try {
             const token = String(req.headers['x-agent-token'] || '');
             const consoleOk = String(req.headers['x-console-token'] || '') === String(cfg.consoleToken || '');
@@ -7867,6 +7869,44 @@ async function main() {
               if (extDispatchRoute(url.pathname, { body: {}, cfg, log, sendJson, economyOn: tokenGuardDowngrade().on })) return;
             }
             const body = await readBody();
+            // NAMES_PATCH：面板要显示名字而不是号码（群名 / 昵称，内存+磁盘缓存）
+            if (url.pathname === '/api/socialV2/names') {
+              try {
+                const pick = (v) => (Array.isArray(v) ? v : []).map((x) => String(x).replace(/\D/g, '')).filter(Boolean).slice(0, 50);
+                const wantGroups = pick(body?.groups);
+                const wantUsers = pick(body?.users);
+                const f = path.join(STATE_DIR, 'names.json');
+                let cache = {};
+                try { cache = JSON.parse(fs.readFileSync(f, 'utf8')); } catch {}
+                cache.groups = cache.groups || {};
+                cache.users = cache.users || {};
+                let changed = false;
+                for (const gid of wantGroups) {
+                  if (cache.groups[gid]?.name) continue;
+                  try {
+                    const info = await bot.getGroupInfo(Number(gid));
+                    const nm = String(info?.group_name || info?.groupName || '').trim();
+                    if (nm) { cache.groups[gid] = { name: nm, at: Date.now() }; changed = true; }
+                  } catch {}
+                }
+                for (const uid of wantUsers) {
+                  if (cache.users[uid]?.name) continue;
+                  try {
+                    const r = await bot.request('get_stranger_info', { user_id: Number(uid) });
+                    const nm = String(r?.data?.nickname || r?.nickname || '').trim();
+                    if (nm) { cache.users[uid] = { name: nm, at: Date.now() }; changed = true; }
+                  } catch {}
+                }
+                if (changed) { try { fs.writeFileSync(f, JSON.stringify(cache, null, 2)); } catch {} }
+                const groups = {};
+                for (const gid of wantGroups) if (cache.groups[gid]?.name) groups[gid] = cache.groups[gid].name;
+                const users = {};
+                for (const uid of wantUsers) if (cache.users[uid]?.name) users[uid] = cache.users[uid].name;
+                return sendJson({ ok: true, groups, users });
+              } catch (error) {
+                return sendJson({ ok: false, error: String(error?.message || error) }, 500);
+              }
+            }
             // EXT_PATCH：扩展路由统一在这里分发（技术笔记等），命中即由扩展自行响应
             if (extDispatchRoute(url.pathname, { body, cfg, log, sendJson, economyOn: tokenGuardDowngrade().on })) return;
             if (!v2ToolEnabled('readGroup')) return sendJson({ ok: false, error: 'readGroup 已关闭' }, 403);
@@ -10018,6 +10058,34 @@ async function main() {
     };
   }
 
+  // ANIM_STILL_PATCH：动图/表情包只取 3 帧拼成一张静图再送模型（模型看不了循环动画）
+  async function flattenAnimated(buffer, mime) {
+    if (!buffer || !/gif|webp|apng/i.test(String(mime || ''))) return null;
+    let tmp = '';
+    try {
+      const os = await import('node:os');
+      const fs = await import('node:fs');
+      const pathMod = await import('node:path');
+      const cp = await import('node:child_process');
+      tmp = pathMod.join(os.tmpdir(), 'anim-' + Date.now() + '-' + process.pid + '.gif');
+      fs.writeFileSync(tmp, buffer);
+      const out = tmp + '.png';
+      await new Promise((resolve, reject) => {
+        cp.execFile('ffmpeg', ['-y', '-v', 'error', '-i', tmp, '-vf', 'fps=1,scale=260:-1,tile=3x1', '-frames:v', '1', out],
+          { timeout: 15000 }, (err) => (err ? reject(err) : resolve()));
+      });
+      const buf = fs.readFileSync(out);
+      fs.rmSync(out, { force: true });
+      if (!buf || buf.length < 200) return null;
+      return { buffer: buf, mimeType: 'image/png' };
+    } catch (e) {
+      log('[media] 动图取帧失败：' + (e?.message || e));
+      return null;
+    } finally {
+      if (tmp) { try { (await import('node:fs')).rmSync(tmp, { force: true }); } catch {} }
+    }
+  }
+
   async function fetchOneBotImage(media) {
     // 表情包（市场/收藏表情）优先走 CDN：get_image 对市场表情必然失败
     // （SnowLuma 缓存里没有该文件），先试 URL 能省一次失败往返，也更可靠。
@@ -10213,15 +10281,21 @@ async function main() {
           ...(media.subType ? { subType: String(media.subType) } : {})
         };
         if (img?.buffer) {
-          if (totalBytes + img.buffer.length > MAX_MEDIA_BYTES) {
+          let buf = img.buffer;
+          let mime = img.mimeType || 'image/jpeg';
+          if (kind === 'sticker' || /gif|apng|webp/i.test(String(mime))) {
+            const flat = await flattenAnimated(buf, mime); // ANIM_STILL_PATCH
+            if (flat) { buf = flat.buffer; mime = flat.mimeType; }
+          }
+          if (totalBytes + buf.length > MAX_MEDIA_BYTES) {
             out.push({ ...base, text: `（${noun}总大小超限，已跳过）` });
             continue;
           }
-          totalBytes += img.buffer.length;
+          totalBytes += buf.length;
           out.push({
             ...base,
-            mimeType: img.mimeType || 'image/jpeg',
-            data: img.buffer.toString('base64'),
+            mimeType: mime,
+            data: buf.toString('base64'),
             text: ''
           });
         } else {
@@ -13282,8 +13356,50 @@ async function main() {
     const adminBlock = adminPromptLine(false);
     // 记忆卡：自己的长期记忆（角色卡是人设，记忆卡是经历）。插件已按 QQ 预算裁剪。
     const memoryBlock = memoryCardPromptBlock(key); // MEMSCOPE_PATCH
-    return [base, adminBlock, biliBrief, memoryBlock].filter(Boolean).join('\n\n');
+    // GROUPSUM_PATCH：私聊时带一段「群里最近在说什么」，让她知道群里刚发生的事（10 分钟内、最多 6 行）
+    const groupNow = String(key || '').startsWith('private:') ? groupRecentBlock() : '';
+    return [base, adminBlock, biliBrief, memoryBlock, groupNow].filter(Boolean).join('\n\n');
   }
+  // GROUPSUM_PATCH：把最近 10 分钟群里的对话压成几行，供私聊时参考
+  function groupRecentBlock(minutes = 10, maxLines = 6) {
+    try {
+      const from = Date.now() - minutes * 60 * 1000;
+      const rows = [];
+      for (const [k, arr] of recentChat) {
+        if (!String(k).startsWith('group:')) continue;
+        for (const m of arr) {
+          if ((m.at || 0) < from) continue;
+          rows.push({ gid: String(k).slice(6), at: m.at, sender: m.sender || '', text: String(m.text || '') });
+        }
+      }
+      // 重启后内存是空的，补一次落盘数据（social-v2.json 的 recentMessages）
+      if (!rows.length) {
+        try {
+          const sv = JSON.parse(fs.readFileSync(path.join(STATE_DIR, 'social-v2.json'), 'utf8'));
+          for (const [k, v] of Object.entries(sv.conversations || {})) {
+            if (!k.startsWith('group:')) continue;
+            for (const m of (v.recentMessages || [])) {
+              const t = typeof m.time === 'number' ? m.time : Date.parse(m.time);
+              if (!t || t < from) continue;
+              rows.push({ gid: k.slice(6), at: t, sender: m.sender || '', text: String(m.plain || m.text || '') });
+            }
+          }
+          rows.sort((a, b) => a.at - b.at);
+        } catch {}
+      }
+      if (!rows.length) return '';
+      rows.sort((a, b) => a.at - b.at);
+      const names = (() => { try { return JSON.parse(fs.readFileSync(path.join(STATE_DIR, 'names.json'), 'utf8')).groups || {}; } catch { return {}; } })();
+      const pad = (n) => String(n).padStart(2, '0');
+      const picked = rows.slice(-maxLines).map((r) => {
+        const d = new Date(r.at);
+        const gname = (names[r.gid] && names[r.gid].name) || ('群' + r.gid);
+        return `- ${pad(d.getHours())}:${pad(d.getMinutes())} [${gname}] ${String(r.sender).slice(0, 12)}：${r.text.replace(/\s+/g, ' ').slice(0, 40)}`;
+      });
+      return ['【群里刚在说】（最近 ' + minutes + ' 分钟；是背景，不要主动念出来，也别假装刚看到）', ...picked].join('\n');
+    } catch { return ''; }
+  }
+
   function currentRoleHint(key = '', personaMode = 'full') {
     return roleHintForMode('v1', key, personaMode);
   }
@@ -13299,7 +13415,7 @@ async function main() {
     const line = String(text ?? '').replace(/\s+/g, ' ').trim();
     if (!line || line.startsWith('/')) return;
     const arr = recentChat.get(key) ?? [];
-    arr.push({ sender, text: line.slice(0, 400) });
+    arr.push({ sender, text: line.slice(0, 400), at: Date.now() }); // GROUPSUM_PATCH
     while (arr.length > RECENT_CHAT_KEEP) arr.shift();
     recentChat.set(key, arr);
   }
@@ -13376,7 +13492,8 @@ async function main() {
   }
 
   // ── 主动搭话（在线时结合最近消息 @ 一个人）──────────────────────────────
-  const pendingProactiveAt = new Map(); // key -> { qq, at }
+  const pendingProactiveAt = new Map();
+const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
 
   async function sendGroupWithAt(key, qq, text) {
     const [kind, id] = key.split(':');
@@ -13490,7 +13607,7 @@ async function main() {
         const msg = '【今日学习】B站上这条可能对你有用：\n《' + v.title + '》\n作者 ' + v.author
           + ' · 时长 ' + dur + ' · ' + v.play + ' 播放\nhttps://www.bilibili.com/video/' + v.bvid + '/\n\n'
           + '现在就去看：用 video_storyboard 抽 6 格画面 + 读平台字幕，看完用 2~3 句话跟我说：它讲了什么、有没有能直接用到你自己身上的东西。'
-          + '没看完之前别只回我“收到”；如果工具报错，把错误原文发我。别转发到群里，别评论。'
+          + '没看完之前别只回我“收到”；如果工具报错，把错误原文发我。别转发到群里，别评论。' + '\n\n【硬要求】看完必须先 note_tech 记一条（title=这条里的技术点，body=3~6 行：讲了什么 / 关键步骤或结论 / 能不能用到你自己身上 / 出处 BV 号），记不进去就当没看懂，别来汇报。只学真的在讲技术的；跑题、只有情绪没有信息量的，直接说「这条没内容」跳过，别硬凑。' // STUDYNOTE_PATCH
           + (tellOwner ? '' : '\n（这次他不要你汇报：看完只把要点用 note_tech 记下来，别给他发消息，也别在别处提这事。）');
         await deliverPrompt('private:' + owner, msg, tellOwner ? undefined : { reason: 'study', silentOutbound: true });
         writeStudyState({ pendingBvid: v.bvid, pendingAt: Date.now(), nudged: 0 }); // BILISTUDY_PATCH2
@@ -13511,7 +13628,7 @@ async function main() {
     tokenGuardDowngrade,
   });
   const styleLearnCfgNow = () => styleLearn.styleLearnCfgNow();
-  try { setInterval(() => { void styleLearn.tick(); }, 5 * 60 * 1000); } catch {}
+  try { setInterval(() => { void styleLearn.tick(); }, 60 * 1000); } catch {}
   try { setInterval(() => { styleLearn.tickCandidates(); }, 30 * 60 * 1000); } catch {}
 
   // MOOD_DIARY_TICK：把当天心情的主色调写进日记（一天一条，零模型开销）
@@ -15956,7 +16073,7 @@ async function main() {
           await sendToQQ(key, '挑到了：《' + v.title + '》 ' + v.author + ' · ' + dur + (r.favorited ? '（已收进收藏夹）' : '（收藏失败：' + r.favReason + '）'));
           const msg = '【今日学习】B站上这条可能对你有用：\n《' + v.title + '》\n作者 ' + v.author + ' · 时长 ' + dur
             + ' · ' + v.play + ' 播放\nhttps://www.bilibili.com/video/' + v.bvid + '/\n\n'
-            + '用 video_storyboard 看一遍（cells=6，要平台字幕），然后用 2~3 句话跟我说：它讲了什么、有没有能直接用到你自己身上的东西。别转发到群里，别评论。';
+            + '用 video_storyboard 看一遍（cells=6，要平台字幕），然后用 2~3 句话跟我说：它讲了什么、有没有能直接用到你自己身上的东西。别转发到群里，别评论。' + '\n\n【硬要求】看完必须先 note_tech 记一条（title=这条里的技术点，body=3~6 行：讲了什么 / 关键步骤或结论 / 能不能用到你自己身上 / 出处 BV 号），记不进去就当没看懂，别来汇报。只学真的在讲技术的；跑题、只有情绪没有信息量的，直接说「这条没内容」跳过，别硬凑。'; // STUDYNOTE_PATCH
           await deliverPrompt('private:' + String(cfg.ownerQQ || ''), msg);
           writeStudyState({ pendingBvid: v.bvid, pendingAt: Date.now(), nudged: 0 });
         } catch (err) {
@@ -17183,13 +17300,28 @@ async function main() {
                       await sendToQQ(key, plain);
                     }
                   } else {
-                    log(`agent 回复 (${key}) ${plain.length} 字`);
+                    toolJsonRetry.delete(key);
+                log(`agent 回复 (${key}) ${plain.length} 字`);
                     appendActivity(`${key} agent 回复：${plain.slice(0, 80)}${plain.length > 80 ? '…' : ''}`);
                     await sendToQQ(key, plain);
                   }
                 }
               } else if (ended.reason.kind === 'error') {
                 const msg = ended.reason.error?.message ?? '未知错误';
+                // TOOLJSON_RETRY_PATCH：模型偶发吐出非法工具参数（DeepSeek Messages stream: tool input is invalid JSON），
+                // 属于采样抖动，重试一次就好；不要把这句原始报错发到 QQ 上吓人。
+                if (/tool input is invalid JSON/i.test(String(msg))) {
+                  const tcnt = (toolJsonRetry.get(key) || 0) + 1;
+                  toolJsonRetry.set(key, tcnt);
+                  log(`↻ 工具参数解析失败，第 ${tcnt} 次（${key}），8 秒后重试`);
+                  if (tcnt <= 2) {
+                    setTimeout(() => { Promise.resolve(sendWakePromptV2(key, 'tool-json-retry')).catch(() => {}); }, 8000);
+                    continue;
+                  }
+                  toolJsonRetry.delete(key);
+                  await sendToQQ(key, '刚才那句卡了一下，没发出去，我重说一遍');
+                  continue;
+                }
                 const safeMsg = shouldAuditKey(key) && SENSITIVE_RE.test(msg) ? '（含敏感信息，已隐藏）' : msg.slice(0, 500);
                 // 以前这里只发 QQ、不写日志：出问题时 bridge.log 里什么都没有，排查只能靠猜（PR #24）。
                 log(`⚠️ agent 处理出错 (${key})：${safeMsg}`);

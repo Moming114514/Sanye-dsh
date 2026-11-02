@@ -103,8 +103,13 @@ export function loopsBlock(raw) {
     if (!cfg.enabled) return '';
     const items = prune(cfg);
     if (!items.length) return '';
+    // ABSTIME_LOOP：把「刚才/今天」这类相对时间换成绝对时间，避免旧事被说成刚发生
+    const abs = (t, at) => String(t || '').replace(/刚才|刚刚/g, () => {
+      const d = new Date(Number(at) || Date.now());
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    }).replace(/今天/g, '今天').replace(/昨天/g, '前一天');
     let body = '【欠着的事】（你自己记的待跟进；做完就用 qq_loop 的 done 划掉）\n'
-      + items.map((it) => `- [${mmdd(it.at)}] ${it.text}${it.due ? `（约好 ${dueLabel(it.due)}）` : ''}`).join('\n');
+      + items.map((it) => `- [${mmdd(it.at)}] ${abs(it.text, it.at)}${it.due ? `（约好 ${dueLabel(it.due)}）` : ''}`).join('\n');
     if (body.length > cfg.injectMaxChars) body = body.slice(0, cfg.injectMaxChars) + '…';
     return body;
   } catch { return ''; }

@@ -1672,9 +1672,27 @@ export function compactMemoryCard(card, config = {}, { targetRatio = 0.85, now =
   return steps;
 }
 
+// ABSTIME_PATCH：记忆里存的是「刚才 / 今天 / 昨天」这类相对时间，
+// 隔一段时间再读就会让她把旧事说成刚发生的。渲染时统一换成绝对时间。
+function absTimeText(text, record) {
+  const t = Number(record?.createdAt || record?.at || 0) || Date.now();
+  const d = new Date(t);
+  const p2 = (n) => String(n).padStart(2, '0');
+  const hm = `${p2(d.getHours())}:${p2(d.getMinutes())}`;
+  const ymd = `${d.getMonth() + 1}月${d.getDate()}日`;
+  return String(text || '')
+    .replace(/刚才|刚刚|刚才那/g, hm)
+    .replace(/今天早上|今早/g, `${ymd}早上`)
+    .replace(/今天晚上|今晚/g, `${ymd}晚上`)
+    .replace(/今天下午|今天上午|今天中午/g, ymd)
+    .replace(/今天/g, ymd)
+    .replace(/昨天/g, '前一天')
+    .replace(/前天/g, '前两天');
+}
+
 function recordLine(record, { platform = 'qq', full = false } = {}) {
   const scope = platform === 'bili' && record.scope === 'qq' ? 'bili' : record.scope;
-  const rawText = redactForMemory(record.text || record.title, { scope, maxChars: 260 });
+  const rawText = absTimeText(redactForMemory(record.text || record.title, { scope, maxChars: 260 }), record);
   let body;
   if (record.clarity === 'fuzzy') {
     body = `${short(rawText, 42)}…（细节记不清了）`;
