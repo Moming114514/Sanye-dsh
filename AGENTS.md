@@ -128,3 +128,5 @@
    - 服务器细节：`state/CHANGELOG-bridge.md`（含日志片段、pid、时间）
 2. 只改文档的提交可以不写第二处，但 `docs/CHANGES.md` 要有。
 3. 接手的人先读：`docs/CHANGES.md` → `docs/LEARN-FROM-ME.md` → `docs/OPERATIONS.md`。
+
+4. **发布节奏**：日常改动只提交到 `dev` 分支，**不推送**；只有用户明确说「发布/同步」时才跑 `bash scripts/publish.sh <tag>` 并推送 main。
