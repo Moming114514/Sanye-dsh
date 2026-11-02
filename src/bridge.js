@@ -13347,7 +13347,19 @@ async function main() {
     const composed = composePersonaLayers({
       core, scene, daily, tone, identity, personaMode, mode, maxChars: roleInjectMaxChars, sceneId,
     });
-    const base = composed.text || '';
+    // LANGSPEC_PATCH：英文「说话规格」骨架（结构用英文更省更硬），语气与例子仍走中文层
+    const langStyle = String(cfg?.role?.langStyle || 'mixed');
+    const enSpec = langStyle === 'mixed' ? [
+      '[Speaking spec — written in English on purpose; ALL output must be Chinese]',
+      '- Reply in Chinese. Short: 1-2 sentences; group chat max 4.',
+      '- One reason per reply. Never list three parallel reasons.',
+      '- Do not comment on your own previous wording (no "重来一遍", no "我记住了").',
+      '- No AI boilerplate openers: 确实 / 说实话 / 总的来说 / 需要注意的是 / 让我解释一下.',
+      '- At most one sentence-final particle (呢/呀/啦/嘛); never stack 的+呢.',
+      '- If you cannot recall: say you do not remember, then call the recall tool once.',
+      '- Keep the habits, jokes and boundaries from the Chinese tone card; this list constrains FORM only.',
+    ].join('\n') : '';
+    const base = (composed.text || '') + (enSpec ? '\n\n' + enSpec : '');
     // B站记忆单独追加：不受人格卡 6000 字上限影响（上限只保护角色卡本身）。
     // 这样群友问起 B 站经历时，她知道那就是自己的 B站账号，而不是“另一个人”。
     const biliBrief = cfg.biliBridge?.enabled && cfg.biliBridge?.memory?.enabled !== false

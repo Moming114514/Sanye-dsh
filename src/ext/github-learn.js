@@ -47,7 +47,8 @@ export default function createGithubLearn({ cfg = {}, deliverPrompt, log = () =>
   const conf = Object.assign({
     enabled: true,
     minStars: 800,
-    weekday: 1,        // 1 = 周一
+    weekday: 1,        // 1 = 周一（兼容旧配置）
+    weekdays: [1],     // 支持多天，如 [1,4]
     hour: 10,
     maxChars: 6000,
     topics: DEFAULT_TOPICS,
@@ -84,7 +85,8 @@ export default function createGithubLearn({ cfg = {}, deliverPrompt, log = () =>
   async function tick() {
     if (!conf.enabled || busy) return;
     const now = new Date();
-    if (now.getDay() !== conf.weekday || now.getHours() < conf.hour) return;
+    const days = Array.isArray(conf.weekdays) && conf.weekdays.length ? conf.weekdays : [conf.weekday];
+    if (!days.includes(now.getDay()) || now.getHours() < conf.hour) return;
     const st = loadState();
     if (st.lastDay === ymd(now)) return;
     busy = true;
