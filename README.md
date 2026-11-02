@@ -572,8 +572,3 @@ node scripts/setup-dsh.mjs      # 重装 preset + MCP
 - 请自行遵守 QQ / B站 服务条款与当地法律；本项目不提供绕过风控的能力。
 
 > 老版本（≤0.6.18）无法自动更新：用 [强制更新提示词.txt](dist/强制更新提示词.txt)（复制给 DSH）或 [在线版说明](docs/guides/FORCE_UPDATE_PROMPT.md)。
-
-## 致谢与来源
-
-本仓库是**整合 + 改造**：底座是 [SurfCore](https://github.com/Mieksido/surfcore)，依赖 NapCatQQ / DSH，参考过 AstrBot 等项目的思路。
-完整的来源、许可与「哪些是我写的」见 [CREDITS.md](CREDITS.md)；V2 的参考项目清单见 [docs/V2-REFERENCES.md](docs/V2-REFERENCES.md)。
