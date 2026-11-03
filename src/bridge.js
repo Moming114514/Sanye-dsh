@@ -62,7 +62,32 @@ import {
   appendMemoryInboxEvent, looksNoteworthyMessage, resolveMemoryCardPaths, loadMemoryCard, saveMemoryCardOutputs, touchMemories } from './memory-card.js';
 import { scopedMemoryText } from './ext/memory-scope.js'; // MEMSCOPE_PATCH
 import { fuzzyRecallFiles } from './recall-vec.js'; // RECALL_FUZZY_PATCH
-import { extDispatchRoute, extPromptBlocks, extStateKey, extWakeGate, extAfterSend, extOnGroupMessage, extOnPrivateMessage } from './ext/index.js'; // EXT_PATCH
+import { extDispatchRoute, extPromptBlocks, extStateKey, extWakeGate, extAfterSend, extOnGroupMessage, extOnPrivateMessage, extList, extManifests } from './ext/index.js'; // EXT_PATCH
+
+// PLUGINS_PATCH（D 批，2026-11-03）：只读清单。数据源 = docs/generated/manifests.json（dump-manifests --json）
+// + extList() 的已注册实例（routes 只在实例上）。不碰任何状态，坏了最多返回空数组。
+function buildPlugins() {
+  const reg = new Map();
+  try { for (const e of extList()) if (e && typeof e === 'object') reg.set(String(e.id || ''), e); } catch { /* 忽略 */ }
+  let gen = null;
+  try { gen = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'docs', 'generated', 'manifests.json'), 'utf8')); } catch { gen = null; }
+  const mods = Array.isArray(gen?.modules) ? gen.modules : [];
+  const rows = mods.map((m) => {
+    const inst = reg.get(String(m.id));
+    let routes = [];
+    try {
+      if (Array.isArray(inst?.routes)) routes = inst.routes.map((r) => String(r?.path || (typeof r === 'string' ? r : ''))).filter(Boolean);
+    } catch { routes = []; }
+    return {
+      id: m.id, title: m.title || '', kind: m.kind || '',
+      hooks: Array.isArray(m.hooks) ? m.hooks : [],
+      config: Array.isArray(m.config) ? m.config : [],
+      stateFiles: Array.isArray(m.stateFiles) ? m.stateFiles : [],
+      routes, order: m.order ?? null, migrated: !!m.registered, wave: m.registered ? 1 : 2,
+    };
+  });
+  return { ok: true, count: rows.length, at: gen?.at || null, modules: rows };
+}
 import createQzoneWatch from './ext/qzone-watch.js'; // QZONE_WATCH_EXT
 import { createChannel } from './ext/channel.js'; // CHANNEL_CAPS_PATCH
 import { fetchQzoneFeed, commentQzone, sendQzone, deleteQzone, qzoneEnabled as qzoneEnabledOf } from './ext/qzone.js'; // QZONE_EXT
@@ -7862,6 +7887,17 @@ async function main() {
             sendJson({ ok: false, error: String(e?.message || e) }, 500);
           }
           return;
+        }
+        if (url.pathname === '/api/plugins') { // PLUGINS_PATCH（D 批）
+          try {
+            const token = String(req.headers['x-agent-token'] || '');
+            const consoleOk = String(req.headers['x-console-token'] || '') === String(cfg.consoleToken || '');
+            const localOk = (req.socket?.remoteAddress === '127.0.0.1' || req.socket?.remoteAddress === '::1' || req.socket?.remoteAddress === '::ffff:127.0.0.1');
+            if (!isLiveAgentToken(token) && !consoleOk && !localOk) return sendJson({ ok: false, error: 'agent token 无效' }, 403);
+            return sendJson(buildPlugins());
+          } catch (e) {
+            return sendJson({ ok: false, error: String(e?.message || e) }, 500);
+          }
         }
         if (url.pathname === '/api/socialV2/style-note' || url.pathname === '/api/socialV2/style-list' || url.pathname === '/api/socialV2/style-candidate' /* STYLE_GATE_PATCH */ || url.pathname === '/api/socialV2/group-recent' || url.pathname === '/api/socialV2/loop' || url.pathname === '/api/socialV2/person' || url.pathname === '/api/socialV2/impression' /* IMPR_EXT */ || url.pathname === '/api/socialV2/tech-notes' /* TECHNOTES_PATCH */ || url.pathname === '/api/socialV2/mute' /* MUTE_PATCH */ || url.pathname === '/api/socialV2/learnmode' /* LEARNMODE_PATCH */ || url.pathname === '/api/socialV2/grouprate' /* GROUPRATE_PATCH */ || url.pathname === '/api/socialV2/economy' /* ECONOMY_PATCH */ || url.pathname === '/api/socialV2/attention' /* ATTENTION_PATCH */ || url.pathname === '/api/socialV2/advice' /* ADVICE_PATCH */ || url.pathname === '/api/socialV2/names' /* NAMES_PATCH */ || url.pathname === '/api/socialV2/safetalk' /* GROUPRATE_PATCH */ || url.pathname === '/api/socialV2/owner-teach' /* OWNERTEACH_PATCH */ || url.pathname === '/api/socialV2/people' || url.pathname === '/api/socialV2/people-mark' /* PEOPLE_PATCH */) { // STYLE_PATCH LOOPS_PATCH NEXT_PATCH
           try {
@@ -16046,12 +16082,25 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
     // 管理命令：仅管理员（ownerQQ）可用，且由桥接直接执行（硬性，不经过模型）
     // CMD_LINE_PATCH：主人懒得打斜杠时，裸词也认（"同意头像" = "/同意头像"）
     let cmdLine = plainContent;
+    // CMD_PREFIX_PATCH（C 批，2026-11-03）：前缀可配。私聊 / 与 # 都认；群里只认 groupPrefixes（默认 # ！），
+    // 群里的 /xxx 不响应（落回普通聊天）。key 形如 group:xxx / private:xxx。
+    let cmdAllowed = true;
+    try {
+      const cp = cfg?.socialV2?.command || {};
+      const isGroup = String(key || '').startsWith('group:');
+      const ch = plainContent.slice(0, 1);
+      const priv = ['/', '#', '！', ...(Array.isArray(cp.prefixes) ? cp.prefixes : [])];
+      const grp = Array.isArray(cp.groupPrefixes) && cp.groupPrefixes.length ? cp.groupPrefixes : ['#', '！'];
+      const allowed = isGroup ? grp : priv;
+      if (isGroup && ch === '/') cmdAllowed = false;
+      else if (ch && ch !== '/' && allowed.includes(ch)) cmdLine = '/' + plainContent.slice(1).trimStart();
+    } catch { /* 配置坏了按老规矩：只认 / */ }
     if (isOwner && !plainContent.startsWith('/')) {
       const bare = /^(花费|成本|关机|开机|重启|帮助|命令|好友|好友申请|好友列表|同意好友|拒绝好友|同意头像|不同意头像|谷价|谷价关|谷价表)\s*(.*)$/.exec(plainContent.trim());
       if (false && bare) cmdLine = '/' + bare[1]; // BOOST_PATCH：按用户要求，命令必须带斜杠
     }
     // GUEST_CMD_AS_CHAT：群友发的斜杠内容不当命令，落回普通聊天（2026-10-31）
-    if (isOwner && cmdLine.startsWith('/')) {
+    if (isOwner && cmdAllowed && cmdLine.startsWith('/')) {
       if (!isOwner) {
         if (/^\/role\b/.test(plainContent)) {
           auditOwner('role.switch', {
@@ -16071,6 +16120,8 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
         // MUTE_CMD_PATCH：分页 + 按主题 + 单条查询
         const _raw = cmdLine.trim();
         const _first = _raw.split(/\s+/)[0] || '';
+        const PFX = String(key || '').startsWith('group:') ? '#' : '/';
+        const show = (x) => (PFX === '/' ? x : String(x).replace(/^\//, PFX));
         const harg = _raw.slice(_first.length).trim().toLowerCase();
         const P = {
           common: [
@@ -16117,15 +16168,15 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
         const topic = Object.keys(TOPIC).find((k) => harg === k);
         if (topic) {
           const rows = [...new Set(TOPIC[topic])].flatMap((k) => P[k]);
-          await sendToQQ(key, '【' + topic + '】\n' + rows.map((r) => r[0] + ' — ' + r[1]).join('\n') + '\n\n/帮助 看全部');
+          await sendToQQ(key, '【' + topic + '】\n' + rows.map((r) => show(r[0]) + ' — ' + r[1]).join('\n') + '\n\n' + PFX + '帮助 看全部');
           return;
         }
         const exact = ALL.find((r) => r[0].split(' ')[0] === harg || r[0] === harg);
         if (harg && !['1', '2', '3'].includes(harg)) {
           if (exact) {
-            await sendToQQ(key, exact[0] + '\n' + exact[1]);
+            await sendToQQ(key, show(exact[0]) + '\n' + exact[1]);
           } else {
-            await sendToQQ(key, '没找到这个命令。发 /帮助 看全部，或 /帮助 开关 /帮助 花费 /帮助 学。');
+            await sendToQQ(key, '没找到这个命令。发 ' + PFX + '帮助 看全部（群里用 # 前缀；私聊 / 和 # 都行），或 ' + PFX + '帮助 开关 /' + PFX + '帮助 花费。');
           }
           return;
         }
@@ -16133,7 +16184,7 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
         const no = page === 'common' ? 1 : page === 'group' ? 2 : 3;
         const title = page === 'common' ? '常用' : page === 'group' ? '群与人' : '其它';
         const next = no === 1 ? '\n\n/帮助 2 下一页 · /帮助 开关 按主题' : no === 2 ? '\n\n/帮助 3 下一页 · /帮助 1 上一页' : '\n\n/帮助 1 回到第一页';
-        await sendToQQ(key, '【帮助 ' + no + '/3 · ' + title + '】（要带斜杠）\n' + P[page].map((r) => r[0] + ' — ' + r[1]).join('\n') + next);
+        await sendToQQ(key, '【帮助 ' + no + '/3 · ' + title + '】（' + (PFX === '#' ? '群里用 # 前缀' : '私聊 / 或 # 都行') + '）\n' + P[page].map((r) => show(r[0]) + ' — ' + r[1]).join('\n') + (PFX === '/' ? next : next.replace(/\/帮助/g, '#帮助')));
         return;
       }
       // MUTE_CMD_PATCH：/静音 /恢复 /静音列表（支持「本群」不输号）
