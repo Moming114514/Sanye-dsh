@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import {
   BRIDGE_SUPERVISOR_LOG, QQBOT_ROOT, QQ_CONFIG, QQ_LOCK_FILE, QQ_STATE_DIR,
   findNodeExe,
@@ -165,7 +165,50 @@ function appendSupervisorLog(text) {
   } catch {}
 }
 
+const SYSTEMD_UNIT = 'surfcore-bridge.service';
+const SYSTEMD_UNIT_FILE = '/etc/systemd/system/surfcore-bridge.service';
+
+/**
+ * 只有「单元文件确实存在」才把桥接当成 systemd 托管。
+ * 这样 Windows / 每个人的老部署（没有 unit）仍然走原来的 spawn/kill 逻辑。
+ */
+export function isSystemdManaged() {
+  try {
+    return fs.statSync(SYSTEMD_UNIT_FILE).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 用 execFile 直接调 systemctl（不经过 shell，避免拼接注入）。
+ * 失败时把 stderr 带回去，**绝不回退去 spawn**——否则又会抢锁出现第二个实例。
+ */
+function runSystemctl(args) {
+  return new Promise((resolve) => {
+    execFile('systemctl', args, { timeout: 15000 }, (error, stdout, stderr) => {
+      const out = String(stdout ?? '').trim().slice(-2000);
+      const err = String(stderr ?? '').trim().slice(-2000);
+      if (error) {
+        resolve({
+          ok: false,
+          via: 'systemd',
+          error: String(error?.message ?? error),
+          stderr: err,
+          stdout: out,
+        });
+        return;
+      }
+      resolve({ ok: true, via: 'systemd', stdout: out, stderr: err });
+    });
+  });
+}
+
 export async function start({ dshWebUrl = '' } = {}) {
+  if (isSystemdManaged()) {
+    // 有 systemd 单元就交给 systemd：不在 dsh-web 里 spawn，避免抢锁产生第二个实例。
+    return runSystemctl(['start', SYSTEMD_UNIT]);
+  }
   if (await portOpen()) return { ok: true, already: true, message: '桥接已经在跑' };
   const env = { ...process.env };
   if (dshWebUrl) env.DSH_WEB_URL = String(dshWebUrl);
@@ -196,6 +239,9 @@ export async function start({ dshWebUrl = '' } = {}) {
 }
 
 export async function stop() {
+  if (isSystemdManaged()) {
+    return runSystemctl(['stop', SYSTEMD_UNIT]);
+  }
   if (!(await portOpen()) && !lockPid()) return { ok: true, already: true, message: '桥接本来就没在跑' };
   if (process.platform === 'win32') {
     const script = path.join(QQBOT_ROOT, 'scripts', 'stop-qq-bot.ps1');
@@ -246,6 +292,10 @@ export async function stop() {
 }
 
 export async function restart(options = {}) {
+  if (isSystemdManaged()) {
+    const result = await runSystemctl(['restart', SYSTEMD_UNIT]);
+    return result.ok ? { ...result, restarted: true } : result;
+  }
   const stopped = await stop();
   if (!stopped.ok) return stopped;
   await new Promise((resolve) => setTimeout(resolve, 800));
