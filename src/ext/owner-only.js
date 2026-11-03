@@ -38,3 +38,16 @@ export default {
     return { allow: false, reason: `[只听主人] 跳过唤醒 ${key}（${reason}）：他最近没在这个群说话` };
   },
 };
+
+// manifest：见 docs/EXT-MANIFEST.md（声明用，不改变任何调用路径）
+export const manifest = {
+  id: 'owner-only',
+  title: '只听主人',
+  kind: 'hook',
+  enabledByDefault: true,
+  hot: true,
+  order: 10,
+  hooks: ['wakeGate', 'onGroupMessage'],
+  config: ['ownerQQ'],
+  stateFiles: [],
+};

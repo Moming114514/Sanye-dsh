@@ -128,3 +128,16 @@ export default function createAttention({ log }) {
     ],
   };
 }
+
+// manifest：见 docs/EXT-MANIFEST.md（声明用，不改变任何调用路径）
+export const manifest = {
+  id: 'attention',
+  title: '该不该接话',
+  kind: 'hook',
+  enabledByDefault: true,
+  hot: true,
+  order: 60,
+  hooks: ['promptBlock', 'wakeGate', 'routes', 'onGroupMessage'],
+  config: ['socialV2.attention'],
+  stateFiles: [],
+};

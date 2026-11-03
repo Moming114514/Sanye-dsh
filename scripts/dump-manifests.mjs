@@ -21,7 +21,7 @@ const OUT_FILE = path.join(ROOT, 'docs', 'generated', 'manifests.json');
 const HOOKS = ['promptBlock', 'wakeGate', 'routes', 'onGroupMessage', 'onPrivateMessage', 'afterSend', 'stateKey'];
 const KINDS = ['core', 'hook', 'tool', 'panel'];
 const ID_RE = /^[a-z][a-z0-9-]{1,31}$/;
-const CFG_RE = /^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)+$/;
+const CFG_RE = /^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*$/; // 允许顶层单段（如 ownerQQ）
 
 const args = new Set(process.argv.slice(2));
 const strict = args.has('--strict');
@@ -53,7 +53,15 @@ function validate(m, ctx = {}) {
 
   // R1 id
   if (typeof m.id !== 'string' || !ID_RE.test(m.id)) errors.push(`id 非法：「${m.id}」（应匹配 ^[a-z][a-z0-9-]{1,31}$）`);
-  else if (ctx.file && m.id !== path.basename(ctx.file, '.js')) errors.push(`id「${m.id}」与文件名「${path.basename(ctx.file)}」不一致`);
+  else if (ctx.file && m.id !== path.basename(ctx.file, '.js')) {
+    // 少数模块的运行时实例 id 与文件名不同（如 advice-capture.js 的实例 id 是 advice）。
+    // 只要 manifest.id 与实例 id 一致，就记警告而不是报错；否则肯定是写错了。
+    if (ctx.instanceId && ctx.instanceId === m.id) {
+      warnings.push(`id「${m.id}」与文件名「${path.basename(ctx.file)}」不同（实例 id 就是它，历史原因；日志前缀仍是 ${m.id}）`);
+    } else {
+      errors.push(`id「${m.id}」与文件名「${path.basename(ctx.file)}」不一致`);
+    }
+  }
 
   // R3 title
   if (typeof m.title !== 'string' || !m.title.trim()) errors.push('title 缺失');
@@ -115,11 +123,19 @@ function parseExtensions() {
   // 装配表是 MODULES（namespace 导入 + {name, mod}），EXTENSIONS 由它派生，不再手写数组
   const block = /const\s+MODULES\s*=\s*\[([\s\S]*?)\n\];/.exec(src);
   if (!block) return [];
+  const body = block[1];
+  const heads = [...body.matchAll(/\{\s*name:\s*'([^']+)',\s*mod:\s*(\w+)/g)];
   const rows = [];
-  for (const m of block[1].matchAll(/\{\s*name:\s*'([^']+)',\s*mod:\s*(\w+)/g)) {
-    const fileName = imported.get(m[2]) || null;
-    rows.push({ name: fileName ? fileName.replace(/\.js$/, '') : m[2], file: fileName });
-  }
+  heads.forEach((h, i) => {
+    // 每个条目从 name 开始到下一个条目之前，用来判断有没有 factory（工厂条目需要实例化后才能校验钩子）
+    const seg = body.slice(h.index, i + 1 < heads.length ? heads[i + 1].index : body.length);
+    const fileName = imported.get(h[2]) || null;
+    rows.push({
+      name: fileName ? fileName.replace(/\.js$/, '') : h[2],
+      file: fileName,
+      factory: /\bfactory\s*:/.test(seg),
+    });
+  });
   return rows.map((r, i) => ({ ...r, order: (i + 1) * 10, index: i }));
 }
 
@@ -194,7 +210,25 @@ async function main() {
       rows.push({ file: f, id: '', title: '', hooks: [], order: null, status: 'missing', errors: [], warnings: ['缺 manifest（未迁移）'] });
       continue;
     }
-    const { errors, warnings } = validate(m, { file: f, impl: mod });
+    // 工厂模块（默认导出是 createX 函数）要先实例化，才能在实例上校验钩子——
+    // 与 loader 的 instanceOf() 同一语义；工厂里只传一个空 log，不碰任何状态。
+    let impl = mod;
+    let factoryError = null;
+    if (expectedOrder.get(f)?.factory) {
+      const create = mod.default;
+      if (typeof create !== 'function') {
+        factoryError = `MODULES 标了 factory，但默认导出不是函数（${typeof create}）`;
+      } else {
+        try {
+          impl = { ...mod, default: create({ log: () => {} }) };
+        } catch (e) {
+          factoryError = `实例化失败：${String(e?.message || e).split('\n')[0]}`;
+        }
+      }
+    }
+    const instanceId = typeof impl?.default?.id === 'string' ? impl.default.id : null;
+    const { errors, warnings } = validate(m, { file: f, impl, instanceId });
+    if (factoryError) errors.push(factoryError);
     if (typeof m.id === 'string') {
       if (idSeen.has(m.id)) errors.push(`id 重复：与 ${idSeen.get(m.id)} 撞了`);
       else idSeen.set(m.id, f);

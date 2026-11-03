@@ -37,7 +37,9 @@ const MODULES = [
   { name: 'learnmode', mod: modLearnmode },
   { name: 'economy', mod: modEconomy },
   { name: 'group-rate', mod: modGroupRate },
-  { name: 'attention', mod: modAttention },
+  // attention 的默认导出是工厂（createAttention），必须显式实例化：
+  // 迁移前的 index.js 直接把工厂函数放进 EXTENSIONS，导致它的三个钩子从未执行过。
+  { name: 'attention', mod: modAttention, factory: (create) => create({ log: (m) => console.log('[ext:attention] ' + m) }) },
   { name: 'advice-capture', mod: modAdviceCapture, factory: (create) => create({ log: (m) => console.log('[ext:advice] ' + m) }) },
   { name: 'people', mod: modPeople, factory: (create) => create() },
   { name: 'utterances', mod: modUtterances, factory: (create) => create() },

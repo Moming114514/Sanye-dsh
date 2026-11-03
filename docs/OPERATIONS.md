@@ -138,3 +138,41 @@ node scripts/verify.mjs          # 语法 + 单测 + 结构快照 + 路由
 3. **然后才改代码**；
 4. 改完跑 `node scripts/verify.mjs`，过了再重启；
 5. 恢复顺序反过来：先起桥接，确认 QQ 已连接，再放开模式。
+
+---
+
+## 十一、回退手册（代码改动出事时按层撤退）
+
+> 原则：**先回退代码，再重启；一次重启只做一件事**。回退完先跑验收，绿了再放开。
+
+| 层 | 撤什么 | 命令（在 `/home/dsh/apps/surfcore` 下） | 要不要重启 |
+|---|---|---|---|
+| L1 | 只撤本轮 manifest（17 个 `export const manifest`） | `git checkout HEAD -- src/ext/` | 不用 |
+| L2 | 撤 ext loader（回到 W1-3 之前） | `git checkout a5460a7~1 -- src/ext/index.js` | **要**：`systemctl restart surfcore-bridge` |
+| L3 | 撤结构快照换代 | `git checkout a5460a7~1 -- scripts/verify.mjs scripts/snap-split.mjs`，并 `git checkout 759f3fa -- scripts/snap-base/structure.json` | 不用 |
+| L4 | 撤校验器与契约文档 | `git checkout a5460a7~1 -- scripts/dump-manifests.mjs docs/EXT-MANIFEST.md` | 不用 |
+| L5 | 人格内容（提示词） | 面板「设置 → 人格」逐条改回；`characters/`、`state/` 不提交，靠每日备份 | 要（缓存重建 ≈¥0.1） |
+
+**整批回到 W1-3 之前（最常用的一条）**：
+
+```bash
+cd /home/dsh/apps/surfcore
+git checkout a5460a7~1 -- src/ext/index.js
+systemctl restart surfcore-bridge
+sleep 12 && systemctl is-active surfcore-bridge
+tail -30 /var/log/surfcore-bridge.log | grep -E "\[ext:loader\]|Error|错误|ECONN" || echo "启动无告警"
+```
+
+**回退后必验三件**（任一不绿就停手，写「现象 / 已试 / 怀疑点」三段再说）：
+
+```bash
+node scripts/dump-manifests.mjs --strict     # 期望 MANIFEST_OK
+npm run verify -- --no-api                   # 期望 VERIFY_PASS
+node scripts/snapshot.mjs && node scripts/snap-split.mjs --check   # 期望 SNAP_OK
+```
+
+**特别提醒**：`attention` 实例化是 W1-4 修的，**首次生效要等重启**。若不想让它现在生效，先在
+`config.json` 里把 `socialV2.attention.enabled` 设为 `false` 再重启；这一步要单独 commit 说明。
+
+**不要做**：不要用 `--save-base` / `--save-code` 把红灯盖绿；不要在回退的同一次重启里加新功能；
+不要在没备份 `state/` 的情况下动人格。

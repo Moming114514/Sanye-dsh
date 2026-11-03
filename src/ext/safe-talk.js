@@ -208,3 +208,16 @@ export default {
     },
   ],
 };
+
+// manifest：见 docs/EXT-MANIFEST.md（声明用，不改变任何调用路径）
+export const manifest = {
+  id: 'safe-talk',
+  title: '敏感话题',
+  kind: 'hook',
+  enabledByDefault: true,
+  hot: true,
+  order: 100,
+  hooks: ['wakeGate', 'routes', 'onGroupMessage', 'onPrivateMessage', 'stateKey'],
+  config: ['socialV2.safeTalk'],
+  stateFiles: ['safe-talk.json', 'muted-keys.json'],
+};

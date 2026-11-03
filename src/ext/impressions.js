@@ -31,3 +31,16 @@ export default {
     },
   ],
 };
+
+// manifest：见 docs/EXT-MANIFEST.md（声明用，不改变任何调用路径）
+export const manifest = {
+  id: 'impressions',
+  title: '她的看法',
+  kind: 'hook',
+  enabledByDefault: true,
+  hot: true,
+  order: 120,
+  hooks: ['promptBlock', 'routes', 'stateKey'],
+  config: ['socialV2.impressions'],
+  stateFiles: [],
+};

@@ -54,18 +54,22 @@ export const manifest = {
 
 | 编号 | 规则 | 不合格时报什么 |
 |---|---|---|
-| R1 | `id` 存在、匹配正则、与文件名一致 | `id 非法/缺失` |
+| R1 | `id` 存在、匹配正则；**必须等于运行时实例 id**（通常与文件名一致）。与文件名不同时报**警告**而不是错误（唯一例外：`advice-capture.js` 的实例 id 是 `advice`） | `id 非法/缺失` 或警告 |
 | R2 | `id` 全仓唯一 | `id 重复（与 X 撞了）` |
 | R3 | `title` 非空、≤24 字 | `title 缺失或过长` |
 | R4 | `kind` ∈ 四选一；`enabledByDefault`/`hot` 是 boolean | `kind/布尔字段非法` |
 | R5 | `hooks` 每项 ∈ 7 个白名单 | `未知钩子 X` |
-| R6 | `hooks` 里声明的，模块默认导出上必须真有对应函数（`routes` 可以是数组或函数） | `声明了 X 但没实现` |
+| R6 | `hooks` 里声明的，模块（或它的**工厂实例**）上必须真有对应函数（`routes` 可以是数组或函数）。默认导出是 `createX` 函数的模块，校验器会先 `create({ log: () => {} })` 取实例再查——与 loader 同一语义 | `声明了 X 但没实现` |
 | R7 | 有 `promptBlock` 必须有 `order`；`order` 为正整数、全仓唯一，且等于 `EXTENSIONS 下标×10+10` | `缺 order / order 冲突 / order 应为 N` |
 | R8 | v1 **禁止** `pages` 字段（面板仍用 PAGES + features.json） | `v1 不支持 pages 字段` |
 | R9 | `config` 每项是 `a.b.c` 点路径；`stateFiles` 不含 `/`、`..` | `config/stateFiles 非法` |
 | R10 | 模块没有 `manifest` 导出 | `缺 manifest`（波 2 期间这是预期失败） |
 
 R10 在迁移期是**已知失败**：30 个模块现在都没有 manifest。校验器的价值从波 2 第一个模块开始体现。
+
+> **状态（2026-11-03）**：已注册进 `EXTENSIONS` 的 17 个模块全部有 manifest（`dump-manifests` 合格 17 / 不合格 0）；
+> 另外 13 个模块还没注册（波 2 才逐模块迁移）。`--strict` 现在应当 `MANIFEST_OK`，
+> `--require-all --strict` 在有未注册模块时仍 `MANIFEST_FAIL`，属预期。
 
 ## 3. 三个示例（都 ≤15 行）
 

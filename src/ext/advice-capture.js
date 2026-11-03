@@ -50,3 +50,16 @@ export default function createAdviceCapture({ log }) {
     ],
   };
 }
+
+// manifest：见 docs/EXT-MANIFEST.md（声明用，不改变任何调用路径）
+export const manifest = {
+  id: 'advice',
+  title: '建议收集',
+  kind: 'hook',
+  enabledByDefault: true,
+  hot: true,
+  order: 70,
+  hooks: ['routes', 'onGroupMessage'],
+  config: ['socialV2.adviceCapture'],
+  stateFiles: ['bot-advice.jsonl'],
+};

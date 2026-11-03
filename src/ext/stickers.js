@@ -13,3 +13,16 @@ export default {
   id: 'stickers',
   title: '表情库',
 };
+
+// manifest：见 docs/EXT-MANIFEST.md（声明用，不改变任何调用路径）
+export const manifest = {
+  id: 'stickers',
+  title: '贴纸待办',
+  kind: 'core',
+  enabledByDefault: true,
+  hot: true,
+  order: 170,
+  hooks: [],
+  config: [],
+  stateFiles: [],
+};

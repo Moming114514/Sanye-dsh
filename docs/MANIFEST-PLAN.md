@@ -214,22 +214,17 @@ node -e "import('./src/ext/index.js').then(()=>console.log('imported clean'))" 2
 
 ---
 
-### W1-4 给 17 个已注册模块补 manifest（分批，每批 5~6 个）
+### W1-4 给 17 个已注册模块补 manifest —— 已完成（2026-11-03 20:49，未重启）
 
-- **顺序**（按今天 `EXTENSIONS` 顺序，避免顺序歧义）：ownerOnly, mute, learnmode, economy, groupRate, attention / advice, people, utterances, safeTalk, promises, impressions / ownerTeach, techNotes, style, loops, stickers
-- **改哪里**：每个 `src/ext/<name>.js` **文件末尾追加** `export const manifest = {...}`（append，不重写、不动原有导出）
-- **代价**：4 批 × 3 步 · 约 1.5 h · 重启 ≤1 次（最后一批做完重启一次，确认启动日志无告警）
-- **回滚**：`git checkout -- src/ext/<name>.js`
-- **验收命令**（每批）：
+- **做法**：每个 `src/ext/<name>.js` **文件末尾追加** `export const manifest = {...}`（append，不重写、不动原有导出）。`loops` 在 W1-3 已加。
+- **实测结果**：`dump-manifests` 汇总 **合格 17 / 不合格 0 / 未迁移 13**（未迁移的是没注册进 `EXTENSIONS` 的 13 个，波 2 才轮到）；`--strict` = `MANIFEST_OK`；`--order-map` 17 行 `10…170` 与注册位逐行一致；`--require-all --strict` = `MANIFEST_FAIL` exit 1（预期，因为还有 13 个未注册模块）；loader 启动 **零告警**（不再有「N/17 还没有 manifest」）；`npm run verify -- --no-api` = `VERIFY_PASS`。
+- **顺带修掉的两个校验器缺口**：①工厂模块（默认导出是 `createX`）要**先实例化再校验钩子**，否则 `attention`/`advice-capture`/`people`/`utterances` 声明任何钩子都会被误判「声明了但没实现」；现在校验器读 `index.js` 的 `MODULES` 里有没有 `factory:`，有就 `create({ log: () => {} })` 取实例（与 loader 同一语义）。②`config` 允许顶层单段（如 `ownerQQ`）。
+- **id 与文件名不一致的唯一例外**：`advice-capture.js` 的运行时实例 id 是 `advice`（历史原因，日志前缀也是 `[ext:advice]`）。契约 R1 放宽为「id 必须等于运行时实例 id；与文件名不同时校验器给**警告**并打印原因」，不再报错。
+- **`stickers` 如实写** `hooks: []`、`kind: 'core'`——第一个被程序抓出来的「名义插件」。
+- **回滚**：`git checkout -- src/ext/`（只撤 manifest 与 loader 改动）；只想撤 attention 实例化：见 §12 回退手册。
+- **代价**：实际 4 步 · 约 25 分钟 · **0 次重启**（比原估 1.5 h / ≤1 次重启省）。
 
-```bash
-node scripts/dump-manifests.mjs   # W1-5 落地后可用；此前退回 node --check
-npm run verify -- --no-api
-node scripts/snapshot.mjs && node scripts/snap-split.mjs --check
-```
-
-- **验收标准**：每批 `verify --no-api` 绿 + 快照 `--diff` 无输出（结构零变化）
-- **注意**：`stickers` 在注册表里但**没有任何钩子函数**，它的 manifest 应如实写 `hooks: []`、`kind: 'util'`——这正好是第一个被程序抓出来的"名义插件"。
+> **这轮最重要的发现**：`attention.js` 不是「缺 id」，而是**自 `d222215` 起从未被实例化**——旧 `index.js` 写的是 `import attention from './attention.js'`（默认导出是工厂 `createAttention`），又把工厂函数直接塞进 `EXTENSIONS`，所以它的 `onGroupMessage` / `wakeGate` / `promptBlock` 一次都没执行过，线上日志里 `[注意力]` 计数为 0。已在 W1-4 修复（`MODULES` 里给 attention 加 `factory: (create) => create({ log })`）。**后果：下次重启后注意力闸门第一次真正生效，她的接话行为会变（低分消息不再唤醒，`socialV2.attention.sample` 会按概率放行）**。详见 §9 风险 7。
 
 ---
 
@@ -449,6 +444,10 @@ node scripts/replay-hooks.mjs --diff
 4. **loader 改造的风险点**：迁移期缺 manifest 的模块必须**保持原数组位置**（回退 `(i+1)*10`），否则注入顺序会变；W1-3 验收里逐项 diff `extList()` 顺序。
 5. **面板没有 git 的历史包袱**：P3-0 必须最先做，否则波 3 的所有改动都无法回滚。
 6. **已知风险：`src/ext/style.js` 有 `promptBlock` 但没有 `stateKey`**（契约 R7 本应报错）。本轮**不补**——补了会改变提示词缓存范围，属于行为变更，不能混在结构迁移里。契约里把它降为**警告**（不阻断波 1），波 2 迁移 style 时单独评估并记入 commit 说明。
+7. **已知风险：`attention` 自 `d222215` 起从未实例化**（工厂函数被直接塞进 `EXTENSIONS`，三个钩子一次没跑；线上 `[注意力]` 计数 0）。W1-4 已修（`index.js` 加 `factory`），但**首次生效要等下一次重启**，届时她的接话行为会变：
+   - 群里 `socialV2.attention.enabled !== false` 时，分数低于 `minScore`（当前 2）的消息不再唤醒；日志会出现 `[注意力] 跳过唤醒 …`。
+   - 当前 config：`sample {389834620: 1%, 680787260: 0.3%, default: 0}`、`replyOnly {389834620: [1962605653]}`、`maxPerDay 40` → **群 389834620 只接这个人的话**（手动/管理员除外）。
+   - **重启前的选择**：想先保持现状，把 `socialV2.attention.enabled` 改成 `false` 再重启；想让它生效，直接重启并在日志里确认 `[注意力]` 开始出现。两条路都要单独 commit 说明。
 
 ---
 
@@ -462,6 +461,7 @@ node scripts/replay-hooks.mjs --diff
 | **D-4** | 代码基准 `code.json` **提交进仓库** `scripts/snap-base/`（空环境也能跑 verify）；人格基准只在服务器，缺失时打印 `persona baseline skipped` 跳过；旧 `structure.json` 退役。 | W1-1/W1-3 重写；verify 改为 `snap-split --check --stdin` |
 | **D-5** | `order` = `EXTENSIONS` 下标 ×10 + 10（10…170）写死，校验器核对。 | W1-2/W1-3 定稿，`--order-map` 可核对 |
 | **D-6** | `pages` 字段 v1 删除；面板继续用 `PAGES` + `features.json`，等 `/api/plugins` 真被消费且能证明「页面只从一个来源渲染」再加。 | 契约 R8、dump-manifests、示例全部同步 |
+| **D-7** | W1-4 顺手修 `attention` 未实例化（加 `factory`）；校验器支持工厂模块；`manifest.id` 以**运行时实例 id** 为准，与文件名不同时只警告。 | W1-4 重写；契约 R1/R6 同步；新增 §9 风险 7 与 §12 回退手册 |
 
 **同时确认的两条补充（不改范围）**：① W1 增加「回滚演练」，只验证"坏得可见"（W1-3b）；② W2 期间除迁移 ext 外不许动 `bridge.js`，每次重启只做一件事（§5 硬规矩）。
 
@@ -501,7 +501,41 @@ node scripts/replay-hooks.mjs --diff           # hooks=N diffs=0 nondet=M
 
 ---
 
-## 12. 附录 A：不排期的顺手活（记录在案，不做时间承诺）
+## 12. 回退手册（出事照这个做，按层从轻到重）
+
+> 原则：**先回退代码，再重启；重启只做一件事**。每层回退完都要跑一遍 §11 第 1~2 层验收命令。
+
+| 层 | 撤什么 | 命令（在 `/home/dsh/apps/surfcore` 下） | 要不要重启 |
+|---|---|---|---|
+| L1 | 只撤本轮 manifest（17 个 `export const manifest`） | `git checkout HEAD -- src/ext/` （若已提交则 checkout 到提交前的 commit） | 不用（manifest 只在 import 时读） |
+| L2 | 撤 loader（回到 W1-3 之前，attention 恢复「不生效」的旧状态） | `git checkout a5460a7~1 -- src/ext/index.js` | **要**：`systemctl restart surfcore-bridge` |
+| L3 | 撤结构快照换代（verify / snap-split / code.json） | `git checkout a5460a7~1 -- scripts/verify.mjs scripts/snap-split.mjs` 并 `git checkout 759f3fa -- scripts/snap-base/structure.json` | 不用 |
+| L4 | 撤校验器与契约文档 | `git checkout a5460a7~1 -- scripts/dump-manifests.mjs docs/EXT-MANIFEST.md` | 不用 |
+| L5 | 人格内容（提示词）回退 | 人格卡在面板「设置 → 人格」里逐条改回；`characters/` 与 `state/` 不提交，靠每日备份 | 要（缓存重建 ≈¥0.1） |
+
+**用户侧的标准回退命令（整批回到 W1-3 之前）**：
+
+```bash
+cd /home/dsh/apps/surfcore
+git checkout a5460a7~1 -- src/ext/index.js
+systemctl restart surfcore-bridge
+sleep 12 && systemctl is-active surfcore-bridge
+tail -30 /var/log/surfcore-bridge.log | grep -E "\[ext:loader\]|错误|Error|ECONN" || echo "启动无告警"
+```
+
+**回退后必验三件**（任一不绿就停手，按 §9 写三段报告）：
+
+```bash
+node scripts/dump-manifests.mjs --strict        # 期望 MANIFEST_OK（回退到旧 loader 时应报缺 manifest，属正常）
+npm run verify -- --no-api                      # 期望 VERIFY_PASS
+node scripts/snapshot.mjs && node scripts/snap-split.mjs --check   # 期望 SNAP_OK
+```
+
+**不要做的事**：不要 `--save-base` / `--save-code` 盖章；不要在回退的同时改人格；不要在同一个重启里既回退又加功能。
+
+---
+
+## 13. 附录 A：不排期的顺手活（记录在案，不做时间承诺）
 
 4 条开关的 `path` 在当前 `config.json` 里不存在——面板能拨、没有任何人读，属于**噪声**：
 
