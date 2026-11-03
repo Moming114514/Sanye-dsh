@@ -45,8 +45,9 @@ export const manifest = {
 `promptBlock` · `wakeGate` · `routes` · `onGroupMessage` · `onPrivateMessage` · `afterSend` · `stateKey`
 
 > `stateKey` 不是"被调用的钩子"，而是**声明"我这块提示词按哪个 key 缓存"**。
-> 有 `promptBlock` 却没 `stateKey` 的模块，会把内容拼进全局提示词、污染所有会话的缓存
-> （现在 `style.js` 就是这种情况，迁移时要核实）。
+> 有 `promptBlock` 却没 `stateKey` 的模块，会把内容拼进全局提示词、污染所有会话的缓存。
+> 这条从 W1-6 起**默认报错**；只有登记在 `scripts/dump-manifests.mjs` 的 `KNOWN_NO_STATEKEY` 里的模块
+> （当前 `style`、`attention`）豁免为警告，且每条都必须写清原因（见 MANIFEST-PLAN §9 风险 6、8）。
 
 ## 2. 校验规则
 
@@ -140,6 +141,11 @@ node scripts/dump-manifests.mjs --require-all --strict   # 连「未迁移」也
 node scripts/dump-manifests.mjs --order-map  # 打印「EXTENSIONS 第几位 → 该给的 order」
 node scripts/dump-manifests.mjs --json       # 写 docs/generated/manifests.json（可提交）
 node scripts/dump-manifests.mjs --selftest   # 用 §3 的三个示例 + 4 个反例自检校验器
+node scripts/dump-manifests.mjs --strict --config config.json
+                                             # 与面板 features.json 互校：每条开关的 path 能不能在 config 里解析到；
+                                             # manifest.config[] 声明的点路径有没有配置、有没有对应开关。
+                                             # 默认 features 路径 /opt/her/features.json，可用 --features 覆盖。
+                                             # 不传 --config 就完全不读服务器本地配置（空环境/CI 友好）。
 ```
 
 - 不知道某个模块该写多少 `order`：先跑 `--order-map`，把对应行原样抄进 manifest。

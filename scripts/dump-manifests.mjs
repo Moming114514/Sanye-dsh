@@ -8,6 +8,9 @@
 //   node scripts/dump-manifests.mjs --json     # 另写 docs/generated/manifests.json
 //   node scripts/dump-manifests.mjs --selftest # 用 3 正例 + 4 反例自检校验器本身
 //   node scripts/dump-manifests.mjs --order-map # 打印「EXTENSIONS 第几位 → 该给的 order」
+//   node scripts/dump-manifests.mjs --config /home/dsh/apps/surfcore/config.json
+//                                              # 与面板 features.json 互校（只读；缺 --config 不跑）
+//                                              # 可选 --features <path> 覆盖默认 /opt/her/features.json
 //
 // 契约：docs/EXT-MANIFEST.md
 import fs from 'node:fs';
@@ -29,6 +32,18 @@ const requireAll = args.has('--require-all');
 const wantJson = args.has('--json');
 const selftest = args.has('--selftest');
 const orderMapOnly = args.has('--order-map');
+// 互校（W1-6）：--config 显式传 config.json 才跑；features.json 默认读面板那份，可覆盖
+const valueOf = (flag) => {
+  const i = process.argv.indexOf(flag);
+  return i >= 0 ? process.argv[i + 1] : null;
+};
+const configPath = valueOf('--config');
+const featuresPath = valueOf('--features') || '/opt/her/features.json';
+// 已知豁免：这些模块有 promptBlock 却故意没有 stateKey（补了属行为变更，另行评估）
+const KNOWN_NO_STATEKEY = new Map([
+  ['style', 'promptBlock 读 style-lib 的样本；补 stateKey 会改变提示词缓存范围'],
+  ['attention', 'promptBlock 读模块内 active（最近一条群消息的打分，3 分钟窗口），本质是跨会话的全局值；补 stateKey 也不解决，要改钩子签名，留到波 2'],
+]);
 
 function isFn(v) { return typeof v === 'function'; }
 function isBool(v) { return typeof v === 'boolean'; }
@@ -79,7 +94,12 @@ function validate(m, ctx = {}) {
     // R6 声明了必须真有实现
     if (impl) for (const h of m.hooks) if (HOOKS.includes(h) && !hasHook(impl, h)) errors.push(`声明了 ${h} 但没实现`);
     if (m.hooks.includes('promptBlock') && !m.hooks.includes('stateKey')) {
-      warnings.push('有 promptBlock 但没有 stateKey：内容会拼进全局提示词，污染所有会话缓存');
+      // 故意不补 stateKey 的模块登记在 KNOWN_NO_STATEKEY（style / attention，见 MANIFEST-PLAN §9 风险 6、8）
+      if (KNOWN_NO_STATEKEY.has(m.id)) {
+        warnings.push(`有 promptBlock 但没有 stateKey（已知风险：${KNOWN_NO_STATEKEY.get(m.id)}）`);
+      } else {
+        errors.push('有 promptBlock 必须有 stateKey（否则内容会拼进全局提示词、污染所有会话缓存）');
+      }
     }
   }
 
@@ -178,6 +198,66 @@ function selftestRun() {
   process.exit(bad === 0 ? 0 : 1);
 }
 
+// ---------- W1-6：与面板 features.json 互校（只读，不自动改任何文件） ----------
+// 两个方向：
+//   ① features.json 里每条的 path 必须能在 config.json 里解析到（解析不到的开关 = 面板能拨没人读）；
+//   ② manifest.config 里声明的点路径必须真有这个配置，且被某条开关覆盖（没被覆盖的记「无开关」）。
+// 4 条已知空开关（greetings.morning.enabled / socialV2.tools.viewSticker / @video:quota.daily / @report:time）
+// 只记录、不让进程变红——清理由人决定补还是下架（MANIFEST-PLAN 附录 A）。
+function atPath(obj, dotted) {
+  let cur = obj;
+  for (const seg of dotted.split('.')) {
+    if (cur === null || typeof cur !== 'object' || !(seg in cur)) return { ok: false };
+    cur = cur[seg];
+  }
+  return { ok: true, value: cur };
+}
+
+function configCrossCheck(rows) {
+  let cfg = null;
+  try {
+    cfg = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  } catch (e) {
+    console.error(`\n✗ 读不了 config：${configPath}（${String(e?.message || e).split('\n')[0]}）`);
+    process.exit(2);
+  }
+  let feats = [];
+  try {
+    feats = JSON.parse(fs.readFileSync(featuresPath, 'utf8')).features || [];
+  } catch (e) {
+    console.error(`\n✗ 读不了 features：${featuresPath}（${String(e?.message || e).split('\n')[0]}）——用 --features <path> 指定`);
+    process.exit(2);
+  }
+
+  const special = [];
+  const missing = [];
+  for (const f of feats) {
+    const p = String(f.path || '');
+    if (!p) { missing.push({ id: f.id, path: '(空)' }); continue; }
+    if (p.startsWith('@')) { special.push(f); continue; }
+    if (!atPath(cfg, p).ok) missing.push({ id: f.id, path: p });
+  }
+
+  const featurePaths = feats.map((f) => String(f.path || '')).filter((p) => p && !p.startsWith('@'));
+  const covered = (p) => featurePaths.some((fp) => fp === p || p.startsWith(fp + '.') || fp.startsWith(p + '.'));
+  const decl = [];
+  for (const r of rows) {
+    if (r.status !== 'ok' || !Array.isArray(r.config)) continue;
+    for (const p of r.config) {
+      const hit = atPath(cfg, p).ok;
+      decl.push({ id: r.id, path: p, inConfig: hit, covered: covered(p) });
+    }
+  }
+
+  console.log(`\n—— 开关互校：${featuresPath} ↔ ${configPath} ——`);
+  console.log(`开关 ${feats.length} 条：可解析 ${feats.length - missing.length - special.length} / 解析不到 ${missing.length} / 特殊（@ 开头）${special.length}`);
+  for (const x of missing) console.log(`  · 解析不到：${x.id} → ${x.path}`);
+  for (const f of special) console.log(`  · 特殊开关：${f.id} → ${f.path}（由代码直接处理，不走 config 点路径）`);
+  console.log(`manifest.config 声明 ${decl.length} 条：config 里未配置 ${decl.filter((d) => !d.inConfig).length}（走默认值）/ 无对应开关 ${decl.filter((d) => d.inConfig && !d.covered).length}（internal）`);
+  for (const d of decl.filter((x) => !x.inConfig)) console.log(`  · ${d.id}: ${d.path} 未配置（模块里用默认值兜底，可接受；若你以为是开关，就是死开关）`);
+  for (const d of decl.filter((x) => x.inConfig && !x.covered)) console.log(`  · ${d.id}: ${d.path} 没有对应开关（internal，可接受）`);
+}
+
 async function main() {
   if (selftest) return selftestRun();
   if (orderMapOnly) return printOrderMap();
@@ -244,6 +324,9 @@ async function main() {
     rows.push({
       file: f, id: m.id || '', title: m.title || '',
       hooks: Array.isArray(m.hooks) ? m.hooks : [], order: m.order ?? null,
+      config: Array.isArray(m.config) ? m.config : [],
+      stateFiles: Array.isArray(m.stateFiles) ? m.stateFiles : [],
+      kind: m.kind || '', registered: expectedOrder.has(f),
       status: errors.length ? 'fail' : 'ok', errors, warnings,
     });
   }
@@ -265,11 +348,14 @@ async function main() {
   console.log(`\n汇总：合格 ${ok.length} / 不合格 ${fail.length} / 未迁移 ${missing.length}（共 ${rows.length}）`);
   if (missing.length) console.log(`  未迁移的 ${missing.length} 个在波 2 逐个补；补完用 --require-all --strict 收口`);
 
+  // 只有显式给 --config 才跑互校：默认不读服务器上的 config/features，保持本命令纯静态、空环境可用
+  if (configPath) configCrossCheck(rows);
+
   if (wantJson) {
     const payload = {
       schema: 'ext-manifests/v1',
       at: new Date().toISOString(),
-      modules: rows.filter((r) => r.status === 'ok').map((r) => ({ file: r.file, id: r.id, title: r.title, hooks: r.hooks, order: r.order })),
+      modules: rows.filter((r) => r.status === 'ok').map((r) => ({ file: r.file, id: r.id, title: r.title, hooks: r.hooks, order: r.order, config: r.config, stateFiles: r.stateFiles, kind: r.kind, registered: r.registered, wave: r.registered ? 1 : 2 })),
       pending: rows.filter((r) => r.status !== 'ok').map((r) => ({ file: r.file, status: r.status, errors: r.errors })),
     };
     fs.mkdirSync(path.dirname(OUT_FILE), { recursive: true });

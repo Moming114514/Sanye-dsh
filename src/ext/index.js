@@ -111,34 +111,64 @@ export function extList() {
   return EXTENSIONS;
 }
 
+// ── 钩子隔离（T1，2026-11-03）────────────────────────────────────────────
+// 目标：任一扩展在任一钩子里抛错，都只记一条日志，主流程继续，返回值按契约兜底。
+//   promptBlock → ''（不注入）；wakeGate → { allow: true }（宁可放行也别误拦）；
+//   其余钩子 → undefined / false。
+// 同一 扩展+钩子 5 分钟内只记一条（防刷屏），但每次失败都计入 extStats.errors。
+const HOOK_LOG_GAP_MS = 5 * 60 * 1000;
+export const extStats = { errors: 0, reported: 0, suppressed: 0 };
+const _hookLogAt = new Map();
+
+function hookTag(ext, fallbackName) {
+  return `ext:${(ext && ext.id) || fallbackName || 'unknown'}`;
+}
+
+function reportHookError(ext, fallbackName, hook, error) {
+  extStats.errors += 1;
+  const key = `${hookTag(ext, fallbackName)}|${hook}`;
+  const now = Date.now();
+  if (now - (_hookLogAt.get(key) || 0) < HOOK_LOG_GAP_MS) {
+    extStats.suppressed += 1;
+    return;
+  }
+  _hookLogAt.set(key, now);
+  extStats.reported += 1;
+  try {
+    console.error(`[${hookTag(ext, fallbackName)}] ${hook} 失败：${String(error?.message || error)}`);
+  } catch {}
+}
+
+function guardHook(ext, fallbackName, hook, fn, fallback) {
+  try {
+    return fn();
+  } catch (error) {
+    reportHookError(ext, fallbackName, hook, error);
+    return fallback;
+  }
+}
+
 /** 路由分发：命中已注册扩展路由时返回 true（该扩展已自行响应）。 */
 export function extDispatchRoute(pathname, ctx) {
-  for (const ext of EXTENSIONS) {
+  for (const row of ASSEMBLED.rows) {
+    const ext = row.ext;
     for (const route of ext.routes || []) {
       if (route.path !== pathname) continue;
-      try {
-        route.handle(ctx);
-      } catch (error) {
-        ctx.log(`[ext:${ext.id}] 处理 ${pathname} 失败：${String(error?.message || error).slice(0, 160)}`);
-        ctx.sendJson({ ok: false, error: String(error?.message || error) }, 500);
-      }
+      guardHook(ext, row.name, 'route', () => route.handle(ctx), undefined);
       return true;
     }
   }
   return false;
 }
 
-/** 提示词块：按注册顺序拼接，空块自动跳过（顺序即注入顺序）。 */
+/** 提示词块：按 order 拼接，空块自动跳过（顺序即注入顺序）。 */
 export function extPromptBlocks(cfg) {
   const out = [];
-  for (const ext of EXTENSIONS) {
+  for (const row of ASSEMBLED.rows) {
+    const ext = row.ext;
     if (typeof ext.promptBlock !== 'function') continue;
-    try {
-      const text = ext.promptBlock(cfg);
-      if (text) out.push(text);
-    } catch (error) {
-      console.error(`[ext:${ext.id}] 生成提示词块失败：${String(error?.message || error)}`);
-    }
+    const text = guardHook(ext, row.name, 'promptBlock', () => ext.promptBlock(cfg), '');
+    if (text) out.push(text);
   }
   return out;
 }
@@ -146,56 +176,50 @@ export function extPromptBlocks(cfg) {
 /** 状态键：任一扩展的状态文件变化都让提示词缓存失效。 */
 export function extStateKey() {
   const parts = [];
-  for (const ext of EXTENSIONS) {
+  for (const row of ASSEMBLED.rows) {
+    const ext = row.ext;
     if (typeof ext.stateKey !== 'function') continue;
-    try { parts.push(String(ext.stateKey() ?? '')); } catch { parts.push(''); }
+    parts.push(guardHook(ext, row.name, 'stateKey', () => String(ext.stateKey() ?? ''), ''));
   }
   return parts.join(',');
 }
 
 /** 群消息入口：谁在说话（只听主人/学说法都要用）。 */
 export function extOnGroupMessage(ctx) {
-  for (const ext of EXTENSIONS) {
+  for (const row of ASSEMBLED.rows) {
+    const ext = row.ext;
     if (typeof ext.onGroupMessage !== 'function') continue;
-    try { ext.onGroupMessage(ctx); } catch (error) {
-      console.error(`[ext:${ext.id}] onGroupMessage 失败：${String(error?.message || error)}`);
-    }
+    guardHook(ext, row.name, 'onGroupMessage', () => ext.onGroupMessage(ctx), undefined);
   }
 }
 
 /** 私聊消息入口：主人在私聊里下的「去做某件事」的指令（如学说法手动触发）。 */
 export function extOnPrivateMessage(ctx) {
-  for (const ext of EXTENSIONS) {
+  for (const row of ASSEMBLED.rows) {
+    const ext = row.ext;
     if (typeof ext.onPrivateMessage !== 'function') continue;
-    try {
-      if (ext.onPrivateMessage(ctx) === true) return true;
-    } catch (error) {
-      console.error(`[ext:${ext.id}] onPrivateMessage 失败：${String(error?.message || error)}`);
-    }
+    const handled = guardHook(ext, row.name, 'onPrivateMessage', () => ext.onPrivateMessage(ctx) === true, false);
+    if (handled) return true;
   }
   return false;
 }
 
 /** 唤醒闸门：任一扩展返回 { allow:false } 即拦下（不给模型烧 token）。 */
 export function extWakeGate(ctx) {
-  for (const ext of EXTENSIONS) {
+  for (const row of ASSEMBLED.rows) {
+    const ext = row.ext;
     if (typeof ext.wakeGate !== 'function') continue;
-    try {
-      const r = ext.wakeGate(ctx);
-      if (r && r.allow === false) return r;
-    } catch (error) {
-      console.error(`[ext:${ext.id}] wakeGate 失败：${String(error?.message || error)}`);
-    }
+    const r = guardHook(ext, row.name, 'wakeGate', () => ext.wakeGate(ctx), { allow: true });
+    if (r && r.allow === false) return r;
   }
   return { allow: true };
 }
 
 /** 发送成功后：欠事捕获、学说法观察等。 */
 export function extAfterSend(ctx) {
-  for (const ext of EXTENSIONS) {
+  for (const row of ASSEMBLED.rows) {
+    const ext = row.ext;
     if (typeof ext.afterSend !== 'function') continue;
-    try { ext.afterSend(ctx); } catch (error) {
-      console.error(`[ext:${ext.id}] afterSend 失败：${String(error?.message || error)}`);
-    }
+    guardHook(ext, row.name, 'afterSend', () => ext.afterSend(ctx), undefined);
   }
 }

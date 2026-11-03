@@ -59,3 +59,6 @@ export function scopedMemoryText({ paths, key = '', config = {}, maxChars = 2800
   while (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value);
   return out;
 }
+
+// manifest：见 docs/EXT-MANIFEST.md（声明用，不改变任何调用路径；本模块未注册进 EXTENSIONS，由 bridge 直接调用）
+export const manifest = { id: 'memory-scope', title: '记忆可见范围', kind: 'core', enabledByDefault: true, hot: false, hooks: [], config: [], stateFiles: [] };

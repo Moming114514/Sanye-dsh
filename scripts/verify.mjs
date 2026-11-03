@@ -107,6 +107,15 @@ function toolsList() {
   }
 }
 
+// 2.5) 扩展清单（manifest 契约）
+//     --strict：有模块的 manifest 不合格就红；缺 manifest 仍只算「未迁移」，不卡波 1/2 的中间态。
+{
+  const r = await run(NODE, ['scripts/dump-manifests.mjs', '--strict']);
+  const lines = (r.out || r.err).trim().split('\n').filter(Boolean);
+  const summaryLine = lines.find((l) => l.startsWith('汇总：')) || lines.slice(-1)[0] || '';
+  record('扩展清单（manifest 契约）', r.code === 0, summaryLine.replace(/^汇总：/, '').slice(0, 160));
+}
+
 // 3) 代码结构快照：工具名 + 路由状态码
 //    比对逻辑只有一份——scripts/snap-split.mjs；verify 把探活结果用 stdin 递过去，
 //    免得两份实现慢慢漂移（人格侧不在这里，见 scripts/snap-split.mjs --check）。

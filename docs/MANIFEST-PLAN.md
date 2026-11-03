@@ -264,10 +264,10 @@ node scripts/dump-manifests.mjs --json && grep -ic 'token\|secret\|password' doc
 ### W1-6 接进 verify + features.json 互校（原 check-manifest 的 R5 保留在这里）
 
 - **做什么**：
-  1. 在 `scripts/verify.mjs` 里追加一行 `node scripts/dump-manifests.mjs --strict`（**只加一行**）；波 1 阶段它应当绿（0 不合格），波 2 每迁一个模块逐步收紧。
+  1. 在 `scripts/verify.mjs` 里追加一段 `node scripts/dump-manifests.mjs --strict`（**只加一段、约 8 行**）；波 1 阶段它应当绿（0 不合格），波 2 每迁一个模块逐步收紧。
   2. features.json 互校：44 条开关里每条的 `path` 必须能在 `config.json` 里解析到；同时 `manifest.config[]` 里声明的点路径必须能在 features.json 找到对应开关（或明确标 `internal`）。输出未覆盖清单，**不**自动改任何文件。
 - **为什么和第 1 条分开放**：互校依赖 `config.json`（隐私、服务器本地），不能进 CI 的默认路径；做成 `--config` 参数显式传路径，默认跳过。
-- **改哪里**：`scripts/verify.mjs` 加 1 行；`dump-manifests.mjs` 加 `--config <path>` 互校分支（约 40 行）
+- **改哪里**：`scripts/verify.mjs` 加一段（约 8 行）；`dump-manifests.mjs` 加 `--config <path>` / `--features <path>` 互校分支（约 55 行）
 - **代价**：3 步 · 约 45 分钟 · 重启 0 次
 - **回滚**：`git checkout -- scripts/verify.mjs` + 删掉 `--config` 分支
 - **验收命令**：
@@ -277,7 +277,15 @@ node scripts/dump-manifests.mjs --config ~/apps/surfcore/config.json --strict; e
 # 负向测试：把某个已迁移模块的 stateKey 从 manifest 删掉（保留 promptBlock），必须 exit=1
 ```
 
-- **验收标准**：当前代码下 `exit=0`；4 条空开关（`greetings.morning.enabled`、`socialV2.tools.viewSticker`、`@video:quota.daily`、`@report:time`）逐条列出；负向测试能变红；`style` 的「有 promptBlock 无 stateKey」以**警告**形式出现并被记入已知问题，不阻断波 1。
+- **验收标准**：当前代码下 `exit=0`；4 条空开关逐条列出；负向测试能变红；`style` 的「有 promptBlock 无 stateKey」以**警告**形式出现并被记入已知问题，不阻断波 1。
+
+- **已完成（2026-11-03 21:20，未重启）**：
+  - `verify.mjs` 新增 `✅ 扩展清单（manifest 契约）  — 合格 17 / 不合格 0 / 未迁移 13（共 30）`；`npm run verify` 全量 `VERIFY_PASS`。
+  - `--config config.json --strict` = `exit=0`，输出：开关 44 条 → **可解析 40 / 解析不到 2 / 特殊（@ 开头）2**；解析不到的正是 `morning → greetings.morning.enabled`、`toolViewSticker → socialV2.tools.viewSticker`，两个 `@video:quota.daily`、`@report:time` 归为「特殊开关」（由代码直接处理，不走 config 点路径）。四条空开关至此**全部可见**，而不是只写在文档里。
+  - `manifest.config` 声明 11 条：config 里未配置 3 条（`socialV2.impressions`、`owner.qq`、`socialV2.techNotes`，模块里都有默认值兜底，标「走默认值」而不是报错）；无对应开关 5 条（`ownerQQ`、`socialV2.adviceCapture`、`socialV2.safeTalk`、`socialV2.attention` 等 internal 项）。
+  - 负向测试：删 `tech-notes` 的 `stateKey` → `✗ 有 promptBlock 必须有 stateKey`、`exit=1`；还原后 `exit=0`。
+  - 由此收紧的规则：`promptBlock` 无 `stateKey` 从「一律警告」改为**默认报错**，只有登记在 `KNOWN_NO_STATEKEY` 的两个模块（`style`、`attention`）例外且必须带原因。`attention` 的例外就是 §9 新增的风险 8。
+
 
 ---
 
@@ -297,6 +305,15 @@ node scripts/replay-hooks.mjs --diff
 
 - **验收标准**：`diffs=0`；`nondet` 数量 ≤3 且逐个在报告里写明原因；故意改一个模块的 promptBlock 文案，`--diff` 必须变红（负向测试）
 
+- **已完成（2026-11-03 22:12，零重启）**：
+  - `scripts/replay-hooks.mjs`（138 行）＋基准 `scripts/snap-base/hooks.json`（9946B，`schema=replay-hooks/v1`）。
+  - 覆盖 **12 个模块×钩子 / 89 个用例**：`promptBlock` 5 个（attention、impressions、owner-teach、tech-notes、style）+ `wakeGate` 7 个（owner-only、mute、learnmode、economy、group-rate、attention、safe-talk）× 12 条打样（群/私聊、manual/admin、atMention、style-learn、静音群、学习群、限额满）。
+  - 隔离：`HOME` 与 `SURFCORE_STATE_DIR` 都指到 `/tmp/replay-hooks-home`，每次调用前重建 7 个固定 fixtures，不读也不写线上状态；`group-rate` 这类会写自己 state 的闸门也能得到可复现结果。
+  - 实测：`hooks=12 diffs=0 nondet=0`（比预期还好，没有不确定模块）；连跑两次一致；`npm run verify` 仍 `VERIFY_PASS`。
+  - 负向测试：把 tech-notes 的 `【技术笔记】` 改成 `【技术笔记·改】` → `diffs=1`、`~ 变化 promptBlock:tech-notes/cfg（90→92 字节）`、exit 1；还原后回到 0。
+  - 基准哈希：`hooks.json 60c307fd…`、`replay-hooks.mjs 1cc7edc7…`。
+  - **规矩**：`--save` 只允许一次（已有基准时拒绝，确需重来加 `--force` 并在提交信息里说明）；改文案导致红是**预期信号**——要么改回，要么 `--save --force` 并单独一笔提交、写清改了什么。
+
 ---
 
 ## 5. 波 2：按清单逐模块迁移
@@ -311,6 +328,8 @@ node scripts/replay-hooks.mjs --diff
 3. 每批开始先 `git status --short`，若出现预期外的文件（尤其是 `src/bridge.js`），先停下来报，不继续。
 
 ### W2-0 `GET /api/plugins` + 第一次重启（把波 1 省下的一次重启在这里花掉）
+
+> **状态（2026-11-03 22:25，未重启）**：代码已落地——`src/bridge.js` 增加只读路由 `/api/plugins`（要求 console token 或 agent token，本机回环放行），数据来自 `docs/generated/manifests.json`（30 条，`config/stateFiles/kind/registered/wave` 已补）+ `extList()` 实例的 routes；`dump-manifests --json` 已重新生成。未跑过线上，等统一重启后按「重启后要验什么」清单核对。
 
 - **做什么**：在 `src/bridge.js` 与 `/api/status` 相邻的位置加一条只读路由，读 loader 的 `MANIFESTS`；顺带新增 1 行 import。
 - **改哪里**：`src/bridge.js` 路由表（约 15 行）+ 顶部 1 行 import。**不碰任何 `_PATCH`。**
@@ -443,11 +462,12 @@ node scripts/replay-hooks.mjs --diff
 3. **重启预算**：波 1 ≤2 次（W1-5、以及 manifest 全部落地后 1 次）；波 2 ≤2 次；波 3 = 0 次 bridge 重启（只重启 her-console）。总计 ≤4 次，超出即视为计划有误。
 4. **loader 改造的风险点**：迁移期缺 manifest 的模块必须**保持原数组位置**（回退 `(i+1)*10`），否则注入顺序会变；W1-3 验收里逐项 diff `extList()` 顺序。
 5. **面板没有 git 的历史包袱**：P3-0 必须最先做，否则波 3 的所有改动都无法回滚。
-6. **已知风险：`src/ext/style.js` 有 `promptBlock` 但没有 `stateKey`**（契约 R7 本应报错）。本轮**不补**——补了会改变提示词缓存范围，属于行为变更，不能混在结构迁移里。契约里把它降为**警告**（不阻断波 1），波 2 迁移 style 时单独评估并记入 commit 说明。
-7. **已知风险：`attention` 自 `d222215` 起从未实例化**（工厂函数被直接塞进 `EXTENSIONS`，三个钩子一次没跑；线上 `[注意力]` 计数 0）。W1-4 已修（`index.js` 加 `factory`），但**首次生效要等下一次重启**，届时她的接话行为会变：
+6. **已知风险：`src/ext/style.js` 有 `promptBlock` 但没有 `stateKey`**。本轮**不补**——补了会改变提示词缓存范围，属于行为变更，不能混在结构迁移里。W1-6 之后契约规则是「promptBlock 无 stateKey 默认**报错**」，豁免名单只有 `style`、`attention` 两项，且每项必须在 `KNOWN_NO_STATEKEY` 里写清原因。
+7. **已知风险：`attention` 自 `d222215` 起从未实例化**（工厂函数被直接塞进 `EXTENSIONS`，三个钩子一次没跑；线上 `[注意力]` 计数 0）。W1-4 已修（`index.js` 加 `factory`），**2026-11-03 20:53 重启后首次生效**：
    - 群里 `socialV2.attention.enabled !== false` 时，分数低于 `minScore`（当前 2）的消息不再唤醒；日志会出现 `[注意力] 跳过唤醒 …`。
    - 当前 config：`sample {389834620: 1%, 680787260: 0.3%, default: 0}`、`replyOnly {389834620: [1962605653]}`、`maxPerDay 40` → **群 389834620 只接这个人的话**（手动/管理员除外）。
-   - **重启前的选择**：想先保持现状，把 `socialV2.attention.enabled` 改成 `false` 再重启；想让它生效，直接重启并在日志里确认 `[注意力]` 开始出现。两条路都要单独 commit 说明。
+   - 若她突然完全不说话：先把 `minScore` 2→1，再不行把 `enabled` 改 false。两条都要单独 commit 说明。
+8. **已知风险 8：`attention.promptBlock` 没有 `stateKey`，而且读的是模块内的全局 `active`**（最近一条群消息的打分，3 分钟窗口）。后果：群 A 的低分消息会让「【这条只值一句】」在 3 分钟内**被拼进别的会话**的提示词（私聊/别的群构建提示词时也会看到），并且让提示词随消息流动而变。它不是 W1-4 引入的（该钩子此前从未执行），但现在真实生效。本轮只登记、不修——正确修法是给 `promptBlock` 加会话参数（改契约）或把注入点移到按会话构建提示词的一侧，两者都是行为变更，需单独立项 + 单独重启。校验器把它和 `style` 一起列入 `KNOWN_NO_STATEKEY` 豁免（警告，不阻断 verify）。
 
 ---
 
@@ -462,6 +482,7 @@ node scripts/replay-hooks.mjs --diff
 | **D-5** | `order` = `EXTENSIONS` 下标 ×10 + 10（10…170）写死，校验器核对。 | W1-2/W1-3 定稿，`--order-map` 可核对 |
 | **D-6** | `pages` 字段 v1 删除；面板继续用 `PAGES` + `features.json`，等 `/api/plugins` 真被消费且能证明「页面只从一个来源渲染」再加。 | 契约 R8、dump-manifests、示例全部同步 |
 | **D-7** | W1-4 顺手修 `attention` 未实例化（加 `factory`）；校验器支持工厂模块；`manifest.id` 以**运行时实例 id** 为准，与文件名不同时只警告。 | W1-4 重写；契约 R1/R6 同步；新增 §9 风险 7 与 §12 回退手册 |
+| **D-8** | W1-6 把 `promptBlock` 无 `stateKey` 从「警告」收紧为「**错误**」，豁免名单 `KNOWN_NO_STATEKEY` 只有 `style`、`attention`（必须写原因）；`--config` / `--features` 互校只有在显式传参时才跑，读不到文件 exit 2，其余情况只报告、不改红。 | W1-6 重写；§9 新增风险 8；契约 R6b 同步 |
 
 **同时确认的两条补充（不改范围）**：① W1 增加「回滚演练」，只验证"坏得可见"（W1-3b）；② W2 期间除迁移 ext 外不许动 `bridge.js`，每次重启只做一件事（§5 硬规矩）。
 
@@ -480,6 +501,7 @@ node --check src/bridge.js
 npm run verify -- --no-api
 grep -c "_PATCH" src/bridge.js                 # 只观察，不作为指标
 node scripts/dump-manifests.mjs                # 波 1 起
+node scripts/dump-manifests.mjs --strict --config config.json   # 在服务器上再跑一次开关互校（W1-6 起）
 node scripts/replay-hooks.mjs --diff           # 波 1 起
 node scripts/snapshot.mjs && node scripts/snap-split.mjs --check
 # ↑ 代码侧（tools/routes）硬失败 exit 1；人格侧只报告 stableSha256 差异；

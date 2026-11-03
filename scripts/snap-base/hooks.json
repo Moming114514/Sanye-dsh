@@ -1,0 +1,543 @@
+{
+ "schema": "replay-hooks/v1",
+ "at": "2026-11-03T14:06:25.546Z",
+ "hooks": 12,
+ "modules": 11,
+ "cases": [
+  {
+   "id": "promptBlock:attention",
+   "case": "cfg",
+   "hash": "f072cbec3bf88418",
+   "bytes": 6
+  },
+  {
+   "id": "promptBlock:impressions",
+   "case": "cfg",
+   "hash": "9c4d4341ae885689",
+   "bytes": 41
+  },
+  {
+   "id": "promptBlock:owner-teach",
+   "case": "cfg",
+   "hash": "12ae32cb1ec02d01",
+   "bytes": 2
+  },
+  {
+   "id": "promptBlock:style",
+   "case": "cfg",
+   "hash": "12ae32cb1ec02d01",
+   "bytes": 2
+  },
+  {
+   "id": "promptBlock:tech-notes",
+   "case": "cfg",
+   "hash": "9538aea033c78239",
+   "bytes": 90
+  },
+  {
+   "id": "wakeGate:attention",
+   "case": "admin",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:attention",
+   "case": "empty-key",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:attention",
+   "case": "group-at",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:attention",
+   "case": "group-learnmode",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:attention",
+   "case": "group-muted",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:attention",
+   "case": "group-normal",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:attention",
+   "case": "group-ratelimited",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:attention",
+   "case": "group-stylelearn",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:attention",
+   "case": "manual",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:attention",
+   "case": "owneronly",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:attention",
+   "case": "private-normal",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:attention",
+   "case": "privateonly",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:economy",
+   "case": "admin",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:economy",
+   "case": "empty-key",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:economy",
+   "case": "group-at",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:economy",
+   "case": "group-learnmode",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:economy",
+   "case": "group-muted",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:economy",
+   "case": "group-normal",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:economy",
+   "case": "group-ratelimited",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:economy",
+   "case": "group-stylelearn",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:economy",
+   "case": "manual",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:economy",
+   "case": "owneronly",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:economy",
+   "case": "private-normal",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:economy",
+   "case": "privateonly",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:group-rate",
+   "case": "admin",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:group-rate",
+   "case": "empty-key",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:group-rate",
+   "case": "group-at",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:group-rate",
+   "case": "group-learnmode",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:group-rate",
+   "case": "group-muted",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:group-rate",
+   "case": "group-normal",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:group-rate",
+   "case": "group-ratelimited",
+   "hash": "3e508b1767190ec0",
+   "bytes": 79
+  },
+  {
+   "id": "wakeGate:group-rate",
+   "case": "group-stylelearn",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:group-rate",
+   "case": "manual",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:group-rate",
+   "case": "owneronly",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:group-rate",
+   "case": "private-normal",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:group-rate",
+   "case": "privateonly",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:learnmode",
+   "case": "admin",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:learnmode",
+   "case": "empty-key",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:learnmode",
+   "case": "group-at",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:learnmode",
+   "case": "group-learnmode",
+   "hash": "9e650881423ef7c7",
+   "bytes": 78
+  },
+  {
+   "id": "wakeGate:learnmode",
+   "case": "group-muted",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:learnmode",
+   "case": "group-normal",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:learnmode",
+   "case": "group-ratelimited",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:learnmode",
+   "case": "group-stylelearn",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:learnmode",
+   "case": "manual",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:learnmode",
+   "case": "owneronly",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:learnmode",
+   "case": "private-normal",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:learnmode",
+   "case": "privateonly",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:mute",
+   "case": "admin",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:mute",
+   "case": "empty-key",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:mute",
+   "case": "group-at",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:mute",
+   "case": "group-learnmode",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:mute",
+   "case": "group-muted",
+   "hash": "98760b6f9abdea77",
+   "bytes": 79
+  },
+  {
+   "id": "wakeGate:mute",
+   "case": "group-normal",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:mute",
+   "case": "group-ratelimited",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:mute",
+   "case": "group-stylelearn",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:mute",
+   "case": "manual",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:mute",
+   "case": "owneronly",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:mute",
+   "case": "private-normal",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:mute",
+   "case": "privateonly",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:owner-only",
+   "case": "admin",
+   "hash": "de02bcaa0e1f0033",
+   "bytes": 14
+  },
+  {
+   "id": "wakeGate:owner-only",
+   "case": "empty-key",
+   "hash": "de02bcaa0e1f0033",
+   "bytes": 14
+  },
+  {
+   "id": "wakeGate:owner-only",
+   "case": "group-at",
+   "hash": "de02bcaa0e1f0033",
+   "bytes": 14
+  },
+  {
+   "id": "wakeGate:owner-only",
+   "case": "group-learnmode",
+   "hash": "de02bcaa0e1f0033",
+   "bytes": 14
+  },
+  {
+   "id": "wakeGate:owner-only",
+   "case": "group-muted",
+   "hash": "de02bcaa0e1f0033",
+   "bytes": 14
+  },
+  {
+   "id": "wakeGate:owner-only",
+   "case": "group-normal",
+   "hash": "de02bcaa0e1f0033",
+   "bytes": 14
+  },
+  {
+   "id": "wakeGate:owner-only",
+   "case": "group-ratelimited",
+   "hash": "de02bcaa0e1f0033",
+   "bytes": 14
+  },
+  {
+   "id": "wakeGate:owner-only",
+   "case": "group-stylelearn",
+   "hash": "de02bcaa0e1f0033",
+   "bytes": 14
+  },
+  {
+   "id": "wakeGate:owner-only",
+   "case": "manual",
+   "hash": "de02bcaa0e1f0033",
+   "bytes": 14
+  },
+  {
+   "id": "wakeGate:owner-only",
+   "case": "owneronly",
+   "hash": "84c1df35b25b8f93",
+   "bytes": 76
+  },
+  {
+   "id": "wakeGate:owner-only",
+   "case": "private-normal",
+   "hash": "de02bcaa0e1f0033",
+   "bytes": 14
+  },
+  {
+   "id": "wakeGate:owner-only",
+   "case": "privateonly",
+   "hash": "f78ff41f5e5311a8",
+   "bytes": 67
+  },
+  {
+   "id": "wakeGate:safe-talk",
+   "case": "admin",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:safe-talk",
+   "case": "empty-key",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:safe-talk",
+   "case": "group-at",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:safe-talk",
+   "case": "group-learnmode",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:safe-talk",
+   "case": "group-muted",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:safe-talk",
+   "case": "group-normal",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:safe-talk",
+   "case": "group-ratelimited",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:safe-talk",
+   "case": "group-stylelearn",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:safe-talk",
+   "case": "manual",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:safe-talk",
+   "case": "owneronly",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:safe-talk",
+   "case": "private-normal",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  },
+  {
+   "id": "wakeGate:safe-talk",
+   "case": "privateonly",
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
+  }
+ ],
+ "nondet": []
+}

@@ -31,3 +31,6 @@ export default {
   id: 'blackbox',
   title: '黑箱任务',
 };
+
+// manifest：见 docs/EXT-MANIFEST.md（声明用，不改变任何调用路径；本模块未注册进 EXTENSIONS，由 bridge 直接调用）
+export const manifest = { id: 'blackbox', title: '黑箱静默', kind: 'core', enabledByDefault: true, hot: false, hooks: [], config: [], stateFiles: [] };
