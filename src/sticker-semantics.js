@@ -556,7 +556,7 @@ export function buildStickerMatchHint(ranked, opts = {}) {
   // （日志原话「sending #06 might read as mocking/repeating」）→ 最后只发了文字。
   const tail = strong
     ? `（${topRef} 和当前语境很贴合（${Number(top.score).toFixed(2)}）：发它用 qq_send_sticker stickerId="${topRef}"。接梗、被吐槽/撒娇时发这张本身就自然，不是只有文字才叫回复；严肃/敏感话题、对方真的在生气时才别发。）`
-    : '（真的贴合才发一张：qq_send_sticker stickerId="#编号"；情绪不对就别硬发，也不要每轮都发。）';
+    : '（贴合就发（0.5 以上别犹豫）；纯水群、卖萌、接梗也可以发，不必很贴：qq_send_sticker stickerId="#编号"。情绪不对就别硬发，但也别每轮都是纯文字。）';
   return [
     `【表情匹配】${mood}本地语义索引最贴合：`,
     ...lines,

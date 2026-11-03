@@ -69,7 +69,7 @@ export default {
     const k = String(key || '');
     const why = String(reason || '');
     if (!k) return true;
-    if (why === 'manual' || why === 'admin') return true;
+    if (why === 'manual' || why === 'admin' || why.startsWith('style-learn')) return true; // MUTE_LEARN_PASS：学样只看不聊，静音不拦
     if (!isMuted(k)) return true;
     return { allow: false, reason: `[静音] 跳过唤醒 ${k}（${why}）：面板里设了先不理这个会话` };
   },

@@ -19,12 +19,19 @@ import stickers from './stickers.js';
 import mute from './mute.js'; // 静音名单
 import learnmode from './learnmode.js'; // 学习模式（只看不聊）
 import groupRate from './group-rate.js'; // 群发言频率
+import attention from './attention.js'; // 一级注意力判定（零成本）
 import safeTalk from './safe-talk.js'; // 敏感话题守门
 import economy from './economy.js'; // 省钱模式（少说话，可按群）
 import ownerTeach from './owner-teach.js'; // 主人教的说法（OWNERTEACH_PATCH）
+import createAdviceCapture from './advice-capture.js'; // 建议收集（ADVICE_PATCH）
+import createPeople from './people.js'; // 人群档案（PEOPLE_PATCH）
+import createUtterances from './utterances.js'; // 她说的话（UTTER_PATCH）
 
 // 注册顺序 = 提示词注入顺序（印象在前、技术笔记在后，与原内联顺序一致）
-const EXTENSIONS = [ownerOnly, mute, learnmode, economy, groupRate, safeTalk, promises, impressions, ownerTeach, techNotes, style, loops, stickers].filter(Boolean);
+const advice = createAdviceCapture({ log: (m) => console.log('[ext:advice] ' + m) });
+const people = createPeople();
+const utterances = createUtterances();
+const EXTENSIONS = [ownerOnly, mute, learnmode, economy, groupRate, attention, advice, people, utterances, safeTalk, promises, impressions, ownerTeach, techNotes, style, loops, stickers].filter(Boolean);
 
 export function extList() {
   return EXTENSIONS;

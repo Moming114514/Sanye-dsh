@@ -15,6 +15,7 @@ import yaml from 'js-yaml';
 import { extractPresetPrefix, presetPromptBlockers, presetPromptWarnings, renderPresetPromptYaml } from './preset-prompt.js';
 import { GEN1_ROLE_LINE_RE, parseRoleSections, roleCharStats, roleSectionReport, selectRoleText } from './role-card.js';
 import { fileURLToPath } from 'node:url';
+import { observe as botObserve, isKnownBot as botKnown, getPeople as peopleList, setMark as setPeopleMark } from './ext/bot-detect.js'; // BOTDETECT_PATCH
 import { SnowLumaWebSocketClient, text } from '@snowluma/sdk';
 import { NodeApiClient, unwrap, createTurnCollector, discoverDshLaunchToken } from './dsh-client.js';
 import { mdToPlain, splitForQQ, truncateText, truncateTextTail } from './md-to-plain.js';
@@ -1114,7 +1115,7 @@ function loadConfig() {
       // 图片/表情（含动图）的数量与体积上限。QQ 的动图表情常见 1~4MB，
       // 旧的 4MB 单条总上限会误伤；这里默认 8MB，仍受 DSH 的 20MB/64MP 限制约束。
       media: {
-        maxBytes: 8 * 1024 * 1024,
+        maxBytes: 16 * 1024 * 1024,
         maxPixels: 64_000_000,
         maxCount: 5
       },
@@ -1223,7 +1224,7 @@ function loadConfig() {
   // socialV2.media：图片/表情的数量与体积上限。旧配置没有这一段，必须深度合并出默认值，
   // 否则 `{...defaults, ...file.socialV2}` 里缺失的 media 会取到 undefined（等于无上限判断）。
   cfg.socialV2.media = {
-    maxBytes: 8 * 1024 * 1024,
+    maxBytes: 16 * 1024 * 1024,
     maxPixels: 64_000_000,
     maxCount: 5,
     ...((cfg.socialV2?.media && typeof cfg.socialV2.media === 'object' && !Array.isArray(cfg.socialV2.media)) ? cfg.socialV2.media : {})
@@ -4619,6 +4620,9 @@ async function main() {
             || url.pathname === '/api/socialV2/grouprate' /* GROUPRATE_PATCH */
             || url.pathname === '/api/socialV2/economy' /* GROUPRATE_PATCH */
             || url.pathname === '/api/socialV2/attention' /* ATTENTION_PATCH */
+            || url.pathname === '/api/socialV2/people' /* PEOPLE_PATCH */
+            || url.pathname === '/api/socialV2/people-mark' /* PEOPLE_PATCH */
+            || url.pathname === '/api/socialV2/advice' /* ADVICE_PATCH */
             || url.pathname === '/api/socialV2/names' /* NAMES_PATCH */
             || url.pathname === '/api/socialV2/owner-teach' /* OWNERTEACH_PATCH */
         // ECONOMY_PATCH
@@ -7859,7 +7863,7 @@ async function main() {
           }
           return;
         }
-        if (url.pathname === '/api/socialV2/style-note' || url.pathname === '/api/socialV2/style-list' || url.pathname === '/api/socialV2/style-candidate' /* STYLE_GATE_PATCH */ || url.pathname === '/api/socialV2/group-recent' || url.pathname === '/api/socialV2/loop' || url.pathname === '/api/socialV2/person' || url.pathname === '/api/socialV2/impression' /* IMPR_EXT */ || url.pathname === '/api/socialV2/tech-notes' /* TECHNOTES_PATCH */ || url.pathname === '/api/socialV2/mute' /* MUTE_PATCH */ || url.pathname === '/api/socialV2/learnmode' /* LEARNMODE_PATCH */ || url.pathname === '/api/socialV2/grouprate' /* GROUPRATE_PATCH */ || url.pathname === '/api/socialV2/economy' /* ECONOMY_PATCH */ || url.pathname === '/api/socialV2/attention' /* ATTENTION_PATCH */ || url.pathname === '/api/socialV2/names' /* NAMES_PATCH */ || url.pathname === '/api/socialV2/safetalk' /* GROUPRATE_PATCH */ || url.pathname === '/api/socialV2/owner-teach' /* OWNERTEACH_PATCH */) { // STYLE_PATCH LOOPS_PATCH NEXT_PATCH
+        if (url.pathname === '/api/socialV2/style-note' || url.pathname === '/api/socialV2/style-list' || url.pathname === '/api/socialV2/style-candidate' /* STYLE_GATE_PATCH */ || url.pathname === '/api/socialV2/group-recent' || url.pathname === '/api/socialV2/loop' || url.pathname === '/api/socialV2/person' || url.pathname === '/api/socialV2/impression' /* IMPR_EXT */ || url.pathname === '/api/socialV2/tech-notes' /* TECHNOTES_PATCH */ || url.pathname === '/api/socialV2/mute' /* MUTE_PATCH */ || url.pathname === '/api/socialV2/learnmode' /* LEARNMODE_PATCH */ || url.pathname === '/api/socialV2/grouprate' /* GROUPRATE_PATCH */ || url.pathname === '/api/socialV2/economy' /* ECONOMY_PATCH */ || url.pathname === '/api/socialV2/attention' /* ATTENTION_PATCH */ || url.pathname === '/api/socialV2/advice' /* ADVICE_PATCH */ || url.pathname === '/api/socialV2/names' /* NAMES_PATCH */ || url.pathname === '/api/socialV2/safetalk' /* GROUPRATE_PATCH */ || url.pathname === '/api/socialV2/owner-teach' /* OWNERTEACH_PATCH */ || url.pathname === '/api/socialV2/people' || url.pathname === '/api/socialV2/people-mark' /* PEOPLE_PATCH */) { // STYLE_PATCH LOOPS_PATCH NEXT_PATCH
           try {
             const token = String(req.headers['x-agent-token'] || '');
             const consoleOk = String(req.headers['x-console-token'] || '') === String(cfg.consoleToken || '');
@@ -11406,12 +11410,15 @@ async function main() {
       fs.mkdirSync(STATE_DIR, { recursive: true });
       fs.writeFileSync(DOWNGRADE_MARK_FILE, JSON.stringify({ day, at: new Date().toISOString() }) + '\n', 'utf8');
       const owner = cfg.ownerQQ;
-      if (!owner) return;
+      const gc0 = tokenGuardCfg();
+      const notifyOwner = gc0.downgradeNotifyOwner !== false; // DG_NOTIFY_SWITCH
+      if (!owner || !notifyOwner) { log('[降级] 已降级（不通知主人，开关关闭）'); } else {
       const text = '【省钱模式】今天已经花了 ¥' + Number(info.cost || 0).toFixed(2)
         + '（额度 ¥' + info.cap + '，到 ' + Math.round(info.ratio * 100) + '% 就降级）。'
         + '群里的消息我暂时只回 @ 了，私聊照常。想临时放开就发 /谷价。';
       void sendToQQ('private:' + owner, text).catch((e) => log('[降级] 通知失败：' + (e?.message ?? e)));
       log('[降级] 已私聊通知管理员：¥' + Number(info.cost || 0).toFixed(2) + ' / ¥' + info.cap);
+      }
       /* QBW_GROUP_NOTICE —— 降级时在群里说一句，避免大家以为她突然不理人 */
       try {
         const gc = tokenGuardCfg();
@@ -13370,8 +13377,27 @@ async function main() {
     // 记忆卡：自己的长期记忆（角色卡是人设，记忆卡是经历）。插件已按 QQ 预算裁剪。
     const memoryBlock = memoryCardPromptBlock(key); // MEMSCOPE_PATCH
     // GROUPSUM_PATCH：私聊时带一段「群里最近在说什么」，让她知道群里刚发生的事（10 分钟内、最多 6 行）
-    const groupNow = String(key || '').startsWith('private:') ? groupRecentBlock() : '';
+    const groupNow = String(key || '').startsWith('private:') ? (groupRecentBlock() + '\n\n' + groupDigestBlock()).trim() : '';
     return [base, adminBlock, biliBrief, memoryBlock, groupNow].filter(Boolean).join('\n\n');
+  }
+  // DIGEST_PATCH：读 scripts/group-digest.mjs 产出的摘要（每 15 分钟刷新），只给私聊
+  function groupDigestBlock(maxGroups = 2, maxLines = 3) {
+    try {
+      const fs2 = fs;
+      const p2 = path.join(process.env.HOME || '/home/dsh', '.dsh/surfcore/state/group-digest.json');
+      const d = JSON.parse(fs2.readFileSync(p2, 'utf8'));
+      if (!d || !d.groups) return '';
+      const at = Date.parse(d.at || '') || 0;
+      if (!at || Date.now() - at > 2 * 3600 * 1000) return '';
+      const rows = [];
+      for (const [gid, g] of Object.entries(d.groups).slice(0, maxGroups)) {
+        if (!g || !g.tail) continue;
+        rows.push(`【${gid.replace('group:', '')}】最近 ${g.n} 条，主要 ${g.who}`);
+        for (const t of g.tail.slice(0, maxLines)) rows.push('- ' + t);
+      }
+      if (!rows.length) return '';
+      return '【各群在聊什么（最近的，别复述，知道就行）】\n' + rows.join('\n');
+    } catch { return ''; }
   }
   // GROUPSUM_PATCH：把最近 10 分钟群里的对话压成几行，供私聊时参考
   function groupRecentBlock(minutes = 10, maxLines = 6) {
@@ -17669,6 +17695,24 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
   bot.onGroupMessage(async (event) => {
     if (String(event?.sender?.user_id ?? '') === String(event?.self_id ?? '')
       || String(event?.user_id ?? '') === String(event?.self_id ?? '')) return;
+    // BOTDETECT_PATCH：群消息入口先做机器人判断（本地、零成本）；判为噪音机器人直接不读
+    try {
+      const uin0 = String(event?.sender?.user_id ?? event?.user_id ?? '');
+      const isOwner0 = uin0 && String(uin0) === String(cfg.ownerQQ || '');
+      if (!isOwner0) {
+        const wl = (cfg?.socialV2?.botPolicy?.whitelist || []).map(String);
+        if (!wl.includes(uin0)) {
+          const txt0 = String(event?.raw_message ?? event?.message ?? '').replace(/\[CQ:[^\]]+\]/g, ' ').trim().slice(0, 200);
+          if (botObserve({ gid: event.group_id, uin: uin0, name: event.sender?.card || event.sender?.nickname, text: txt0 })) {
+            if (!globalThis.__botLogAt || Date.now() - globalThis.__botLogAt > 30000) {
+              globalThis.__botLogAt = Date.now();
+              log(`[机器人] 跳过 group:${event.group_id} ${uin0}：${txt0.slice(0, 30)}`);
+            }
+            return;
+          }
+        }
+      }
+    } catch (e0) { globalThis.__botErr = String(e0?.message || e0); }
     void cacheIncomingMedia('group:' + event.group_id, event.message_id, event.message).catch(() => {});
     try { await handleIncoming('group', event.group_id, event, cfg); } catch (error) { log('处理群消息出错:', error?.message ?? error); }
   });

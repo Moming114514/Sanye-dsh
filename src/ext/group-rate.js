@@ -66,7 +66,21 @@ export function groupRates() {
     count: Number(v?.count || 0),
     lastAt: Number(v?.lastAt || 0),
     ...LEVELS[LEVELS[v?.level] ? v.level : 'normal'],
+    custom: v?.custom || null,
   }));
+}
+
+export function setGroupCustom(gid, patch) { // CUSTOM_RATE：每群可单独设最小间隔/每日上限
+  const id = String(gid || '').replace(/\D/g, '');
+  if (!id) throw new Error('群号不对');
+  const d = readAll();
+  const cur = d.groups[id] || { level: 'normal', count: 0, lastAt: 0 };
+  const minGapMin = Math.max(0, Math.round(Number(patch?.minGapMin ?? cur.custom?.minGapMin ?? 0)));
+  const perDay = Math.max(1, Math.round(Number(patch?.perDay ?? cur.custom?.perDay ?? 40)));
+  cur.custom = { minGapMin, perDay };
+  d.groups[id] = cur;
+  writeAll(d);
+  return cur;
 }
 
 export function setGroupLevel(gid, level) {
@@ -114,12 +128,15 @@ export default {
     const count = Number(st.count || 0);
     const lastAt = Number(st.lastAt || 0);
     const now = Date.now();
-    if (count >= cfg.maxPerDay) {
-      return { allow: false, reason: `[频繁度] 跳过唤醒 ${k}（${why}）：${cfg.label}档，今天已 ${count}/${cfg.maxPerDay} 次` };
+    const cu = st.custom || null; // CUSTOM_RATE
+    const maxPerDay = cu?.perDay ? Number(cu.perDay) : cfg.maxPerDay;
+    const minGapMs = cu?.minGapMin ? Number(cu.minGapMin) * 60000 : cfg.minGapMs;
+    if (count >= maxPerDay) {
+      return { allow: false, reason: `[频繁度] 跳过唤醒 ${k}（${why}）：今天已 ${count}/${maxPerDay} 次` };
     }
-    if (lastAt && now - lastAt < cfg.minGapMs) {
-      const waitMin = Math.ceil((cfg.minGapMs - (now - lastAt)) / 60000);
-      return { allow: false, reason: `[频繁度] 跳过唤醒 ${k}（${why}）：${cfg.label}档，还要等 ${waitMin} 分钟` };
+    if (lastAt && now - lastAt < minGapMs) {
+      const waitMin = Math.ceil((minGapMs - (now - lastAt)) / 60000);
+      return { allow: false, reason: `[频繁度] 跳过唤醒 ${k}（${why}）：还要等 ${waitMin} 分钟` };
     }
     bump(gid);
     return true;
@@ -144,7 +161,17 @@ export default {
           }
           return;
         }
-        sendJson({ ok: false, error: 'action 只能是 list / set' }, 400);
+        if (action === 'custom') {
+          try {
+            const r = setGroupCustom(gid, body || {});
+            log(`[频繁度] 群 ${gid} 自定义：${r.custom.minGapMin} 分钟 / 每天 ${r.custom.perDay} 次`);
+            sendJson({ ok: true, rate: r, rates: groupRates() });
+          } catch (e) {
+            sendJson({ ok: false, error: String(e?.message || e) }, 400);
+          }
+          return;
+        }
+        sendJson({ ok: false, error: 'action 只能是 list / set / custom' }, 400);
       },
     },
   ],

@@ -11,12 +11,12 @@ const CHAR_FILE = path.join(DATA_DIR, 'characters', 'current.json');
 
 // ── 33 种心情：基线、行为提示、分层 ─────────────────────────────
 export const MOODS = [
-  { id: 'calm', zh: '平静', base: 40, hint: '正常说话，不用刻意简短；平静不等于没反应，可以有一两句自己的态度（例：嗯……我看看，问题应该在这儿）' },
-  { id: 'happy', zh: '开心', base: 30, hint: '语气轻快，可用一个感叹号或叠词（例：好啦好啦／成了！）' },
-  { id: 'curious', zh: '好奇', base: 28, hint: '多追问一句（例：那你当时怎么弄的？）' },
+  { id: 'calm', zh: '平静', base: 26, hint: '正常说话，不用刻意简短；平静不等于没反应，可以有一两句自己的态度（例：嗯……我看看，问题应该在这儿）' },
+  { id: 'happy', zh: '开心', base: 34, hint: '语气轻快，可用一个感叹号或叠词（例：好啦好啦／成了！）' },
+  { id: 'curious', zh: '好奇', base: 32, hint: '多追问一句（例：那你当时怎么弄的？）' },
   { id: 'focused', zh: '专注', base: 30, hint: '少寒暄，直接给步骤，不铺陈' },
-  { id: 'excited', zh: '兴奋', base: 16, hint: '情绪外露，短句连发（例：真的？那也太行了！）' },
-  { id: 'tired', zh: '疲惫', base: 18, hint: '收着说，允许拖尾（例：好了……我歇会儿）' },
+  { id: 'excited', zh: '兴奋', base: 30, hint: '情绪外露，短句连发（例：真的？那也太行了！）' },
+  { id: 'tired', zh: '疲惫', base: 10, hint: '收着说，允许拖尾（例：好了……我歇会儿）' },
   { id: 'annoyed', zh: '烦躁', base: 10, hint: '话短带刺，允许反问和省略主语（例：行吧。你又来了）' },
   { id: 'down', zh: '低落', base: 10, hint: '语气低一点，承认情绪但不展开（例：嗯……是有点提不起劲）' },
   { id: 'fear', zh: '恐惧', base: 7, hint: '谨慎、留余地（例：我不太确定，万一呢）' },
@@ -24,7 +24,7 @@ export const MOODS = [
   { id: 'surprise', zh: '惊讶', base: 9, hint: '反应大一点，会追一句（例：啊？真的假的）' },
   { id: 'hurt', zh: '委屈', base: 10, hint: '语气软下来，带点忍着的辩解（例：我也不是故意的啊）' },
   { id: 'sulk', zh: '生闷气', base: 8, hint: '话少、嘴硬（例：没事。你忙你的）' },
-  { id: 'proud', zh: '得意', base: 12, hint: '可以小飘一下（例：那当然，这回我做得不错）' },
+  { id: 'proud', zh: '得意', base: 18, hint: '可以小飘一下（例：那当然，这回我做得不错）' },
   { id: 'gloomy', zh: '消沉', base: 6, hint: '话很少（例：嗯）' },
   { id: 'anxious', zh: '焦虑', base: 10, hint: '会反复确认（例：这样真的没问题吧？）' },
   { id: 'numb', zh: '麻木', base: 8, hint: '平、干、没起伏（例：知道了）' },
@@ -92,11 +92,13 @@ function freshState() {
     roundsToday: 0,
     day: new Date().toISOString().slice(0, 10),
     diary: {},
-    prefs: { enabled: true, margin: 5, blendGap: 8, blendMax: 3 },
+    prefs: { enabled: true, margin: 3, blendGap: 8, blendMax: 3 },
   };
 }
 
-export function readMood() {
+export const MOOD_LIVELY = 1; // 压低平静/疲惫，抬高开心/好奇/兴奋，情绪更容易切换
+
+function readMood() {
   try {
     const j = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
     if (!j || typeof j !== 'object' || !j.values) return freshState();
@@ -108,7 +110,24 @@ export function readMood() {
   }
 }
 
+function sampleHistory(st) { // MOOD_TIRED_FIX：面板画曲线用
+  try {
+    if (!Array.isArray(st.history)) st.history = [];
+    st.history.push({
+      t: Date.now(),
+      cur: st.current || '',
+      tired: Math.round(st.values.tired || 0),
+      calm: Math.round(st.values.calm || 0),
+      excited: Math.round(st.values.excited || 0),
+      happy: Math.round(st.values.happy || 0),
+      lonely: Math.round(st.values.lonely || 0),
+    });
+    if (st.history.length > 240) st.history = st.history.slice(-240);
+  } catch {}
+}
+
 function writeMood(st) {
+  sampleHistory(st);
   ensureDir(path.dirname(STATE_FILE));
   try {
     fs.writeFileSync(STATE_FILE, JSON.stringify(st, null, 1), { mode: 0o600 });
@@ -172,7 +191,7 @@ export function moodObserve(text, kind = 'private') {
     }
   }
   if (s.length >= 80) add(st.values, 'focused', 1);
-  if (s.length <= 6) add(st.values, 'tired', 1);
+  if (s.length <= 6) add(st.values, 'tired', 0.2); // MOOD_TIRED_FIX：短句只加一点点，别被「在吗/好」喂满
   // 群里：亲密类只削峰、不归零（不到极端就行）
   if (kind === 'group') {
     for (const id of ['love', 'flutter', 'jealous', 'coy']) {
@@ -180,7 +199,7 @@ export function moodObserve(text, kind = 'private') {
       if (v > 32) st.values[id] = 32 + (v - 32) * 0.3;
     }
   }
-  add(st.values, 'calm', 0.3); // 轻微回稳
+  add(st.values, 'calm', 0.05); // MOOD_TIRED_FIX：回稳别太快，否则平静永远满分
   commit(st);
   writeMood(st);
   return st;
@@ -195,6 +214,7 @@ export function moodTick(now = Date.now()) {
     const v = st.values[m.id];
     add(st.values, m.id, (m.base - v) * 0.25 + (Math.random() * 6 - 3));
   }
+  add(st.values, 'tired', -6); // MOOD_TIRED_FIX：每轮漂移先歇一口气
   if ((st.roundsToday || 0) >= 8) add(st.values, 'focused', 4);
   if ((st.toolErrors || 0) >= 3) {
     add(st.values, 'annoyed', Math.min(6, st.toolErrors));

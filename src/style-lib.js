@@ -248,7 +248,9 @@ export function styleSamplesBlock(maxChars = 520, maxItems = 6) {
   const lines = [];
   let used = 0;
   for (const s of list) {
-    const txt = String(s.text || '').slice(0, 80);
+    // STYLE_SHORT_PATCH：有短句就用短句（可直接说出来），原话只留作记录
+    const short = String(s.short || '').trim();
+    const txt = short ? short.slice(0, 40) : String(s.text || '').slice(0, 80);
     const line = `- 「${txt}」${s.why ? `（${s.why}）` : ''}`;
     if (used + line.length > maxChars) break;
     lines.push(line);

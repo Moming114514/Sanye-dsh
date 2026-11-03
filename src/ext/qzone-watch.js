@@ -96,7 +96,7 @@ async function qzoneWatchTick() {
                   if (!c || String(c.uin ?? '') !== ownerUin) continue;
                   // QZONE_WATCH_REPLY_FIX：@ 别人的略过；@ 她本人的要算（那是他在回她）
                   const cText = String(c.content ?? '');
-                  if (cText.includes('@{uin:') && !cText.includes(`uin:${String(getSelfUserId() || '')},`)) continue;
+                  if (cText.includes('@{uin:') && !cText.includes(`uin:${String(helpers.getSelfUserId() || '')},`)) continue;
                   const key = `${m.tid}:${c.create_time ?? c.createTime ?? ''}:${String(c.content ?? '').slice(0, 20)}`;
                   if (st.comments.includes(key) || st.pending.some((p) => p.key === key)) continue;
                   if (seedOnly) { st.comments.push(key); continue; }
@@ -126,7 +126,7 @@ async function qzoneWatchTick() {
       st.pending = st.pending.filter((x) => x.tid !== p.tid);
       st.seen = [...st.seen, p.tid].slice(-200);
       st.delivered += 1;
-      const ownerQQ = String(cfg.ownerQQ ?? '');
+      const ownerQQ = String(getCfg().ownerQQ ?? ''); // QZCFG_FIX：cfg 不在作用域，必须走 getCfg()
       const mins = Math.max(1, Math.round((now - p.at) / 60000));
       const isComment = p.kind === 'comment';
       const prompt = isComment
