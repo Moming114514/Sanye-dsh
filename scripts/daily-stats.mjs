@@ -62,6 +62,11 @@ out.services = {};
 for (const name of ['surfcore-bridge', 'dsh-web', 'asr-shim', 'her-console']) {
   out.services[name] = sh('systemctl', ['is-active', name]) || 'unknown';
 }
+// asr-shim 是 socket 按需激活：service inactive 不代表坏，socket 在就是正常（MEM-01 T3）
+if ((out.services['asr-shim'] || '') !== 'active') {
+  const asrSock = sh('systemctl', ['is-active', 'asr-shim.socket']);
+  if (asrSock === 'active') out.services['asr-shim'] = 'socket';
+}
 
 const mem = sh('free', ['-m']).split('\n');
 out.res = {

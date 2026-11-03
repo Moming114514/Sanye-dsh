@@ -21,9 +21,18 @@ const items = [];
 const add = (name, ok, detail) => items.push({ name, ok: !!ok, detail });
 
 // 1. systemd 服务
-for (const unit of ['dsh-web', 'surfcore-bridge', 'asr-shim', 'her-console']) {
+for (const unit of ['dsh-web', 'surfcore-bridge', 'her-console']) {
   const s = sh('systemctl', ['is-active', unit]);
   add(unit, s === 'active', s || 'not active');
+}
+// asr-shim 自 2026-11-03 起改为 socket 按需激活（MEM-01 T3）：service 平时就该 inactive，
+// 只要 asr-shim.socket 在监听就算正常，否则这条会常年挂红。
+{
+  const asrSock = sh('systemctl', ['is-active', 'asr-shim.socket']);
+  const asrSvc = sh('systemctl', ['is-active', 'asr-shim']);
+  const ok = asrSock === 'active' || asrSvc === 'active';
+  const detail = asrSvc === 'active' ? 'active（转写中）' : (asrSock === 'active' ? 'socket 待命（按需启动）' : (asrSvc || asrSock || 'not active'));
+  add('asr-shim', ok, detail);
 }
 
 // 2. NapCat 由端口 6099 + OneBot 3001 代判（dsh 用户无 docker 权限）

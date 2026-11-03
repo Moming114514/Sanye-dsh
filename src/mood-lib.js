@@ -178,6 +178,10 @@ export function moodObserve(text, kind = 'private') {
   _lastObs = { t: now, s };
   const st = readMood();
   if (!st.prefs.enabled) return st;
+  // MOOD_SETTLE（2026-11-03）：每条消息先向基线回落 5%，再按规则加分。
+  // 之前只有每 3~6 小时一次的 moodTick 回落，活跃群里固定加分（calm +0.05/条、tired +0.2/条、
+  // focused +1/条…）远超回落速度，几小时内就会把 calm/happy/curious/focused/excited/tired/proud 顶到 100 并卡住。
+  for (const m of MOODS) add(st.values, m.id, (m.base - st.values[m.id]) * 0.05);
   const day = new Date().toISOString().slice(0, 10);
   if (st.day !== day) {
     st.day = day;
