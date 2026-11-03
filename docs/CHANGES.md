@@ -17,6 +17,34 @@
 - 以后每完成一批功能打一个 tag；`main` 始终是最新（别人看 main 就是最新）。
 - 想知道线上跑的是哪个版本：看这里最后一条 tag，或 `git describe --tags`。
 
+## 2026-11-03（v1.1）
+
+**一句话**：把「代码结构」和「面板」各翻了一版地基——插件有了单一事实源，面板能按页看/按页调，桥接重新回到 systemd 管理。
+
+### 插件化地基（波 1，8/8）
+- `manifest` 契约（`docs/EXT-MANIFEST.md`）：每个 ext 声明 `id/order/hooks/stateFiles/config/hot`；30 个模块 100% 覆盖（17 注册 + 13 由 bridge 直接调用的 lib）。
+- loader 改造（`src/ext/index.js`）：按 `manifest.order` 装配、缺声明回退下标×10、重复 order 报错、`extManifests()` 导出。
+- 钩子隔离 `guardHook()`：7 个钩子全部 try/catch，单个 ext 炸不影响主流程（5 分钟一条日志）。
+- `scripts/replay-hooks.mjs`：12 模块 × 钩子 89 用例的行为金丝雀。
+- `scripts/snap-split.mjs`：代码快照与人格快照拆开，人格易变小节用 `stableSha256`；`verify` 全绿（清单 30/30）。
+
+### 面板（布局与该页能调什么）
+- 侧栏 5 组（状态 / 她的言行 / 记忆与心情 / 花费 / 系统），手机端组名隐藏、底部导航保留。
+- 每页首卡前一行「本页能调：…」；功能开关「立即 / 需重启」徽标。
+- 新页「系统 → 插件」（读 `/api/plugins`，30 条，含 wave 与 hooks/routes 数）。
+- 心情改只读（删掉点一下 +5）。
+
+### 行为修复
+- **情绪恒 100**：每条消息先向基线回落 5% 再按规则加分（`MOOD_SETTLE`），修后 100 条模拟 calm 24 / happy 45 / tired 12。
+- **命令前缀可配置**：私聊 `/`、`#`、`！` 归一；群里只认 `#`、`！`（`/` 落回普通聊天），帮助文案按会话前缀渲染。
+- **bridge 双实例**：插件启停改为委托 `systemctl`（有 unit 时），杜绝 dsh-web spawn 第二实例；unit 的 `StartLimit*` 移回 `[Unit]`。
+- **ASR 按需**：socket 激活、空闲 300s 退出；自检把「socket active」视为正常。
+- **内存**：zram 1G + `vm.swappiness=60` + dsh-web 内存上限（1200/1800M），常驻 used 2370→1963M。
+
+### 已知遗留
+- 13 个模块尚未迁到 loader 钩子（只有清单，行为不变）。
+- 群「限制总览 + 一键恢复默认」、`mface` 动图抽帧、待生效偶发仍待做。
+
 ## 2026-11-02
 
 ### 00:25 修「白名单加成功但没加上」

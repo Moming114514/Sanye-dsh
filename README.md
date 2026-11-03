@@ -15,6 +15,7 @@
 
 > **定位**：这是一份**参考实现**——「怎么把别人的 QQ 机器人改到能长期用」，**不是开箱即用的产品**。要自己装 NapCat/OneBot + DSH + Node 22，并手写 `config.json` 与人格卡。
 > **支持范围**：**Linux 优先**（Debian 12 实测）。Windows 与 SnowLuma 桌面版未验证；`scripts/`、systemd、`runuser`、`ps` 都是 Linux 写法。
+> **当前版本**：`v1.1-20261103`（dev）—— 插件化地基（30 个模块清单全覆盖）+ 面板按页重组 + 情绪/命令前缀修复。
 > 想做什么还没做、为什么、代价多大：见 [`docs/V2-ROADMAP.md`](docs/V2-ROADMAP.md)。
 
 ---
