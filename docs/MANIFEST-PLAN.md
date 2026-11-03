@@ -29,7 +29,7 @@
 | bridge 直连 import 的 ext | — | **15 个模块**（与注册重叠 2 个） | `grep -o "from '\./ext/[a-z-]*\.js'" src/bridge.js \| sort -u` |
 | 双路径模块 | 未记录 | **2**：`stickers.js`、`promises.js` | 注册表 ∩ 直连 import |
 | 功能开关条数 | — | **44**（`/opt/her/features.json`） | `python3 -c "import json;print(len(json.load(open('/opt/her/features.json'))['features']))"` |
-| 其中 `path` 在当前 config.json 里不存在 | — | **4 条**（`greetings.morning.enabled`、`socialV2.tools.viewSticker`、`@video:quota.daily`、`@report:time`） | 见 §7 的 `check-manifest` 规则 R5 |
+| 其中 `path` 在当前 config.json 里不存在 | — | **4 条**（`greetings.morning.enabled`、`socialV2.tools.viewSticker`、`@video:quota.daily`、`@report:time`） | 见 W1-6 的 features.json 互校 |
 | 面板页数 | 文档说 8000+ 行手写 | **16 页，`PAGES` 表驱动**（app.js:6），app.js 2875 行 | `sed -n '6,24p' app.js` |
 | `npm run verify`（完整） | 应全绿 | **红 1 项**：结构快照三份提示词字节数漂移 9984→13568 / 7730→11883 / 8014→11975（人格卡改过） | `npm run verify` |
 | `/opt/her-console` 版本化 | 未知 | **不在 git**，只有 `.bak.*` 手抄备份 | `git -C /opt/her-console rev-parse` |
@@ -59,7 +59,7 @@
 
 | 波 | 目标 | 主要产出 | 代价 | 结束标志 | 回滚粒度 |
 |---|---|---|---|---|---|
-| **波 1 立清单** | 让"有哪些扩展"变成可枚举事实 | 两套基线（`snap-base/` + `snap-base-persona/`）；`docs/EXT-MANIFEST.md` 契约；loader 排序+断言；回滚演练；17 个已注册模块的 manifest；`scripts/dump-manifests.mjs` → `docs/generated/manifests.json`；`scripts/check-manifest.mjs`；`scripts/replay-hooks.mjs` | ~36 步 · 约 5.5 h · **重启 0 次** | `node scripts/dump-manifests.mjs` 产出 17 条且 `check-manifest` 退出码 0 | 每个 commit 单独回滚；代码只碰 `scripts/*.mjs` 与 `src/ext/*.js` 的**文件末尾**，`bridge.js` 零改动 |
+| **波 1 立清单** | 让"有哪些扩展"变成可枚举事实 | 两套基线（`snap-base/` + `snap-base-persona/`）；`docs/EXT-MANIFEST.md` 契约；loader 排序+断言；回滚演练；17 个已注册模块的 manifest；`scripts/dump-manifests.mjs`（含校验器 + `--selftest`）→ `docs/generated/manifests.json`；`scripts/replay-hooks.mjs` | ~36 步 · 约 5.5 h · **重启 0 次** | `--selftest` 全中；汇总「合格 17 / 不合格 0」；`--require-all --strict` 退出码 0 | 每个 commit 单独回滚；代码只碰 `scripts/*.mjs` 与 `src/ext/*.js` 的**文件末尾**，`bridge.js` 零改动 |
 | **波 2 逐模块迁移** | 30 个模块全部有 manifest，声明与实现经程序互校 | 6 批 × 5 个模块的 `export const manifest` | ~30 步 · 约 4.5 h · 重启 ≤2 次 | 指标 M1 = 30/30，M4 = 0 漂移 | 单文件 `git checkout -- src/ext/x.js` |
 | **波 3 面板改读清单** | 页面与开关不再手抄第二份真相 | her-console 版本化（git + 每日备份）；`/api/plugins` 消费；开关页与 features.json 联合渲染；4 条空开关进黄条（修/删不排期） | ~23 步 · 约 4 h · **不重启 bridge** | 指标 M3 ≥ 8 页由清单渲染 | her-console 回到上一个 commit / 上一个备份目录 |
 
@@ -75,12 +75,12 @@
   1. 探测 API 端口归属（bridge 3100 / 面板 7800 谁提供 `/api/*`）——后续所有「先 curl 验后端」依赖这一条。
   2. 跑一次 `node scripts/snapshot.mjs`，拿到 live 快照（`/tmp/snap-live/snap.json`，一次性、可重跑）。
   3. **按内容切成两个持久目录**：
-     - `${SURFCORE_STATE_DIR}/snap/snap-base/`：**代码结构**——工具数/工具名、5 条路由状态码。**不含任何提示词文本或字节数。**
+     - `scripts/snap-base/code.json`（**仓库内，提交进 git**）：**代码结构**——工具数/工具名、5 条路由状态码。**不含任何提示词文本或字节数。** 放仓库是因为 verify 必须在空环境/新机器上也能跑（m00399）。
      - `${SURFCORE_STATE_DIR}/snap/snap-base-persona/`：**人格内容**——三份提示词的字节数、行数、sha256、小节标题、以及正文（key 归一成 `private:#1` / `group:#1`，权限 600，**永不进 git**）。
      - **额外一条（2026-11-03 实测后补）**：正文里有一批**自己会变**的小节——`## 最近记得的`、`【群里刚在说】`、`【各群在聊什么…】`、`【<群号>】`。实测 private 正文 23 分钟内 13568B → 13621B，就是它们在变。因此每份提示词除了全文 `sha256`，再存一个**去掉这些小节后的 `stableSha256`**；`--check` 只对 `stableSha256` 报差异，易变小节的变化单独打印成「不算改变」。不做这一步，人格基准每天都会红，等于又退回橡皮章。
   4. 5 条只读接口的响应体存到 `${SURFCORE_STATE_DIR}/snap/base-routes/`（后续面板"开关是否生效"要比对）。
 - **为什么放 state 目录而不是 `/tmp`**：`/tmp` 重启就没了，一个会蒸发的基准不能当基准；state 目录本身已在 `.gitignore` 的隐私范围里。
-- **判定「拆完就干净了」的标准**：切分前先证明当前 verify 的红色**只来自人格侧**——把 live 的 tools/routes 与已提交的 `scripts/snap-base/structure.json` 逐项比对，必须完全一致；不一致就说明有代码侧漂移，本步立即停止上报。
+- **判定「拆完就干净了」的标准**：切分前先证明当前 verify 的红色**只来自人格侧**——把 live 的 tools/routes 与已提交的 `scripts/snap-base/code.json` 逐项比对，必须完全一致；不一致就说明有代码侧漂移，本步立即停止上报。
 - **改哪里**：新增 `scripts/snap-split.mjs`（实际约 205 行：读 live 快照、切两个目录、去易变小节、`--check` 比对；无依赖、不改任何现有文件）。
 - **代价**：3 步 · 约 30 分钟 · 重启 0 次
 - **回滚**：`rm -rf /home/dsh/.dsh/surfcore/snap`（只删新建的基准目录）
@@ -103,8 +103,33 @@ for r in status socialV2/states socialV2/mood socialV2/style-list socialV2/tech-
 done
 ```
 
-- **验收标准**：`snap-base/` 里只有 tools 与 routes（`grep -c '"hint"'` = 0、`grep -c '"text"'` = 0）；`snap-base-persona/` 里三份提示词的 key 已归一成 `private:#1` / `group:#1` / `group:#2`，每份都有 `stableSha256`；两个目录都 `chown dsh:dsh`、`chmod 700`，json `chmod 600`；5 条接口全 200；`snap-base/` 的 tools/routes 与 `scripts/snap-base/structure.json` 完全一致（证明红的是人格侧，不是代码侧）；紧接着再跑一次 `--check` 必须 `SNAP_OK`（自洽，否则基准本身有问题）。
+- **验收标准**：`code.json` 里只有 tools 与 routes（`grep -c '"hint"'` = 0、`grep -c '"text"'` = 0）；`snap-base-persona/` 里三份提示词的 key 已归一成 `private:#1` / `group:#1` / `group:#2`，每份都有 `stableSha256`；两个目录都 `chown dsh:dsh`、`chmod 700`，json `chmod 600`；5 条接口全 200；`code.json` 的 tools/routes 与已提交基准完全一致（证明红的是人格侧，不是代码侧）；紧接着再跑一次 `--check` 必须 `SNAP_OK`（自洽，否则基准本身有问题）。
 - **已完成（2026-11-03 20:15，未重启任何服务）**：code.json 1440B（tools 50 + 5 路由全 200，`"hint"`/`"text"` 计数均为 0）；persona.json 69820B、600；私有提示词**全文 13621B / 稳定 12718B / 排除 5 个易变小节**，两个群提示词无易变小节（11883B / 11975B）；`base-routes/` 5 个响应体（24071 / 5343 / 7502 / 11761 / 1627 B），600；`--check` = `SNAP_OK`。
+- **按 m00399 调整（2026-11-03 20:3x）**：`code.json` 从 `$STATE/snap/snap-base/` 迁到仓库 `scripts/snap-base/code.json` 并提交；人格基准留在 `$STATE/snap/snap-base-persona/`，`--check` 检测到缺失时打印 `persona baseline skipped` 并以 exit 0 通过；旧 `scripts/snap-base/structure.json` 改名为 `structure.json.retired`（保留可查，不再被任何脚本读取）。
+
+---
+
+### W1-1b 易变小节清单（"稳定哈希"的边界，越界即基线失效）
+
+机器可读副本只有一份：`scripts/snap-volatile.json`（`scripts/snap-split.mjs` 只读它，不再在代码里写死正则）。
+
+| 小节 | pattern | 为什么算易变 |
+|---|---|---|
+| `## 最近记得的` | `^##\s*最近记得的` | 记忆检索命中结果，每几轮对话就变 |
+| `【群里刚在说】` | `^【群里刚在说】` | 最近 10 分钟群消息，每分钟都可能变 |
+| `【各群在聊什么…】` | `^【各群在聊什么` | 各群近况摘要，随消息滚动 |
+| `【<群号>】` | `^【\d{5,12}】` | 按群生成的近况小节，条数随聊天变化 |
+| `## 正在模糊的事` | `^##\s*正在模糊的事` | 情绪/模糊记忆状态，随时间衰减 |
+
+**硬规则（三条，都是硬的）**：
+
+1. **新增任何"随消息或时间会变"的提示词小节，必须在同一次提交里同时更新两处**：`scripts/snap-volatile.json`（机器读）与本表（人读）。只改一处 = 基线静默失效，这是本计划里最隐蔽的失败模式。
+2. **清单为空直接报错**：`snap-split.mjs` 加载时若 `sections` 为空、缺 `pattern`、或正则非法，一律 `exit 2` 并打印提示，绝不"空清单就当没有易变小节"继续跑。
+3. **判据**：改完跑 `node scripts/snap-split.mjs --check`；出现「只有易变小节变了（不算改变）」是正常的；只有出现「稳定正文变化」才需要一次单独的人格 commit。
+
+**为什么这条不能省**：实测 private 正文 23 分钟里从 13568B 涨到 13621B，全部来自这 5 节。若不剥离，人格基准每天都会红，最后必然演变成"红了就 `--save` 盖章"，验收门退化成橡皮章——这正是我们在 A 里认定的结构问题之一。
+
+**已完成（2026-11-03 20:23）**：`scripts/snap-volatile.json` 落地（812B，5 条，含 `reason`），`snap-split.mjs` 改为只从它加载。负向测试各跑一遍：清单为空 → `exit 2` + 「易变清单为空…空清单会让基准静默失效」；文件缺失 → `exit 2`；还原后 `SNAP_OK`。另外用 python 对 base 与 live 的稳定正文逐行 diff，三份提示词**均 0 行差异**——说明当前这 5 条覆盖是够的（至少这一刻）。
 
 ---
 
@@ -114,18 +139,15 @@ done
 
 ```js
 export const manifest = {
-  id: 'mute',              // kebab-case，全局唯一，= 文件名去 .js
-  title: '禁言',            // 面板显示名
-  kind: 'plugin',          // plugin | util | patch | capture
-  order: 20,               // 提示词注入顺序，步长 10；= 今天 EXTENSIONS 的位置
-  defaultEnabled: true,    // 默认开
-  permission: 'group',     // group | private | both | none（谁触发它）
-  hooks: ['routes', 'stateKey', 'wakeGate'],   // 声明实现哪些钩子，必须 ⊆ 实际导出
-  stateKey: 'mute',        // 有 promptBlock 时必填
-  pages: [],               // 面板页 [{id,title}]，没页面就空数组
-  config: [{ path: 'socialV2.mute.enabled', kind: 'bool' }], // 对应 features.json 的 path
-  directImport: false,     // 是否被 bridge.js 直接 import（true 必须写 reason）
-  reason: ''               // directImport 的理由
+  id: 'mute',                    // kebab-case，全仓唯一，= 文件名去 .js
+  title: '禁言',                  // 面板显示名，1–24 字
+  kind: 'hook',                  // core | hook | tool | panel
+  enabledByDefault: true,        // 新装机器上默认开/关
+  hot: true,                     // 改 config 是否立即生效（false = 要重启）
+  hooks: ['routes', 'stateKey', 'wakeGate'],  // 只能是 7 个钩子之一，且必须真有实现
+  order: 20,                     // 有 promptBlock 时必填 = EXTENSIONS 下标×10+10
+  config: ['socialV2.mute.enabled'],          // 读的 cfg 点路径（可选）
+  stateFiles: ['mute.json']                   // 写在 SURFCORE_STATE_DIR 的文件名（可选）
 };
 ```
 
@@ -140,15 +162,14 @@ export const manifest = {
 
 ### W1-3 loader 改造（波 1 唯一动 `src/ext/index.js` 的一步）
 
-- **做什么**：把 `EXTENSIONS` 从**手写顺序**改为**由 manifest 的 `order` 排序派生**，并加校验。
-- **改哪里**：只改 `src/ext/index.js` —— 现有 `EXTENSIONS` 数组的构造处。具体：
-  - 保留原有静态 `import` 语句（ESM 不能安全地动态扫目录，会改启动时序）；
-  - 新增 `const DECLARED = [ownerOnly, mute, ...]`（只是把今天的 17 个按原顺序列出来）；
-  - 新增 `sortByOrder()`：读每个模块的 `manifest`，缺 manifest 的模块**按旧位置兜底**并告警（保证迁移期不炸）；
-  - 新增 `assertManifest()`：`id` 唯一、`order` 唯一、`hooks ⊆ 实际导出`、有 `promptBlock` 必须有 `stateKey`；
-  - `export const EXTENSIONS = sortByOrder(DECLARED)`；
-  - `export const MANIFESTS = ...` 供后续 `/api/plugins` 读。
-- **代价**：4~6 步 · 约 1 h · 重启 0 次（用 `node --check` + 单测，不重启）
+- **做什么**：把 `EXTENSIONS` 从**手写顺序**改为**由 manifest 的 `order` 排序派生**，并做启动期断言（只告警、不抛错——加载器不能因为一份坏声明把桥接带死）。
+- **改哪里**：只改 `src/ext/index.js` 的「import + 装配」段（导出钩子函数零改动）：
+  1. 17 个默认导入改成 `import * as modX from './x.js'`（ESM 不能安全扫目录，保留静态导入以免改启动时序）；
+  2. `const MODULES = [{name:'owner-only', mod: modOwnerOnly}, …]` 按今天的原顺序登记 17 项；三个工厂项（advice / people / utterances）带 `factory`；
+  3. `assemble()`：有合法 `manifest.order` 用它，否则回退 `(i+1)*10` 并记入 `missing`；重复 `order`、非正整数记入 `problems`；排序后派生 `EXTENSIONS`；
+  4. 模块加载时打印一行 `[ext:loader] N/17 个扩展还没有 manifest，按注册顺序回退：…`；`problems` 逐条 `console.error`；
+  5. 新增 `export function extManifests()` → `[{id, file, order, hasManifest}]`，供 `dump-manifests --order-map` 与将来的 `/api/plugins` 对账。
+- **代价**：4~6 步 · 约 1 h · 重启 0 次（用 `node --check` + `node -e import`，不重启）
 - **回滚**：`git checkout -- src/ext/index.js`（单文件）
 - **验收命令**：
 
@@ -156,10 +177,12 @@ export const manifest = {
 # 顺序必须与今天逐项一致
 node -e "import('./src/ext/index.js').then(m=>console.log(m.EXTENSIONS.map(x=>x.id||x.name).join(',')))" > /tmp/ext-order-after.txt
 diff /tmp/ext-order-before.txt /tmp/ext-order-after.txt && echo ORDER_OK
+node scripts/dump-manifests.mjs --order-map
 npm run verify -- --no-api
 ```
 
-- **验收标准**：`ORDER_OK` 且 `diff` 为空；`verify --no-api` 全绿；故意给两个模块写相同 `order` 时 loader 必须抛错（负向测试，1 分钟）
+- **验收标准**：`ORDER_OK` 且 `diff` 为空；`--order-map` 列出 17 行且 order 为 10…170；`verify --no-api` 全绿；故意把 loops 的 `order` 改成 150（与 style 撞）时 loader 必须 `console.error` 报 `order 重复` 且 `EXTENSIONS` 仍是 17 项（负向测试，1 分钟）
+- **已完成（2026-11-03 20:36，未重启任何服务）**：`extList()` 顺序与迁移前逐项一致（`owner-only,mute,learnmode,economy,group-rate,?,advice,people,utterances,safe-talk,promises,impressions,owner-teach,tech-notes,style,loops,stickers`；`?` 是 attention 自带的旧问题——它没有 `id` 字段，日志里一直是 `[ext:undefined]`，与本次改动无关，波 2 补 manifest 时顺手修）；`extManifests()` 17 项且 loops 是唯一 `hasManifest=true`；启动告警 `[ext:loader] 16/17 个扩展还没有 manifest，按注册顺序回退：…`；`--order-map` 17 行、`--selftest` 7/7、`verify --no-api` 与 `verify` 全量均 `VERIFY_PASS`；`--check --stdin` 正常 `SNAP_OK`/`exit 0`、工具数改 51 时 `SNAP_FAIL`/`exit 1`；`--check`（含人格侧）`人格侧：一致`；W1-3b 演练删掉 loops manifest → 告警变成 `17/17` 且顺序仍为 10…170，还原后恢复 `16/17`。
 
 ---
 
@@ -200,7 +223,7 @@ node -e "import('./src/ext/index.js').then(()=>console.log('imported clean'))" 2
 - **验收命令**（每批）：
 
 ```bash
-node scripts/check-manifest.mjs   # W1-6 完成后才有，之前用 node --check
+node scripts/dump-manifests.mjs   # W1-5 落地后可用；此前退回 node --check
 npm run verify -- --no-api
 node scripts/snapshot.mjs && node scripts/snap-split.mjs --check
 ```
@@ -210,52 +233,56 @@ node scripts/snapshot.mjs && node scripts/snap-split.mjs --check
 
 ---
 
-### W1-5 `scripts/dump-manifests.mjs`（已定 D-1：**波 1 零重启、不碰 bridge**）
+### W1-5 契约 + 清单校验器（把"靠记忆"换成"靠断言"）
 
-- **做什么**：把 loader 内存里的 manifest 落成文件，给面板和 CI 读。
-  - 输出 `docs/generated/manifests.json`（**进仓库**，因为它只含代码侧事实：id/title/kind/order/hooks/pages/config 路径，无密钥、无 config 值）；
-  - 同时可 `--out /tmp/manifests.json` 覆盖路径，供临时排查。
-  - 脚本先 import `src/ext/index.js`，若 loader 抛错就**直接失败退出 1**（让"清单坏了"在 CI 里红，而不是生成一份残缺 JSON）。
-- **改哪里**：新增 `scripts/dump-manifests.mjs`（约 40 行）；在 `scripts/verify.mjs` 里追加 1 行调用（只加一行，不改现有逻辑）；`docs/generated/` 加进 `.gitignore` 的例外（或直接提交，二选一在提交时定）。
-- **代价**：3 步 · 约 40 分钟 · **重启 0 次**
-- **回滚**：删除脚本 + `git checkout -- scripts/verify.mjs`
+> 已定 D-1：**波 1 零重启、不碰 bridge**；校验器就放在 `dump-manifests.mjs` 里，不单独再起一个脚本。
+
+- **做什么**（两件，一起交付）：
+  1. `docs/EXT-MANIFEST.md` 契约：字段 schema 表（id/title/kind/enabledByDefault/hot/hooks/order/config/stateFiles，含类型、必填、示例）+ 7 个钩子白名单 + 校验规则 + **三个 ≤15 行示例**（纯函数 / 写自身 state 且原子替换 / 带 route）。`pages` 字段 v1 删除（m00399）。
+  2. `scripts/dump-manifests.mjs`：扫 `src/ext/*.js`，import 每个模块 → 取 `manifest` → 校验 → 打表；`--json` 写 `docs/generated/manifests.json`。
+- **校验规则（R1–R10，与契约文档一致）**：id 合法且与文件名一致 / id 唯一 / title ≤24 字 / kind 与两个布尔 / hooks ∈ 7 白名单 / 声明了必须真有实现（含 `routes`）/ 有 `promptBlock` 必有 `order`、唯一且等于 `EXTENSIONS 下标×10+10` / v1 **禁止** `pages` 字段 / `config` 是点路径、`stateFiles` 不含路径 / 缺 manifest 记为「未迁移」。
+- **三档退出码语义**（这是门禁不变成橡皮章的关键）：
+  - 默认：不合格只打印，退出码 0（迁移期用）；
+  - `--strict`：**有不合格**就 exit 1，但「缺 manifest」仍只算未迁移（否则波 1 永远红）；
+  - `--require-all --strict`：连「缺 manifest」也算失败 —— **波 2 收尾时**才切到这一档。
+- **`--selftest`**：用 §3 的 3 个正例 + 4 个反例（钩子拼错 / 声明没实现 / 带 `pages` 字段 / 缺 order）自检校验器本身。0 个合格模块时，这是唯一能证明"校验器真的会咬人"的手段。
+- **改哪里**：新增 `docs/EXT-MANIFEST.md`、`scripts/dump-manifests.mjs`；`docs/generated/manifests.json` 由脚本生成。
+- **代价**：4 步 · 约 1 h · **重启 0 次**
+- **回滚**：删两个新文件 + `rm -rf docs/generated`（不碰任何现有脚本）
 - **验收命令**：
 
 ```bash
 cd /home/dsh/apps/surfcore
-node scripts/dump-manifests.mjs && echo EXIT_OK
-python3 -c "import json;d=json.load(open('docs/generated/manifests.json'));print(len(d));print([x['id'] for x in d[:5]])"
-grep -ic 'token\|secret\|password' docs/generated/manifests.json
+node --check scripts/dump-manifests.mjs
+node scripts/dump-manifests.mjs --selftest; echo "selftest exit=$?"     # 期望 SELFTEST_OK / 0
+node scripts/dump-manifests.mjs | tail -3                              # 汇总行
+node scripts/dump-manifests.mjs --require-all --strict; echo "gate exit=$?"  # 期望 MANIFEST_FAIL / 1
+node scripts/dump-manifests.mjs --json && grep -ic 'token\|secret\|password' docs/generated/manifests.json
 ```
 
-- **验收标准**：`EXIT_OK`；条数 = 17；敏感词计数 = 0；`git status` 里除新文件外无其他改动（证明零重启、零接触）。
+- **验收标准**：`SELFTEST_OK`；普通跑汇总为「合格 0 / 不合格 0 / 未迁移 30」；`--require-all --strict` 退出码 1 且打印 30 个模块名；json 里敏感词计数 0。
+- **已完成（2026-11-03 20:22）**：`docs/EXT-MANIFEST.md` 6.6KB（字段表 + R1–R10 + 3 个 ≤15 行示例 + 反例）；`scripts/dump-manifests.mjs` 11.5KB；`--selftest` **7/7 命中**（3 正例 0 错、4 反例各自命中对应报错）；实跑 30 模块 = 「合格 0 / 不合格 0 / 未迁移 30」（预期：波 2 之前一个都没有）；`--require-all --strict` = `MANIFEST_FAIL` / exit 1；`docs/generated/manifests.json` 2389B，敏感词 0；`npm run verify -- --no-api` 仍 `VERIFY_PASS`。
 - **桥接路由的去向**：`GET /api/plugins` 挪到 **W2-0**（见 §5），和 W2 第一次必须重启的动作合并，省掉一次重启。
 
 ---
 
-### W1-6 `scripts/check-manifest.mjs`（把"靠记忆"换成"靠断言"）
+### W1-6 接进 verify + features.json 互校（原 check-manifest 的 R5 保留在这里）
 
-- **做什么**：独立脚本，5 条规则，失败退出码 1：
-
-| 规则 | 检查 | 抓什么 |
-|---|---|---|
-| R1 | `id` 唯一、kebab、= 文件名 | 复制粘贴导致的重复 id |
-| R2 | `order` 唯一且升序有意义 | 两个模块抢同一注入位置 |
-| R3 | `hooks` ⊆ 实际导出 | 声明了 `wakeGate` 但没实现（漏接的主因） |
-| R4 | 有 `promptBlock` 必有 `stateKey` | 污染全局提示词缓存（现有 `style` 疑似命中） |
-| R5 | manifest `config[].path` 在 `features.json` 中存在且 `config.json` 可解析 | 4 条空开关（见 §1） |
-
-- **改哪里**：新增 `scripts/check-manifest.mjs`（约 120 行，纯 Node，无新依赖）；在 `scripts/verify.mjs` 里追加一行调用（**只加一行**，不改现有逻辑）
+- **做什么**：
+  1. 在 `scripts/verify.mjs` 里追加一行 `node scripts/dump-manifests.mjs --strict`（**只加一行**）；波 1 阶段它应当绿（0 不合格），波 2 每迁一个模块逐步收紧。
+  2. features.json 互校：44 条开关里每条的 `path` 必须能在 `config.json` 里解析到；同时 `manifest.config[]` 里声明的点路径必须能在 features.json 找到对应开关（或明确标 `internal`）。输出未覆盖清单，**不**自动改任何文件。
+- **为什么和第 1 条分开放**：互校依赖 `config.json`（隐私、服务器本地），不能进 CI 的默认路径；做成 `--config` 参数显式传路径，默认跳过。
+- **改哪里**：`scripts/verify.mjs` 加 1 行；`dump-manifests.mjs` 加 `--config <path>` 互校分支（约 40 行）
 - **代价**：3 步 · 约 45 分钟 · 重启 0 次
-- **回滚**：删除脚本 + `git checkout -- scripts/verify.mjs`
+- **回滚**：`git checkout -- scripts/verify.mjs` + 删掉 `--config` 分支
 - **验收命令**：
 
 ```bash
-node scripts/check-manifest.mjs; echo "exit=$?"
-# 负向测试：临时把某模块 stateKey 注释掉，必须 exit=1
+node scripts/dump-manifests.mjs --config ~/apps/surfcore/config.json --strict; echo "exit=$?"
+# 负向测试：把某个已迁移模块的 stateKey 从 manifest 删掉（保留 promptBlock），必须 exit=1
 ```
 
-- **验收标准**：当前代码下 `exit=0`（`style` 若命中 R4 则先记为已知问题并单列，不阻断波 1）；负向测试能变红；R5 首次运行应报出 **4 条**空开关（与 §1 实测一致才算规则正确）
+- **验收标准**：当前代码下 `exit=0`；4 条空开关（`greetings.morning.enabled`、`socialV2.tools.viewSticker`、`@video:quota.daily`、`@report:time`）逐条列出；负向测试能变红；`style` 的「有 promptBlock 无 stateKey」以**警告**形式出现并被记入已知问题，不阻断波 1。
 
 ---
 
@@ -279,7 +306,7 @@ node scripts/replay-hooks.mjs --diff
 
 ## 5. 波 2：按清单逐模块迁移
 
-**迁移的严格定义**：只做 **L0 声明**（加 manifest）和 **L1 断言**（check-manifest 通过）。
+**迁移的严格定义**：只做 **L0 声明**（加 manifest）和 **L1 断言**（dump-manifests 通过）。
 **L2（把 bridge 里 126 处补丁调用改成经 ctx 注入）属于拆 bridge，本计划一律不做。**
 
 ### W2 的硬规矩（写在这里，越界即失败）
@@ -298,7 +325,7 @@ node scripts/replay-hooks.mjs --diff
 - **门槛**：先跑完 W1-5，`docs/generated/manifests.json` 与接口返回必须逐字段一致。
 
 每批 5 个模块，每批 4~5 步，约 40 分钟。6 批共 30 个模块。
-每批固定四步：① 5 个文件末尾追加 manifest → ② `node scripts/check-manifest.mjs` → ③ `npm run verify -- --no-api` + 快照 `--diff` → ④ `node scripts/replay-hooks.mjs --diff`
+每批固定四步：① 5 个文件末尾追加 manifest → ② `node scripts/dump-manifests.mjs` → ③ `npm run verify -- --no-api` + 快照 `--diff` → ④ `node scripts/replay-hooks.mjs --diff`
 每两批重启一次 bridge 验证启动（共 2 次），不必每批都重启。
 
 ### 迁移顺序表（风险从低到高）
@@ -377,7 +404,7 @@ node scripts/replay-hooks.mjs --diff
 ### P3-3 4 条空开关：**已移出排期**（见附录 A）
 - 波 3 只要求它们**显式可见**（面板黄条逐条列出），不要求在本计划里修掉。
 - 若判断为"补 path"，那是代码改动，必须单独立项并报代价；若判断为"下架"，是纯数据改动，可顺手做但不算本计划验收项。
-- **验收**：`node scripts/check-manifest.mjs` 的 R5 输出里这 4 条仍然列着（说明没被静默吞掉），面板黄条条数 = 4。
+- **验收**：`node scripts/dump-manifests.mjs --config <cfg>` 的互校输出里这 4 条仍然列着（说明没被静默吞掉），面板黄条条数 = 4。
 
 ---
 
@@ -385,10 +412,10 @@ node scripts/replay-hooks.mjs --diff
 
 | 指标 | 定义 | 当前 | 波 1 后 | 波 2 后 | 波 3 后 | 采集命令 |
 |---|---|---|---|---|---|---|
-| **M1 manifest 覆盖** | 有合法 manifest 的 ext 数 / 30 | 0/30 | 17/30 | 30/30 | 30/30 | `node scripts/check-manifest.mjs --stats` |
+| **M1 manifest 覆盖** | 有合法 manifest 的 ext 数 / 30 | 0/30 | 17/30 | 30/30 | 30/30 | `node scripts/dump-manifests.mjs \| grep 汇总` |
 | **M2 直连残留可见度** | 被 bridge 直连且已登记的模块数 / 直连总数 | 0/15 | 15/15* | 15/15 | 15/15 | 同上（`directImport:true` 计数） |
 | **M3 面板清单渲染页数** | 由 `/api/plugins` 或 features.json 渲染的页数 / 16 | 1/16† | 1/16 | 1/16 | ≥8/16 | 人工核对 + 页面截图 |
-| **M4 漂移断言** | `check-manifest` 报出的漂移条数 | 4（R5） | 4 | 4 | **4 条全部显式可见**（面板黄条逐条列出，不静默；修/删不排期，见附录 A） | `node scripts/check-manifest.mjs` |
+| **M4 漂移断言** | 互校报出的空 path 条数 | 4 | 4 | 4 | **4 条全部显式可见**（面板黄条逐条列出，不静默；修/删不排期，见附录 A） | `node scripts/dump-manifests.mjs --config <cfg>` |
 | **M5 金丝雀** | `replay-hooks --diff` 的 diff 数 | n/a | 0 | 0 | 0 | `node scripts/replay-hooks.mjs --diff` |
 
 \* M2 波 1 就能到 15/15：因为 17 个已注册模块里有 15 个同时被直连（含重叠 2 个），加 manifest 时一并登记。
@@ -416,11 +443,12 @@ node scripts/replay-hooks.mjs --diff
 
 ## 9. 风险与止损
 
-1. **快照变红怎么办**：先分类——人格内容红（三份提示词字节数变）→ 只允许由一次人格 commit 解释；代码结构红（小节/工具名/路由变化）→ 一定是本次改动引入，**立即回滚该步**，不允许 `--save-base`。
+1. **快照变红怎么办**：先分类——人格侧红（小节标题 / 字节数）→ 只允许由一次人格 commit 解释，且 `--check` 只对 `stableSha256` 报红；代码侧红（工具名 / 路由）→ 一定是本次改动引入，**立即回滚该步**，不允许 `--save-base` / `--save-code` 盖章。
 2. **同一问题最多 3 次**：第 3 次仍不绿，停下来写"现象 / 已试 / 怀疑点"三段，报告后再动。
 3. **重启预算**：波 1 ≤2 次（W1-5、以及 manifest 全部落地后 1 次）；波 2 ≤2 次；波 3 = 0 次 bridge 重启（只重启 her-console）。总计 ≤4 次，超出即视为计划有误。
-4. **loader 改造的风险点**：`sortByOrder` 若在迁移期对"缺 manifest"的模块排序不稳定，会打乱注入顺序 → 用 `byOrder` 兜底（缺声明者保持原数组位置），并在 W1-3 验收里逐项 diff 顺序。
+4. **loader 改造的风险点**：迁移期缺 manifest 的模块必须**保持原数组位置**（回退 `(i+1)*10`），否则注入顺序会变；W1-3 验收里逐项 diff `extList()` 顺序。
 5. **面板没有 git 的历史包袱**：P3-0 必须最先做，否则波 3 的所有改动都无法回滚。
+6. **已知风险：`src/ext/style.js` 有 `promptBlock` 但没有 `stateKey`**（契约 R7 本应报错）。本轮**不补**——补了会改变提示词缓存范围，属于行为变更，不能混在结构迁移里。契约里把它降为**警告**（不阻断波 1），波 2 迁移 style 时单独评估并记入 commit 说明。
 
 ---
 
@@ -431,6 +459,9 @@ node scripts/replay-hooks.mjs --diff
 | **D-1** | 波 1 **不加 bridge 路由**；改 `scripts/dump-manifests.mjs` → `docs/generated/manifests.json`，零重启。`GET /api/plugins` 挪到 W2 第一次必须重启时一起加，省一次重启。 | W1-5 重写；新增 W2-0；波 1 重启预算从 2 次降到 **0 次** |
 | **D-2** | her-console **git init + 每日备份 cron 两件都做**；`.gitignore` 必须排除 `token.txt`、`*.log` 及任何含密钥文件；做完在 `docs/OPERATIONS.md` 补回滚说明。 | P3-0 重写，验收里加了"忽略项核对" |
 | **D-3** | 快照拆成 **两个输出目录**：`snap-base/`（代码结构）+ `snap-base-persona/`（人格内容），**不加 `--scope` 参数**。 | W1-1 重写；§11 验收命令同步改 |
+| **D-4** | 代码基准 `code.json` **提交进仓库** `scripts/snap-base/`（空环境也能跑 verify）；人格基准只在服务器，缺失时打印 `persona baseline skipped` 跳过；旧 `structure.json` 退役。 | W1-1/W1-3 重写；verify 改为 `snap-split --check --stdin` |
+| **D-5** | `order` = `EXTENSIONS` 下标 ×10 + 10（10…170）写死，校验器核对。 | W1-2/W1-3 定稿，`--order-map` 可核对 |
+| **D-6** | `pages` 字段 v1 删除；面板继续用 `PAGES` + `features.json`，等 `/api/plugins` 真被消费且能证明「页面只从一个来源渲染」再加。 | 契约 R8、dump-manifests、示例全部同步 |
 
 **同时确认的两条补充（不改范围）**：① W1 增加「回滚演练」，只验证"坏得可见"（W1-3b）；② W2 期间除迁移 ext 外不许动 `bridge.js`，每次重启只做一件事（§5 硬规矩）。
 
@@ -439,26 +470,23 @@ node scripts/replay-hooks.mjs --diff
 ## 11. 附录：五层验收命令（每次改动后照抄）
 
 ```bash
-# 第 0 层：基线已固化（W1-1 做过就跳过，永不重跑 --save-base）
+# 第 0 层：基线已固化（W1-1 做过就跳过，永不重跑 --save-base / --save-code）
 S=/home/dsh/.dsh/surfcore/snap
-ls -l $S/snap-base $S/snap-base-persona $S/base-routes
+ls -l scripts/snap-base/code.json $S/snap-base-persona $S/base-routes
 
 # 第 1 层：静态
 cd /home/dsh/apps/surfcore
 node --check src/bridge.js
 npm run verify -- --no-api
 grep -c "_PATCH" src/bridge.js                 # 只观察，不作为指标
-node scripts/check-manifest.mjs                # 波 1 起
+node scripts/dump-manifests.mjs                # 波 1 起
 node scripts/replay-hooks.mjs --diff           # 波 1 起
-node scripts/snapshot.mjs && node scripts/snap-split.mjs --check   # 代码侧硬失败 / 人格侧只报告
-# 人格侧：persona 基准只允许随「人格 commit」变化
-#   在 W1-2 把 verify 接到新基准之前，用这一条手工比对：
-#   node scripts/snap-split.mjs && diff <(python3 -c "import json;print(json.load(open('$S/snap-base-persona/persona.json'))['hash'])") ...
-#   ↑ 具体比对命令在 W1-1 落地后按实际字段名补（不预先编造命令名）
+node scripts/snapshot.mjs && node scripts/snap-split.mjs --check
+# ↑ 代码侧（tools/routes）硬失败 exit 1；人格侧只报告 stableSha256 差异；
+#   人格基准缺失时打印 "persona baseline skipped" 并以 0 通过
 
 # 第 2 层：接口
 for r in status socialV2/states socialV2/mood socialV2/style-list socialV2/tech-notes; do
-  f=$(echo "$r" | tr '/' '_')
   curl -s "http://127.0.0.1:3100/api/$r" | python3 -c "import sys,json;json.load(sys.stdin);print('OK $r')"
 done
 

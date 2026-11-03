@@ -1,0 +1,162 @@
+{
+ "schema": "ext-manifests/v1",
+ "at": "2026-11-03T12:39:26.652Z",
+ "modules": [
+  {
+   "file": "loops.js",
+   "id": "loops",
+   "title": "欠事与人物",
+   "hooks": [
+    "routes"
+   ],
+   "order": 160
+  }
+ ],
+ "pending": [
+  {
+   "file": "advice-capture.js",
+   "status": "missing",
+   "errors": []
+  },
+  {
+   "file": "attention.js",
+   "status": "missing",
+   "errors": []
+  },
+  {
+   "file": "blackbox.js",
+   "status": "missing",
+   "errors": []
+  },
+  {
+   "file": "bot-detect.js",
+   "status": "missing",
+   "errors": []
+  },
+  {
+   "file": "channel.js",
+   "status": "missing",
+   "errors": []
+  },
+  {
+   "file": "economy.js",
+   "status": "missing",
+   "errors": []
+  },
+  {
+   "file": "github-learn.js",
+   "status": "missing",
+   "errors": []
+  },
+  {
+   "file": "group-rate.js",
+   "status": "missing",
+   "errors": []
+  },
+  {
+   "file": "impressions.js",
+   "status": "missing",
+   "errors": []
+  },
+  {
+   "file": "learnmode.js",
+   "status": "missing",
+   "errors": []
+  },
+  {
+   "file": "memory-card.js",
+   "status": "missing",
+   "errors": []
+  },
+  {
+   "file": "memory-scope.js",
+   "status": "missing",
+   "errors": []
+  },
+  {
+   "file": "mute.js",
+   "status": "missing",
+   "errors": []
+  },
+  {
+   "file": "owner-only.js",
+   "status": "missing",
+   "errors": []
+  },
+  {
+   "file": "owner-teach.js",
+   "status": "missing",
+   "errors": []
+  },
+  {
+   "file": "people.js",
+   "status": "missing",
+   "errors": []
+  },
+  {
+   "file": "profile.js",
+   "status": "missing",
+   "errors": []
+  },
+  {
+   "file": "promises.js",
+   "status": "missing",
+   "errors": []
+  },
+  {
+   "file": "qzone-watch.js",
+   "status": "missing",
+   "errors": []
+  },
+  {
+   "file": "qzone.js",
+   "status": "missing",
+   "errors": []
+  },
+  {
+   "file": "related-memory.js",
+   "status": "missing",
+   "errors": []
+  },
+  {
+   "file": "reminders.js",
+   "status": "missing",
+   "errors": []
+  },
+  {
+   "file": "safe-talk.js",
+   "status": "missing",
+   "errors": []
+  },
+  {
+   "file": "sticker-frames.js",
+   "status": "missing",
+   "errors": []
+  },
+  {
+   "file": "stickers.js",
+   "status": "missing",
+   "errors": []
+  },
+  {
+   "file": "style-learn.js",
+   "status": "missing",
+   "errors": []
+  },
+  {
+   "file": "style.js",
+   "status": "missing",
+   "errors": []
+  },
+  {
+   "file": "tech-notes.js",
+   "status": "missing",
+   "errors": []
+  },
+  {
+   "file": "utterances.js",
+   "status": "missing",
+   "errors": []
+  }
+ ]
+}
