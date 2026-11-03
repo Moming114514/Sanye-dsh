@@ -9459,7 +9459,17 @@ async function main() {
   // 更新 lastAiReplyAt / 活跃调度，实际群里什么都没收到，而且只有一行滚动日志能看出问题。
   const lastSendFailed = new Map(); // key -> true（下一次成功即清除）
   // 鱼群保护的两张运行时表（提前初始化：sendToQQ 可能在后面的状态机建立前被调用）。
-  const fishGroupNames = new Map(); // groupId -> group_name（'' = 查不到）
+  // FISH_LOG_THROTTLE：鱼群保护日志每群 5 分钟最多一条，避免刷屏
+const fishLogAt = new Map();
+function fishLogOnce(k, m) {
+  const now = Date.now();
+  const last = fishLogAt.get(k) || 0;
+  if (now - last < 5 * 60 * 1000) return;
+  fishLogAt.set(k, now);
+  log(m);
+}
+
+const fishGroupNames = new Map(); // groupId -> group_name（'' = 查不到）
   const fishChatWindows = new Map(); // groupId -> [{sender,userId,time,isSelf,isOwner,fish}]
 
   function sendToQQ(key, msg) {
@@ -14946,7 +14956,7 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
       isOwner: Boolean(st.fishGuardBypass?.owner && bypass),
     });
     if (fishWake.blocked) {
-      log(`[鱼群保护] 跳过唤醒 ${key}（${reason}）：${fishGuardReasonText(fishWake) || '保护冷却中'}`);
+      fishLogOnce(key, `[鱼群保护] 跳过唤醒 ${key}（${reason}）：${fishGuardReasonText(fishWake) || '保护冷却中'}`);
       return;
     }
     // Token 防爆破：鱼群守则之后、真正投递之前。被拦时消息保留在未读，不烧模型回合。
@@ -16532,7 +16542,7 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
       });
       if (fish.blocked) {
         appendActivity(`${key} [鱼群保护] 本轮不参与：${fishGuardReasonText(fish) || '保护冷却中'}`);
-        log(`[鱼群保护] 跳过唤醒 ${key}：${fishGuardReasonText(fish) || '保护冷却中'}`);
+        fishLogOnce(key, `[鱼群保护] 跳过唤醒 ${key}：${fishGuardReasonText(fish) || '保护冷却中'}`);
         return;
       }
       if (fish.rawBlocked && fish.bypass) {
@@ -16593,7 +16603,7 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
       });
       if (fish.blocked) {
         appendActivity(`${key} [鱼群保护] 本轮不参与：${fishGuardReasonText(fish) || '保护中'}`);
-        log(`[鱼群保护] 跳过群聊回复 ${key}：${fishGuardReasonText(fish) || '保护中'}`);
+        fishLogOnce(key, `[鱼群保护] 跳过群聊回复 ${key}：${fishGuardReasonText(fish) || '保护中'}`);
         return;
       }
       // 2026-10-23 修：以前这里只放行“接收”，发送时 fishGuardSendBlock 会重新判一次；
