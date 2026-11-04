@@ -10223,7 +10223,7 @@ const fishGroupNames = new Map(); // groupId -> group_name（'' = 查不到）
         const out = tmp + '.' + size + '.jpg';
         try {
           await new Promise((resolve, reject) => {
-            cp.execFile('ffmpeg', ['-y', '-v', 'error', '-i', tmp, '-vf', `scale=min(${size}\\,iw):-2`, '-q:v', String(q), '-frames:v', '1', out],
+            cp.execFile('ffmpeg', ['-y', '-v', 'error', '-i', tmp, '-vf', `scale=${size}:${size}:force_original_aspect_ratio=decrease`, '-q:v', String(q), '-frames:v', '1', out],
               { timeout: 20000 }, (err) => (err ? reject(err) : resolve()));
           });
           const buf = fs.readFileSync(out);
