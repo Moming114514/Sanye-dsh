@@ -162,7 +162,7 @@ export default {
 
 // manifest：见 docs/EXT-MANIFEST.md（声明用，不改变任何调用路径）
 export const manifest = {
-  id: 'economy',
+  id: 'economy', layer: '判断',
   title: '省钱模式',
   kind: 'hook',
   enabledByDefault: true,

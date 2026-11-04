@@ -128,4 +128,5 @@ export function setMark(uin, mark) {
 
 export function getMarks() { return marks; }
 // manifest：见 docs/EXT-MANIFEST.md（声明用，不改变任何调用路径；本模块未注册进 EXTENSIONS，由 bridge 直接调用）
-export const manifest = { id: 'bot-detect', title: '机器识别', kind: 'tool', enabledByDefault: true, hot: false, hooks: [], config: [], stateFiles: ['bot-ids.json', 'human-marks.json'] };
+export const manifest = { id: 'bot-detect',
+  layer: '感知', title: '机器识别', kind: 'tool', enabledByDefault: true, hot: false, hooks: [], config: [], stateFiles: ['bot-ids.json', 'human-marks.json'] };

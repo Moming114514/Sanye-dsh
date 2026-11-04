@@ -54,6 +54,7 @@ export default function createAdviceCapture({ log }) {
 // manifest：见 docs/EXT-MANIFEST.md（声明用，不改变任何调用路径）
 export const manifest = {
   id: 'advice',
+  layer: '记忆',
   title: '建议收集',
   kind: 'hook',
   enabledByDefault: true,

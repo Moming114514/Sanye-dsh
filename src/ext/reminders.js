@@ -72,4 +72,5 @@ export function createReminders({ getCfg, log, sendToQQ, readStudyState, isConne
 }
 
 // manifest：见 docs/EXT-MANIFEST.md（声明用，不改变任何调用路径；本模块未注册进 EXTENSIONS，由 bridge 直接调用）
-export const manifest = { id: 'reminders', title: '提醒与汇报', kind: 'tool', enabledByDefault: true, hot: false, hooks: [], config: ['socialV2.reminders', 'socialV2.alerts', 'socialV2.report', 'ownerQQ'], stateFiles: [] };
+export const manifest = { id: 'reminders',
+  layer: '运维', title: '提醒与汇报', kind: 'tool', enabledByDefault: true, hot: false, hooks: [], config: ['socialV2.reminders', 'socialV2.alerts', 'socialV2.report', 'ownerQQ'], stateFiles: [] };

@@ -71,4 +71,5 @@ export async function stickerFrames({ key, count, findCached, frameSheet, fetchH
 }
 
 // manifest：见 docs/EXT-MANIFEST.md（声明用，不改变任何调用路径；本模块未注册进 EXTENSIONS，由 bridge 直接调用）
-export const manifest = { id: 'sticker-frames', title: '表情帧', kind: 'core', enabledByDefault: true, hot: false, hooks: [], config: [], stateFiles: [] };
+export const manifest = { id: 'sticker-frames',
+  layer: '感知', title: '表情帧', kind: 'core', enabledByDefault: true, hot: false, hooks: [], config: [], stateFiles: [] };

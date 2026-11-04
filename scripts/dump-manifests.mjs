@@ -23,6 +23,7 @@ const OUT_FILE = path.join(ROOT, 'docs', 'generated', 'manifests.json');
 
 const HOOKS = ['promptBlock', 'wakeGate', 'routes', 'onGroupMessage', 'onPrivateMessage', 'afterSend', 'stateKey'];
 const KINDS = ['core', 'hook', 'tool', 'panel'];
+const LAYERS = ['感知', '判断', '表达', '记忆', '运维'];
 const ID_RE = /^[a-z][a-z0-9-]{1,31}$/;
 const CFG_RE = /^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*$/; // 允许顶层单段（如 ownerQQ）
 
@@ -84,6 +85,9 @@ function validate(m, ctx = {}) {
 
   // R4 kind / 布尔
   if (!KINDS.includes(m.kind)) errors.push(`kind 非法：「${m.kind}」（只能是 ${KINDS.join('/')}）`);
+  // R11 layer：必填，且必须是五层之一（W4 体系建设）
+  if (typeof m.layer !== 'string' || !m.layer) errors.push('layer 必填（感知/判断/表达/记忆/运维）');
+  else if (!LAYERS.includes(m.layer)) errors.push(`layer 非法：「${m.layer}」（只能是 ${LAYERS.join('/')}）`);
   if (!isBool(m.enabledByDefault)) errors.push('enabledByDefault 必须是 boolean');
   if (!isBool(m.hot)) errors.push('hot 必须是 boolean');
 
@@ -176,13 +180,14 @@ function selftestRun() {
     return { default: { promptBlock: f, wakeGate: f, routes: [], stateKey: f, afterSend: f }, routes: [] };
   };
   const cases = [
-    { name: '纯函数', expect: null, manifest: { id: 'memory-card', title: '记忆卡片上限', kind: 'core', enabledByDefault: true, hot: false, hooks: [] }, impl: { default: () => {} } },
-    { name: '写自身 state', expect: null, manifest: { id: 'group-rate', title: '群聊频率', kind: 'hook', enabledByDefault: true, hot: true, order: 50, config: ['socialV2.groupRate'], stateFiles: ['group-rate.json'], hooks: ['promptBlock', 'routes', 'stateKey'] }, impl: implOk() },
-    { name: '带 route', expect: null, manifest: { id: 'tech-notes', title: '技术笔记', kind: 'hook', enabledByDefault: true, hot: true, order: 140, hooks: ['promptBlock', 'routes', 'stateKey'] }, impl: implOk() },
-    { name: '反例：钩子拼错 route', expect: '未知钩子', manifest: { id: 'x-bad1', title: '拼错', kind: 'hook', enabledByDefault: true, hot: true, order: 10, hooks: ['promptBlock', 'route'] }, impl: implOk() },
-    { name: '反例：声明了没实现', expect: '但没实现', manifest: { id: 'x-bad2', title: '空声明', kind: 'hook', enabledByDefault: true, hot: true, hooks: ['afterSend'] }, impl: { default: () => {} } },
-    { name: '反例：pages 字段', expect: 'v1 不支持 pages', manifest: { id: 'x-bad3', title: '页', kind: 'panel', enabledByDefault: true, hot: false, hooks: [], pages: [{ id: 'p1', title: 'P', api: '/api/x' }] }, impl: {} },
-    { name: '反例：promptBlock 缺 order', expect: '必须给 order', manifest: { id: 'x-bad4', title: '缺序', kind: 'hook', enabledByDefault: true, hot: true, hooks: ['promptBlock', 'stateKey'] }, impl: implOk() },
+    { name: '纯函数', expect: null, manifest: { layer: '感知', id: 'memory-card', title: '记忆卡片上限', kind: 'core', enabledByDefault: true, hot: false, hooks: [] }, impl: { default: () => {} } },
+    { name: '写自身 state', expect: null, manifest: { layer: '感知', id: 'group-rate', title: '群聊频率', kind: 'hook', enabledByDefault: true, hot: true, order: 50, config: ['socialV2.groupRate'], stateFiles: ['group-rate.json'], hooks: ['promptBlock', 'routes', 'stateKey'] }, impl: implOk() },
+    { name: '带 route', expect: null, manifest: { layer: '感知', id: 'tech-notes', title: '技术笔记', kind: 'hook', enabledByDefault: true, hot: true, order: 140, hooks: ['promptBlock', 'routes', 'stateKey'] }, impl: implOk() },
+    { name: '反例：钩子拼错 route', expect: '未知钩子', manifest: { layer: '感知', id: 'x-bad1', title: '拼错', kind: 'hook', enabledByDefault: true, hot: true, order: 10, hooks: ['promptBlock', 'route'] }, impl: implOk() },
+    { name: '反例：声明了没实现', expect: '但没实现', manifest: { layer: '感知', id: 'x-bad2', title: '空声明', kind: 'hook', enabledByDefault: true, hot: true, hooks: ['afterSend'] }, impl: { default: () => {} } },
+    { name: '反例：pages 字段', expect: 'v1 不支持 pages', manifest: { layer: '感知', id: 'x-bad3', title: '页', kind: 'panel', enabledByDefault: true, hot: false, hooks: [], pages: [{ id: 'p1', title: 'P', api: '/api/x' }] }, impl: {} },
+    { name: '反例：layer 非法', expect: 'layer 非法', manifest: { layer: '平台', id: 'x-bad5', title: '层错', kind: 'core', enabledByDefault: true, hot: false, hooks: [] }, impl: { default: () => {} } },
+    { name: '反例：promptBlock 缺 order', expect: '必须给 order', manifest: { layer: '感知', id: 'x-bad4', title: '缺序', kind: 'hook', enabledByDefault: true, hot: true, hooks: ['promptBlock', 'stateKey'] }, impl: implOk() },
   ];
   let bad = 0;
   console.log('校验器自检（3 正例 + 4 反例）\n');
@@ -326,7 +331,7 @@ async function main() {
       hooks: Array.isArray(m.hooks) ? m.hooks : [], order: m.order ?? null,
       config: Array.isArray(m.config) ? m.config : [],
       stateFiles: Array.isArray(m.stateFiles) ? m.stateFiles : [],
-      kind: m.kind || '', registered: expectedOrder.has(f),
+      kind: m.kind || '', layer: m.layer || '', registered: expectedOrder.has(f),
       status: errors.length ? 'fail' : 'ok', errors, warnings,
     });
   }
@@ -355,7 +360,7 @@ async function main() {
     const payload = {
       schema: 'ext-manifests/v1',
       at: new Date().toISOString(),
-      modules: rows.filter((r) => r.status === 'ok').map((r) => ({ file: r.file, id: r.id, title: r.title, hooks: r.hooks, order: r.order, config: r.config, stateFiles: r.stateFiles, kind: r.kind, registered: r.registered, wave: r.registered ? 1 : 2 })),
+      modules: rows.filter((r) => r.status === 'ok').map((r) => ({ file: r.file, id: r.id, title: r.title, hooks: r.hooks, order: r.order, config: r.config, stateFiles: r.stateFiles, kind: r.kind, layer: r.layer, registered: r.registered, wave: r.registered ? 1 : 2 })),
       pending: rows.filter((r) => r.status !== 'ok').map((r) => ({ file: r.file, status: r.status, errors: r.errors })),
     };
     fs.mkdirSync(path.dirname(OUT_FILE), { recursive: true });

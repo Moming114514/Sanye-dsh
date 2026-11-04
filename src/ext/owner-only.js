@@ -41,7 +41,7 @@ export default {
 
 // manifest：见 docs/EXT-MANIFEST.md（声明用，不改变任何调用路径）
 export const manifest = {
-  id: 'owner-only',
+  id: 'owner-only', layer: '判断',
   title: '只听主人',
   kind: 'hook',
   enabledByDefault: true,

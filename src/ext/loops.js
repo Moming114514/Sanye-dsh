@@ -5,7 +5,7 @@ import { parseDue, notePerson } from '../next-lib.js';
 // manifest：声明「我是什么、挂哪些钩子、排第几、写哪些文件」（契约 docs/EXT-MANIFEST.md）
 // 只加声明，不改任何调用路径；order = index.js 里第 16 位（下标 15）×10+10
 export const manifest = {
-  id: 'loops',
+  id: 'loops', layer: '记忆',
   title: '欠事与人物',
   kind: 'hook',
   enabledByDefault: true,

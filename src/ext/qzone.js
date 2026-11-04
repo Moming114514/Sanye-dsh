@@ -138,4 +138,5 @@ export async function deleteQzone({ bot, body }) {
 }
 
 // manifest：见 docs/EXT-MANIFEST.md（声明用，不改变任何调用路径；本模块未注册进 EXTENSIONS，由 bridge 直接调用）
-export const manifest = { id: 'qzone', title: 'QQ 空间', kind: 'tool', enabledByDefault: true, hot: false, hooks: [], config: ['socialV2.qzone', 'ownerQQ'], stateFiles: [] };
+export const manifest = { id: 'qzone',
+  layer: '表达', title: 'QQ 空间', kind: 'tool', enabledByDefault: true, hot: false, hooks: [], config: ['socialV2.qzone', 'ownerQQ'], stateFiles: [] };

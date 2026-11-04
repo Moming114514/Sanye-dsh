@@ -42,7 +42,7 @@ export default {
 
 // manifest：见 docs/EXT-MANIFEST.md（声明用，不改变任何调用路径）
 export const manifest = {
-  id: 'tech-notes',
+  id: 'tech-notes', layer: '表达',
   title: '技术笔记',
   kind: 'hook',
   enabledByDefault: true,

@@ -86,7 +86,7 @@ export default function createUtterances() {
 
 // manifest：见 docs/EXT-MANIFEST.md（声明用，不改变任何调用路径）
 export const manifest = {
-  id: 'utterances',
+  id: 'utterances', layer: '表达',
   title: '她说的话',
   kind: 'hook',
   enabledByDefault: true,

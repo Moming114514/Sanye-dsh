@@ -1,501 +1,531 @@
 {
-  "schema": "ext-manifests/v1",
-  "at": "2026-11-03T14:18:38.732Z",
-  "modules": [
-    {
-      "file": "advice-capture.js",
-      "id": "advice",
-      "title": "建议收集",
-      "hooks": [
-        "routes",
-        "onGroupMessage"
-      ],
-      "order": 70,
-      "config": [
-        "socialV2.adviceCapture"
-      ],
-      "stateFiles": [
-        "bot-advice.jsonl"
-      ],
-      "kind": "hook",
-      "registered": true,
-      "wave": 1
-    },
-    {
-      "file": "attention.js",
-      "id": "attention",
-      "title": "该不该接话",
-      "hooks": [
-        "promptBlock",
-        "wakeGate",
-        "routes",
-        "onGroupMessage"
-      ],
-      "order": 60,
-      "config": [
-        "socialV2.attention"
-      ],
-      "stateFiles": [],
-      "kind": "hook",
-      "registered": true,
-      "wave": 1
-    },
-    {
-      "file": "blackbox.js",
-      "id": "blackbox",
-      "title": "黑箱静默",
-      "hooks": [],
-      "order": null,
-      "config": [],
-      "stateFiles": [],
-      "kind": "core",
-      "registered": false,
-      "wave": 2
-    },
-    {
-      "file": "bot-detect.js",
-      "id": "bot-detect",
-      "title": "机器识别",
-      "hooks": [],
-      "order": null,
-      "config": [],
-      "stateFiles": [
-        "bot-ids.json",
-        "human-marks.json"
-      ],
-      "kind": "tool",
-      "registered": false,
-      "wave": 2
-    },
-    {
-      "file": "channel.js",
-      "id": "channel",
-      "title": "通道能力探测",
-      "hooks": [],
-      "order": null,
-      "config": [],
-      "stateFiles": [
-        "channel-caps.json"
-      ],
-      "kind": "tool",
-      "registered": false,
-      "wave": 2
-    },
-    {
-      "file": "economy.js",
-      "id": "economy",
-      "title": "省钱模式",
-      "hooks": [
-        "wakeGate",
-        "routes",
-        "stateKey"
-      ],
-      "order": 40,
-      "config": [],
-      "stateFiles": [
-        "economy.json"
-      ],
-      "kind": "hook",
-      "registered": true,
-      "wave": 1
-    },
-    {
-      "file": "github-learn.js",
-      "id": "github-learn",
-      "title": "GitHub 学习",
-      "hooks": [],
-      "order": null,
-      "config": [
-        "socialV2.githubLearn"
-      ],
-      "stateFiles": [
-        "github-learn.json"
-      ],
-      "kind": "tool",
-      "registered": false,
-      "wave": 2
-    },
-    {
-      "file": "group-rate.js",
-      "id": "group-rate",
-      "title": "群聊频率",
-      "hooks": [
-        "wakeGate",
-        "routes",
-        "stateKey"
-      ],
-      "order": 50,
-      "config": [],
-      "stateFiles": [
-        "group-rate.json"
-      ],
-      "kind": "hook",
-      "registered": true,
-      "wave": 1
-    },
-    {
-      "file": "impressions.js",
-      "id": "impressions",
-      "title": "她的看法",
-      "hooks": [
-        "promptBlock",
-        "routes",
-        "stateKey"
-      ],
-      "order": 120,
-      "config": [
-        "socialV2.impressions"
-      ],
-      "stateFiles": [],
-      "kind": "hook",
-      "registered": true,
-      "wave": 1
-    },
-    {
-      "file": "learnmode.js",
-      "id": "learnmode",
-      "title": "学习模式",
-      "hooks": [
-        "wakeGate",
-        "routes",
-        "onGroupMessage",
-        "stateKey"
-      ],
-      "order": 30,
-      "config": [
-        "ownerQQ",
-        "owner.qq"
-      ],
-      "stateFiles": [
-        "learn-mode.json"
-      ],
-      "kind": "hook",
-      "registered": true,
-      "wave": 1
-    },
-    {
-      "file": "loops.js",
-      "id": "loops",
-      "title": "欠事与人物",
-      "hooks": [
-        "routes"
-      ],
-      "order": 160,
-      "config": [],
-      "stateFiles": [
-        "loops.json",
-        "people.json"
-      ],
-      "kind": "hook",
-      "registered": true,
-      "wave": 1
-    },
-    {
-      "file": "memory-card.js",
-      "id": "memory-card",
-      "title": "记忆卡片上限",
-      "hooks": [],
-      "order": null,
-      "config": [],
-      "stateFiles": [],
-      "kind": "core",
-      "registered": false,
-      "wave": 2
-    },
-    {
-      "file": "memory-scope.js",
-      "id": "memory-scope",
-      "title": "记忆可见范围",
-      "hooks": [],
-      "order": null,
-      "config": [],
-      "stateFiles": [],
-      "kind": "core",
-      "registered": false,
-      "wave": 2
-    },
-    {
-      "file": "mute.js",
-      "id": "mute",
-      "title": "静音名单",
-      "hooks": [
-        "wakeGate",
-        "routes",
-        "stateKey"
-      ],
-      "order": 20,
-      "config": [],
-      "stateFiles": [
-        "muted-keys.json"
-      ],
-      "kind": "hook",
-      "registered": true,
-      "wave": 1
-    },
-    {
-      "file": "owner-only.js",
-      "id": "owner-only",
-      "title": "只听主人",
-      "hooks": [
-        "wakeGate",
-        "onGroupMessage"
-      ],
-      "order": 10,
-      "config": [
-        "ownerQQ"
-      ],
-      "stateFiles": [],
-      "kind": "hook",
-      "registered": true,
-      "wave": 1
-    },
-    {
-      "file": "owner-teach.js",
-      "id": "owner-teach",
-      "title": "主人教的说法",
-      "hooks": [
-        "promptBlock",
-        "routes",
-        "stateKey"
-      ],
-      "order": 130,
-      "config": [],
-      "stateFiles": [
-        "owner-teach.json"
-      ],
-      "kind": "hook",
-      "registered": true,
-      "wave": 1
-    },
-    {
-      "file": "people.js",
-      "id": "people",
-      "title": "人群档案",
-      "hooks": [
-        "routes"
-      ],
-      "order": 80,
-      "config": [],
-      "stateFiles": [],
-      "kind": "hook",
-      "registered": true,
-      "wave": 1
-    },
-    {
-      "file": "profile.js",
-      "id": "profile",
-      "title": "档案与好友",
-      "hooks": [],
-      "order": null,
-      "config": [
-        "socialV2.profile"
-      ],
-      "stateFiles": [
-        "friend-requests.json",
-        "avatar-pending.json",
-        "friend-notify.json"
-      ],
-      "kind": "tool",
-      "registered": false,
-      "wave": 2
-    },
-    {
-      "file": "promises.js",
-      "id": "promises",
-      "title": "欠事捕获",
-      "hooks": [
-        "afterSend"
-      ],
-      "order": 110,
-      "config": [
-        "socialV2.loops"
-      ],
-      "stateFiles": [],
-      "kind": "hook",
-      "registered": true,
-      "wave": 1
-    },
-    {
-      "file": "qzone-watch.js",
-      "id": "qzone-watch",
-      "title": "空间巡查",
-      "hooks": [],
-      "order": null,
-      "config": [
-        "socialV2.qzoneWatch"
-      ],
-      "stateFiles": [
-        "qzone-seen.json"
-      ],
-      "kind": "tool",
-      "registered": false,
-      "wave": 2
-    },
-    {
-      "file": "qzone.js",
-      "id": "qzone",
-      "title": "QQ 空间",
-      "hooks": [],
-      "order": null,
-      "config": [
-        "socialV2.qzone",
-        "ownerQQ"
-      ],
-      "stateFiles": [],
-      "kind": "tool",
-      "registered": false,
-      "wave": 2
-    },
-    {
-      "file": "related-memory.js",
-      "id": "related-memory",
-      "title": "相关记忆",
-      "hooks": [],
-      "order": null,
-      "config": [
-        "socialV2.relatedMemories"
-      ],
-      "stateFiles": [],
-      "kind": "core",
-      "registered": false,
-      "wave": 2
-    },
-    {
-      "file": "reminders.js",
-      "id": "reminders",
-      "title": "提醒与汇报",
-      "hooks": [],
-      "order": null,
-      "config": [
-        "socialV2.reminders",
-        "socialV2.alerts",
-        "socialV2.report",
-        "ownerQQ"
-      ],
-      "stateFiles": [],
-      "kind": "tool",
-      "registered": false,
-      "wave": 2
-    },
-    {
-      "file": "safe-talk.js",
-      "id": "safe-talk",
-      "title": "敏感话题",
-      "hooks": [
-        "wakeGate",
-        "routes",
-        "onGroupMessage",
-        "onPrivateMessage",
-        "stateKey"
-      ],
-      "order": 100,
-      "config": [
-        "socialV2.safeTalk"
-      ],
-      "stateFiles": [
-        "safe-talk.json",
-        "muted-keys.json"
-      ],
-      "kind": "hook",
-      "registered": true,
-      "wave": 1
-    },
-    {
-      "file": "sticker-frames.js",
-      "id": "sticker-frames",
-      "title": "表情帧",
-      "hooks": [],
-      "order": null,
-      "config": [],
-      "stateFiles": [],
-      "kind": "core",
-      "registered": false,
-      "wave": 2
-    },
-    {
-      "file": "stickers.js",
-      "id": "stickers",
-      "title": "贴纸待办",
-      "hooks": [],
-      "order": 170,
-      "config": [],
-      "stateFiles": [],
-      "kind": "core",
-      "registered": true,
-      "wave": 1
-    },
-    {
-      "file": "style-learn.js",
-      "id": "style-learn",
-      "title": "学说话任务",
-      "hooks": [],
-      "order": null,
-      "config": [
-        "socialV2.styleLearn",
-        "ownerQQ"
-      ],
-      "stateFiles": [
-        "style-learn.json",
-        "style-learn-now.json"
-      ],
-      "kind": "tool",
-      "registered": false,
-      "wave": 2
-    },
-    {
-      "file": "style.js",
-      "id": "style",
-      "title": "学说话",
-      "hooks": [
-        "promptBlock",
-        "routes",
-        "onGroupMessage",
-        "onPrivateMessage"
-      ],
-      "order": 150,
-      "config": [
-        "socialV2.styleLearn",
-        "socialV2.tools"
-      ],
-      "stateFiles": [],
-      "kind": "hook",
-      "registered": true,
-      "wave": 1
-    },
-    {
-      "file": "tech-notes.js",
-      "id": "tech-notes",
-      "title": "技术笔记",
-      "hooks": [
-        "promptBlock",
-        "routes",
-        "stateKey"
-      ],
-      "order": 140,
-      "config": [
-        "socialV2.techNotes"
-      ],
-      "stateFiles": [],
-      "kind": "hook",
-      "registered": true,
-      "wave": 1
-    },
-    {
-      "file": "utterances.js",
-      "id": "utterances",
-      "title": "她说的话",
-      "hooks": [
-        "routes"
-      ],
-      "order": 90,
-      "config": [],
-      "stateFiles": [
-        "utterance-marks.json"
-      ],
-      "kind": "hook",
-      "registered": true,
-      "wave": 1
-    }
-  ],
-  "pending": []
+ "schema": "ext-manifests/v1",
+ "at": "2026-11-04T05:46:24.307Z",
+ "modules": [
+  {
+   "file": "advice-capture.js",
+   "id": "advice",
+   "title": "建议收集",
+   "hooks": [
+    "routes",
+    "onGroupMessage"
+   ],
+   "order": 70,
+   "config": [
+    "socialV2.adviceCapture"
+   ],
+   "stateFiles": [
+    "bot-advice.jsonl"
+   ],
+   "kind": "hook",
+   "layer": "记忆",
+   "registered": true,
+   "wave": 1
+  },
+  {
+   "file": "attention.js",
+   "id": "attention",
+   "title": "该不该接话",
+   "hooks": [
+    "promptBlock",
+    "wakeGate",
+    "routes",
+    "onGroupMessage"
+   ],
+   "order": 60,
+   "config": [
+    "socialV2.attention"
+   ],
+   "stateFiles": [],
+   "kind": "hook",
+   "layer": "判断",
+   "registered": true,
+   "wave": 1
+  },
+  {
+   "file": "blackbox.js",
+   "id": "blackbox",
+   "title": "黑箱静默",
+   "hooks": [],
+   "order": null,
+   "config": [],
+   "stateFiles": [],
+   "kind": "core",
+   "layer": "运维",
+   "registered": false,
+   "wave": 2
+  },
+  {
+   "file": "bot-detect.js",
+   "id": "bot-detect",
+   "title": "机器识别",
+   "hooks": [],
+   "order": null,
+   "config": [],
+   "stateFiles": [
+    "bot-ids.json",
+    "human-marks.json"
+   ],
+   "kind": "tool",
+   "layer": "感知",
+   "registered": false,
+   "wave": 2
+  },
+  {
+   "file": "channel.js",
+   "id": "channel",
+   "title": "通道能力探测",
+   "hooks": [],
+   "order": null,
+   "config": [],
+   "stateFiles": [
+    "channel-caps.json"
+   ],
+   "kind": "tool",
+   "layer": "感知",
+   "registered": false,
+   "wave": 2
+  },
+  {
+   "file": "economy.js",
+   "id": "economy",
+   "title": "省钱模式",
+   "hooks": [
+    "wakeGate",
+    "routes",
+    "stateKey"
+   ],
+   "order": 40,
+   "config": [],
+   "stateFiles": [
+    "economy.json"
+   ],
+   "kind": "hook",
+   "layer": "判断",
+   "registered": true,
+   "wave": 1
+  },
+  {
+   "file": "github-learn.js",
+   "id": "github-learn",
+   "title": "GitHub 学习",
+   "hooks": [],
+   "order": null,
+   "config": [
+    "socialV2.githubLearn"
+   ],
+   "stateFiles": [
+    "github-learn.json"
+   ],
+   "kind": "tool",
+   "layer": "运维",
+   "registered": false,
+   "wave": 2
+  },
+  {
+   "file": "group-rate.js",
+   "id": "group-rate",
+   "title": "群聊频率",
+   "hooks": [
+    "wakeGate",
+    "routes",
+    "stateKey"
+   ],
+   "order": 50,
+   "config": [],
+   "stateFiles": [
+    "group-rate.json"
+   ],
+   "kind": "hook",
+   "layer": "判断",
+   "registered": true,
+   "wave": 1
+  },
+  {
+   "file": "impressions.js",
+   "id": "impressions",
+   "title": "她的看法",
+   "hooks": [
+    "promptBlock",
+    "routes",
+    "stateKey"
+   ],
+   "order": 120,
+   "config": [
+    "socialV2.impressions"
+   ],
+   "stateFiles": [],
+   "kind": "hook",
+   "layer": "记忆",
+   "registered": true,
+   "wave": 1
+  },
+  {
+   "file": "learnmode.js",
+   "id": "learnmode",
+   "title": "学习模式",
+   "hooks": [
+    "wakeGate",
+    "routes",
+    "onGroupMessage",
+    "stateKey"
+   ],
+   "order": 30,
+   "config": [
+    "ownerQQ",
+    "owner.qq"
+   ],
+   "stateFiles": [
+    "learn-mode.json"
+   ],
+   "kind": "hook",
+   "layer": "判断",
+   "registered": true,
+   "wave": 1
+  },
+  {
+   "file": "loops.js",
+   "id": "loops",
+   "title": "欠事与人物",
+   "hooks": [
+    "routes"
+   ],
+   "order": 160,
+   "config": [],
+   "stateFiles": [
+    "loops.json",
+    "people.json"
+   ],
+   "kind": "hook",
+   "layer": "记忆",
+   "registered": true,
+   "wave": 1
+  },
+  {
+   "file": "memory-card.js",
+   "id": "memory-card",
+   "title": "记忆卡片上限",
+   "hooks": [],
+   "order": null,
+   "config": [],
+   "stateFiles": [],
+   "kind": "core",
+   "layer": "记忆",
+   "registered": false,
+   "wave": 2
+  },
+  {
+   "file": "memory-scope.js",
+   "id": "memory-scope",
+   "title": "记忆可见范围",
+   "hooks": [],
+   "order": null,
+   "config": [],
+   "stateFiles": [],
+   "kind": "core",
+   "layer": "记忆",
+   "registered": false,
+   "wave": 2
+  },
+  {
+   "file": "mute.js",
+   "id": "mute",
+   "title": "静音名单",
+   "hooks": [
+    "wakeGate",
+    "routes",
+    "stateKey"
+   ],
+   "order": 20,
+   "config": [],
+   "stateFiles": [
+    "muted-keys.json"
+   ],
+   "kind": "hook",
+   "layer": "判断",
+   "registered": true,
+   "wave": 1
+  },
+  {
+   "file": "owner-only.js",
+   "id": "owner-only",
+   "title": "只听主人",
+   "hooks": [
+    "wakeGate",
+    "onGroupMessage"
+   ],
+   "order": 10,
+   "config": [
+    "ownerQQ"
+   ],
+   "stateFiles": [],
+   "kind": "hook",
+   "layer": "判断",
+   "registered": true,
+   "wave": 1
+  },
+  {
+   "file": "owner-teach.js",
+   "id": "owner-teach",
+   "title": "主人教的说法",
+   "hooks": [
+    "promptBlock",
+    "routes",
+    "stateKey"
+   ],
+   "order": 130,
+   "config": [],
+   "stateFiles": [
+    "owner-teach.json"
+   ],
+   "kind": "hook",
+   "layer": "表达",
+   "registered": true,
+   "wave": 1
+  },
+  {
+   "file": "people.js",
+   "id": "people",
+   "title": "人群档案",
+   "hooks": [
+    "routes"
+   ],
+   "order": 80,
+   "config": [],
+   "stateFiles": [],
+   "kind": "hook",
+   "layer": "感知",
+   "registered": true,
+   "wave": 1
+  },
+  {
+   "file": "profile.js",
+   "id": "profile",
+   "title": "档案与好友",
+   "hooks": [],
+   "order": null,
+   "config": [
+    "socialV2.profile"
+   ],
+   "stateFiles": [
+    "friend-requests.json",
+    "avatar-pending.json",
+    "friend-notify.json"
+   ],
+   "kind": "tool",
+   "layer": "记忆",
+   "registered": false,
+   "wave": 2
+  },
+  {
+   "file": "promises.js",
+   "id": "promises",
+   "title": "欠事捕获",
+   "hooks": [
+    "afterSend"
+   ],
+   "order": 110,
+   "config": [
+    "socialV2.loops"
+   ],
+   "stateFiles": [],
+   "kind": "hook",
+   "layer": "记忆",
+   "registered": true,
+   "wave": 1
+  },
+  {
+   "file": "qzone-watch.js",
+   "id": "qzone-watch",
+   "title": "空间巡查",
+   "hooks": [],
+   "order": null,
+   "config": [
+    "socialV2.qzoneWatch"
+   ],
+   "stateFiles": [
+    "qzone-seen.json"
+   ],
+   "kind": "tool",
+   "layer": "感知",
+   "registered": false,
+   "wave": 2
+  },
+  {
+   "file": "qzone.js",
+   "id": "qzone",
+   "title": "QQ 空间",
+   "hooks": [],
+   "order": null,
+   "config": [
+    "socialV2.qzone",
+    "ownerQQ"
+   ],
+   "stateFiles": [],
+   "kind": "tool",
+   "layer": "表达",
+   "registered": false,
+   "wave": 2
+  },
+  {
+   "file": "related-memory.js",
+   "id": "related-memory",
+   "title": "相关记忆",
+   "hooks": [],
+   "order": null,
+   "config": [
+    "socialV2.relatedMemories"
+   ],
+   "stateFiles": [],
+   "kind": "core",
+   "layer": "记忆",
+   "registered": false,
+   "wave": 2
+  },
+  {
+   "file": "reminders.js",
+   "id": "reminders",
+   "title": "提醒与汇报",
+   "hooks": [],
+   "order": null,
+   "config": [
+    "socialV2.reminders",
+    "socialV2.alerts",
+    "socialV2.report",
+    "ownerQQ"
+   ],
+   "stateFiles": [],
+   "kind": "tool",
+   "layer": "运维",
+   "registered": false,
+   "wave": 2
+  },
+  {
+   "file": "safe-talk.js",
+   "id": "safe-talk",
+   "title": "敏感话题",
+   "hooks": [
+    "wakeGate",
+    "routes",
+    "onGroupMessage",
+    "onPrivateMessage",
+    "stateKey"
+   ],
+   "order": 100,
+   "config": [
+    "socialV2.safeTalk"
+   ],
+   "stateFiles": [
+    "safe-talk.json",
+    "muted-keys.json"
+   ],
+   "kind": "hook",
+   "layer": "判断",
+   "registered": true,
+   "wave": 1
+  },
+  {
+   "file": "sticker-frames.js",
+   "id": "sticker-frames",
+   "title": "表情帧",
+   "hooks": [],
+   "order": null,
+   "config": [],
+   "stateFiles": [],
+   "kind": "core",
+   "layer": "感知",
+   "registered": false,
+   "wave": 2
+  },
+  {
+   "file": "stickers.js",
+   "id": "stickers",
+   "title": "贴纸待办",
+   "hooks": [],
+   "order": 170,
+   "config": [],
+   "stateFiles": [],
+   "kind": "core",
+   "layer": "表达",
+   "registered": true,
+   "wave": 1
+  },
+  {
+   "file": "style-learn.js",
+   "id": "style-learn",
+   "title": "学说话任务",
+   "hooks": [],
+   "order": null,
+   "config": [
+    "socialV2.styleLearn",
+    "ownerQQ"
+   ],
+   "stateFiles": [
+    "style-learn.json",
+    "style-learn-now.json"
+   ],
+   "kind": "tool",
+   "layer": "表达",
+   "registered": false,
+   "wave": 2
+  },
+  {
+   "file": "style.js",
+   "id": "style",
+   "title": "学说话",
+   "hooks": [
+    "promptBlock",
+    "routes",
+    "onGroupMessage",
+    "onPrivateMessage"
+   ],
+   "order": 150,
+   "config": [
+    "socialV2.styleLearn",
+    "socialV2.tools"
+   ],
+   "stateFiles": [],
+   "kind": "hook",
+   "layer": "表达",
+   "registered": true,
+   "wave": 1
+  },
+  {
+   "file": "tech-notes.js",
+   "id": "tech-notes",
+   "title": "技术笔记",
+   "hooks": [
+    "promptBlock",
+    "routes",
+    "stateKey"
+   ],
+   "order": 140,
+   "config": [
+    "socialV2.techNotes"
+   ],
+   "stateFiles": [],
+   "kind": "hook",
+   "layer": "表达",
+   "registered": true,
+   "wave": 1
+  },
+  {
+   "file": "utterances.js",
+   "id": "utterances",
+   "title": "她说的话",
+   "hooks": [
+    "routes"
+   ],
+   "order": 90,
+   "config": [],
+   "stateFiles": [
+    "utterance-marks.json"
+   ],
+   "kind": "hook",
+   "layer": "表达",
+   "registered": true,
+   "wave": 1
+  }
+ ],
+ "pending": []
 }

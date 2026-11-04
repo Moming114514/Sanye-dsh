@@ -16,7 +16,7 @@ export default {
 
 // manifest：见 docs/EXT-MANIFEST.md（声明用，不改变任何调用路径）
 export const manifest = {
-  id: 'stickers',
+  id: 'stickers', layer: '表达',
   title: '贴纸待办',
   kind: 'core',
   enabledByDefault: true,

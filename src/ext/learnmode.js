@@ -132,7 +132,7 @@ export default {
 
 // manifest：见 docs/EXT-MANIFEST.md（声明用，不改变任何调用路径）
 export const manifest = {
-  id: 'learnmode',
+  id: 'learnmode', layer: '判断',
   title: '学习模式',
   kind: 'hook',
   enabledByDefault: true,

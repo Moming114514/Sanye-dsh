@@ -30,6 +30,7 @@ export const manifest = {
 | `id` | string | ✅ | 全仓唯一，`^[a-z][a-z0-9-]{1,31}$`，与文件名去掉 `.js` 一致 | `'group-rate'` |
 | `title` | string | ✅ | 面板/文档显示用中文短名，1–24 字 | `'群聊频率'` |
 | `kind` | enum | ✅ | `core` / `hook` / `tool` / `panel`，四选一 | `'hook'` |
+| `layer` | enum | ✅ | 五层体系之一：`感知` / `判断` / `表达` / `记忆` / `运维`。口径与模块归属见 `docs/SYSTEM-MAP.md` | `'判断'` |
 | `enabledByDefault` | boolean | ✅ | 新装机器上默认开还是关 | `true` |
 | `hot` | boolean | ✅ | 改 config 是否立即生效（false = 要重启桥接） | `true` |
 | `hooks` | string[] | ✅ | 实现了哪些钩子，只能是下面 7 个；没有钩子写 `[]` | `['promptBlock','routes']` |
@@ -65,12 +66,13 @@ export const manifest = {
 | R8 | v1 **禁止** `pages` 字段（面板仍用 PAGES + features.json） | `v1 不支持 pages 字段` |
 | R9 | `config` 每项是 `a.b.c` 点路径；`stateFiles` 不含 `/`、`..` | `config/stateFiles 非法` |
 | R10 | 模块没有 `manifest` 导出 | `缺 manifest`（波 2 期间这是预期失败） |
+| R11 | `layer` 必填且必须是五层之一（W4 起，所有 ext 模块都要标） | `layer 必填` / `layer 非法` |
 
-R10 在迁移期是**已知失败**：30 个模块现在都没有 manifest。校验器的价值从波 2 第一个模块开始体现。
+R10 是迁移期的过渡规则：30 个模块现在全部有 manifest，正常状态下不该再看到这条。
 
-> **状态（2026-11-03）**：已注册进 `EXTENSIONS` 的 17 个模块全部有 manifest（`dump-manifests` 合格 17 / 不合格 0）；
-> 另外 13 个模块还没注册（波 2 才逐模块迁移）。`--strict` 现在应当 `MANIFEST_OK`，
-> `--require-all --strict` 在有未注册模块时仍 `MANIFEST_FAIL`，属预期。
+> **状态（2026-11-04，W4）**：30 个模块全部合格（`dump-manifests` 合格 30 / 不合格 0 / 未迁移 0），
+> `--strict` 与 `--require-all --strict` 都应 `MANIFEST_OK`。
+> 每个 manifest 的 `layer` 必填（R11），五层口径见 `docs/SYSTEM-MAP.md`。
 
 ## 3. 三个示例（都 ≤15 行）
 

@@ -132,6 +132,7 @@ export default function createAttention({ log }) {
 // manifest：见 docs/EXT-MANIFEST.md（声明用，不改变任何调用路径）
 export const manifest = {
   id: 'attention',
+  layer: '判断',
   title: '该不该接话',
   kind: 'hook',
   enabledByDefault: true,

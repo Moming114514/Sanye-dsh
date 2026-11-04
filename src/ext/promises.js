@@ -55,7 +55,7 @@ export default {
 
 // manifest：见 docs/EXT-MANIFEST.md（声明用，不改变任何调用路径）
 export const manifest = {
-  id: 'promises',
+  id: 'promises', layer: '记忆',
   title: '欠事捕获',
   kind: 'hook',
   enabledByDefault: true,

@@ -105,7 +105,7 @@ export default {
 
 // manifest：见 docs/EXT-MANIFEST.md（声明用，不改变任何调用路径）
 export const manifest = {
-  id: 'mute',
+  id: 'mute', layer: '判断',
   title: '静音名单',
   kind: 'hook',
   enabledByDefault: true,
