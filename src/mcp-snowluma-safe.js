@@ -380,7 +380,7 @@ const TOOL_PROFILE = String(
   process.env.SURFCORE_TOOL_PROFILE || cfg.socialV2?.toolProfile ||
   (cfg.socialV2?.tools?.getSnapshot === false ? 'full' : 'balanced')
 );
-if (!['full', 'balanced', 'compact', 'core', 'lean'].includes(TOOL_PROFILE)) {
+if (!['full', 'balanced', 'compact', 'core', 'core-min', 'lean'].includes(TOOL_PROFILE)) {
   console.error(`[tool-profile] 未知档位 "${TOOL_PROFILE}"，按 balanced 处理`);
 }
 const PROFILE_HIDDEN = {
@@ -423,11 +423,28 @@ const LEAN_TOOL_NAMES = new Set([
   'qq_social_state', 'qq_get_active_members', 'qq_get_my_recent_messages', 'qq_learn_from_owner',
 ]);
 // 实际生效的档位（未知值回落 balanced，避免配置手滑导致工具全空或全开）
-const EFFECTIVE_PROFILE = ['full', 'balanced', 'compact', 'core', 'lean'].includes(TOOL_PROFILE) ? TOOL_PROFILE : 'balanced';
+// core-min 档位：A-4 实测后收敛的 22 个（聊天主链 6 + 高频 9 + 其它 7）。
+// 与 core 的区别：去掉 6 天内 0 次的 impression/get_group_members/memory_query/
+// slang_query/slang_submit/get_self_image；补回 unread/style_note/collect_sticker。
+const CORE_MIN_TOOL_NAMES = new Set([
+  // 聊天主链
+  'qq_send_message', 'qq_reply', 'qq_wait_for_messages', 'qq_get_prompt',
+  'qq_mark_read', 'qq_close_conversation',
+  // 高频
+  'qq_set_wake_config', 'qq_get_message_images', 'qq_get_unread_messages',
+  'qq_read_group_recent', 'qq_get_context_snapshot', 'qq_style_note',
+  'qq_collect_sticker', 'qq_send_poke', 'qq_get_sticker_image',
+  // 其它
+  'qq_get_message_detail', 'qq_list_stickers', 'qq_memory_append', 'qq_loop',
+  'qq_status', 'qq_list_groups', 'qq_get_forward_msg',
+]);
+
+const EFFECTIVE_PROFILE = ['full', 'balanced', 'compact', 'core', 'core-min', 'lean'].includes(TOOL_PROFILE) ? TOOL_PROFILE : 'balanced';
 const hiddenByProfile = (name) => {
   if (EFFECTIVE_PROFILE === 'full') return false;
   if (EFFECTIVE_PROFILE === 'lean') return !LEAN_TOOL_NAMES.has(name);
   if (EFFECTIVE_PROFILE === 'core') return !CORE_TOOL_NAMES.has(name);
+  if (EFFECTIVE_PROFILE === 'core-min') return !CORE_MIN_TOOL_NAMES.has(name);
   return PROFILE_HIDDEN[EFFECTIVE_PROFILE]?.has(name) ?? false;
 };
 const disabledTools = [];

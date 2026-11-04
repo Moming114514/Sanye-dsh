@@ -19,14 +19,25 @@ const REPO = path.resolve(HERE, '..');
 const HOME = process.env.HOME || os.homedir();
 const MCP_FILE = path.join(REPO, 'src', 'mcp-snowluma-safe.js');
 const JSON_MODE = process.argv.includes('--json');
+const PROFILE = (() => {
+  const i = process.argv.indexOf('--profile');
+  const v = i >= 0 ? process.argv[i + 1] : 'lean';
+  return ['lean', 'core-min', 'core', 'compact', 'balanced'].includes(v) ? v : 'lean';
+})();
+const KEEP_CONST = {
+  lean: 'LEAN_TOOL_NAMES',
+  core: 'CORE_TOOL_NAMES',
+  'core-min': 'CORE_MIN_TOOL_NAMES',
+}[PROFILE];
 
 const NAME_RE = /\b(qq_[a-z0-9_]+|video_storyboard|note_tech)\b/g;
 const MAX_POS_PER_NAME = 4;
 
-function readLeanKeep() {
+function readKeep() {
   const src = fs.readFileSync(MCP_FILE, 'utf8');
-  const m = src.match(/LEAN_TOOL_NAMES\s*=\s*new Set\(\[([\s\S]*?)\]\)/);
-  if (!m) throw new Error('mcp-snowluma-safe.js 里找不到 LEAN_TOOL_NAMES');
+  if (!KEEP_CONST) return null; // balanced/compact 用 PROFILE_HIDDEN，不在本脚本范围
+  const m = src.match(new RegExp(KEEP_CONST + '\\s*=\\s*new Set\\(\\[([\\s\\S]*?)\\]\\)'));
+  if (!m) throw new Error('mcp-snowluma-safe.js 里找不到 ' + KEEP_CONST);
   const names = [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
   return new Set(names);
 }
@@ -141,7 +152,7 @@ function registeredTools() {
   });
 }
 
-const keep = readLeanKeep();
+const keep = readKeep();
 const files = scanRoots();
 const mentions = collectMentions(files);
 const registered = await registeredTools();
