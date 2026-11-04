@@ -1848,7 +1848,34 @@ let stateDirHardened = null;
 
 // ── 主流程 ──────────────────────────────────────────────────────────────────
 async function main() {
-  const cfg = loadConfig();
+  // CFG_HOT_RELOAD：面板改 config.json 后，运行期读 cfg 的分支不用重启就能生效。
+  // 注意：启动时已经展开进闭包的值（turnGuard.maxSteps 等）仍然是旧值，需要重启才更新。
+  let cfg = loadConfig();
+  const cfgFile = path.join(ROOT, 'config.json');
+  const cfgStampOf = () => {
+    try { const st = fs.statSync(cfgFile); return `${st.mtimeMs}:${st.size}`; } catch { return ''; }
+  };
+  let cfgStamp = cfgStampOf();
+  let cfgReloadErrorAt = '';
+  function refreshCfgFromDisk(where = '') {
+    const stamp = cfgStampOf();
+    if (!stamp || stamp === cfgStamp) return false;
+    try {
+      cfg = loadConfig();
+      cfgStamp = stamp;
+      cfgReloadErrorAt = '';
+      log(`[cfg] 配置已重新加载（${stamp}）${where ? ' @' + where : ''}`);
+      return true;
+    } catch (error) {
+      // 文件正在被写/写坏了：保留旧配置，等下一次变更再试，避免每条消息都重试刷日志。
+      cfgStamp = stamp;
+      if (cfgReloadErrorAt !== stamp) {
+        cfgReloadErrorAt = stamp;
+        log('[cfg] 重新加载失败，继续用旧配置：' + (error?.message ?? error));
+      }
+      return false;
+    }
+  }
   fs.mkdirSync(STATE_DIR, { recursive: true });
   hardenStateDirAcl();
   acquireLock();
@@ -11405,6 +11432,7 @@ const fishGroupNames = new Map(); // groupId -> group_name（'' = 查不到）
   // 花费降级：当日花费达到额度的一定比例后，群里自动降级成「只回 @」（等同高峰策略）。
   let guardCostCache = { at: 0, cost: 0 };
   function tokenGuardTodayCost() {
+    refreshCfgFromDisk('cost');
     if (Date.now() - guardCostCache.at < 60000) return guardCostCache.cost;
     let cost = 0;
     try {
@@ -11485,6 +11513,7 @@ const fishGroupNames = new Map(); // groupId -> group_name（'' = 查不到）
   }
 
   function tokenGuardDowngrade() {
+    refreshCfgFromDisk('downgrade');
     const g = tokenGuardCfg();
     if (g.enabled === false) return { on: false, cost: 0, cap: 0, ratio: 0 };
     const capRaw = Number(g.maxDailyCostCNY);
@@ -14524,6 +14553,7 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
   }
 
   function evaluateWakeTriggerV2(key, st, event, kind, textContent, plainContent, quoteTargetIsSelf) {
+    refreshCfgFromDisk('wake');
     if (kind === 'private') return 'private';
     // QQ_MODE_ONLY_OWNER：只听主人——群里别人说话一律不叫模型（比关机轻、比全开省）
     // PRIVATEONLY_PATCH：只跟我私聊——群里任何消息都不叫模型
