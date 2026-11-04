@@ -380,7 +380,7 @@ const TOOL_PROFILE = String(
   process.env.SURFCORE_TOOL_PROFILE || cfg.socialV2?.toolProfile ||
   (cfg.socialV2?.tools?.getSnapshot === false ? 'full' : 'balanced')
 );
-if (!['full', 'balanced', 'compact', 'core'].includes(TOOL_PROFILE)) {
+if (!['full', 'balanced', 'compact', 'core', 'lean'].includes(TOOL_PROFILE)) {
   console.error(`[tool-profile] 未知档位 "${TOOL_PROFILE}"，按 balanced 处理`);
 }
 const PROFILE_HIDDEN = {
@@ -410,10 +410,23 @@ const CORE_TOOL_NAMES = new Set([
   'qq_close_conversation',
   'qq_send_voice', 'qq_list_voices', 'qq_send_poke',
 ]);
+// lean 档：按线上使用数据（看图/记忆/群信息/黑话/欠事/印象）挑的高频 12 + 中频 8。
+// 注意：本清单只对本 server 注册的工具生效；video_storyboard 不在本 server，属于其它 MCP，
+// 这里保留它只是为了让名单与使用数据表格一一对应（不存在会静默跳过）。
+const LEAN_TOOL_NAMES = new Set([
+  // 高频 12
+  'qq_get_message_images', 'qq_get_unread_messages', 'qq_view_sticker', 'qq_collect_sticker',
+  'qq_list_stickers', 'qq_memory_query', 'qq_get_group_members', 'qq_get_group_history',
+  'qq_read_group_recent', 'qq_style_note', 'qq_loop', 'qq_get_context_snapshot',
+  // 中频 8
+  'qq_impression', 'video_storyboard', 'qq_get_recent_messages', 'note_tech',
+  'qq_social_state', 'qq_get_active_members', 'qq_get_my_recent_messages', 'qq_learn_from_owner',
+]);
 // 实际生效的档位（未知值回落 balanced，避免配置手滑导致工具全空或全开）
-const EFFECTIVE_PROFILE = ['full', 'balanced', 'compact', 'core'].includes(TOOL_PROFILE) ? TOOL_PROFILE : 'balanced';
+const EFFECTIVE_PROFILE = ['full', 'balanced', 'compact', 'core', 'lean'].includes(TOOL_PROFILE) ? TOOL_PROFILE : 'balanced';
 const hiddenByProfile = (name) => {
   if (EFFECTIVE_PROFILE === 'full') return false;
+  if (EFFECTIVE_PROFILE === 'lean') return !LEAN_TOOL_NAMES.has(name);
   if (EFFECTIVE_PROFILE === 'core') return !CORE_TOOL_NAMES.has(name);
   return PROFILE_HIDDEN[EFFECTIVE_PROFILE]?.has(name) ?? false;
 };

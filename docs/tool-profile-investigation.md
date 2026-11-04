@@ -159,3 +159,37 @@ node /tmp/tools-measure.mjs
 curl -s -H "x-console-token: $TOK" \
   "http://127.0.0.1:3100/api/socialV2/prompt?key=private:3160624852"
 ```
+
+## 7. lean 档与「文案冲突」检查（2026-11-04 22:30）
+
+按使用数据加了一个更窄的 `lean` 档（保留 20 个：看图/未读/表情/记忆/群信息/黑话/欠事/印象/上下文等）。
+它同样只在注册期过滤，默认仍是 `balanced`。
+
+实测（`SURFCORE_TOOL_PROFILE=lean`）：
+
+| 档位 | 工具数 | 描述+schema 字符 |
+|---|---:|---:|
+| balanced | 50 | 29,678 |
+| core | 25 | 16,763 |
+| **lean** | **19** | **9,221（−69%）** |
+
+**但 lean 会隐藏 `qq_send_message`、`qq_reply`、`qq_wait_for_messages`、`qq_get_prompt`、`qq_mark_read`、
+`qq_close_conversation` 这 6 个聊天主链工具**——按现在的运行方式，模型靠这些工具收发消息，
+所以 lean 目前**不能直接开**（除非确认发送走的是别的通道）。
+
+### 冲突检查脚本
+
+```bash
+node scripts/check-tool-mentions.mjs        # 人读表格
+node scripts/check-tool-mentions.mjs --json # 机器读
+```
+
+扫描范围：`src/bridge.js`、仓库 `docs/**`（含 handoff 任务文案）、`~/.dsh/surfcore/characters/**`、
+`~/.dsh/profiles/*/`（preset 与插件文案，跳过 node_modules）。
+
+输出：`工具名 | 出现位置(文件:行) | 出现次数`，附「按来源」统计，`CONFLICT_COUNT` 作为退出码依据
+（0 = 无冲突，1 = 有冲突）。
+
+当前结果：**34 个冲突**。其中 32 个来自 `bridge.js`（绝大多数是 `toolMap`/`enabledTools` 的权限名单，
+不是提示词文案），角色包只有 1 个（`characters/char-mvugwthv/memory/self.md:5` 提到 `qq_diary`）。
+按任务约定：**冲突数 > 0，不启 lean**；先给用户看清单。
