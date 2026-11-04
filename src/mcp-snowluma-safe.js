@@ -427,6 +427,11 @@ const LEAN_TOOL_NAMES = new Set([
 // 与 core 的区别：去掉 6 天内 0 次的 impression/get_group_members/memory_query/
 // slang_query/slang_submit/get_self_image；补回 unread/style_note/collect_sticker。
 const CORE_MIN_TOOL_NAMES = new Set([
+  'qq_recall_memory',
+  'qq_memory_query',
+  'qq_impression',
+  'qq_view_sticker',
+  'qq_send_qzone_msg',
   // 聊天主链
   'qq_send_message', 'qq_reply', 'qq_wait_for_messages', 'qq_get_prompt',
   'qq_mark_read', 'qq_close_conversation',
