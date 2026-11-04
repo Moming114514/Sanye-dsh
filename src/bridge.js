@@ -10074,6 +10074,84 @@ const fishGroupNames = new Map(); // groupId -> group_name（'' = 查不到）
     if (/不是有效图片/.test(joined)) return 'not-image';
     return 'fetch-failed';
   }
+  // TASK-AUTO-LOOK（2026-11-04）：唤醒时自动把「这条消息的图」附给模型。
+  // 背景：硬规则写在提示词里，deepseek-flash 经常不照做（media-stats 里 withMedia=2/looked=0），
+  // 所以改成 bridge 主动附图 + 末尾追加一段说明，模型不用再自己调 qq_get_message_images。
+  function mediaLookCfg() {
+    const m = cfg.socialV2?.media ?? {};
+    return {
+      autoLook: m.autoLook !== false,
+      maxPerWake: Math.max(1, Math.min(3, Number(m.maxPerWake) || 1)),
+      groupOnlyWhenMentioned: m.groupOnlyWhenMentioned !== false,
+      skipWhenPeek: m.skipWhenPeek === true,
+    };
+  }
+  function pickAutoLookMedia(key, reason) {
+    const c = mediaLookCfg();
+    if (!c.autoLook) return null;
+    const isPrivate = String(key).startsWith('private:');
+    if (!isPrivate && c.groupOnlyWhenMentioned) {
+      const okReason = ['atMention', 'nameMention', 'private', 'askOwner'].includes(String(reason));
+      if (!okReason) return null;
+    }
+    if (c.skipWhenPeek && /peek/i.test(String(reason))) return null;
+    const st = getSocialV2State(key);
+    const list = Array.isArray(st.unread) ? st.unread : [];
+    for (let i = list.length - 1; i >= 0; i -= 1) {
+      const m = list[i];
+      const ms = Array.isArray(m?.media) ? m.media.filter((x) => x && ['image', 'sticker', 'face'].includes(x.kind)) : [];
+      if (ms.length) return { list: ms.slice(-c.maxPerWake), total: ms.length, msgId: m.messageId };
+    }
+    return null;
+  }
+  async function prepareAutoLookMedia(key, reason) {
+    const pick = pickAutoLookMedia(key, reason);
+    if (!pick) return null;
+    const picked = pick.list;
+    const parts = [];
+    const cache = readMediaCache();
+    for (let idx = 0; idx < picked.length; idx += 1) {
+      const media = picked[idx];
+      const label = media.kind === 'sticker' ? '表情包' : media.kind === 'face' ? '表情' : '图片';
+      let buffer = null;
+      let mimeType = '';
+      // 先吃「收到消息时已经落盘的缓存」，避免每次唤醒再拉一遍网络（媒体链接过期很快）。
+      try {
+        const hit = cache.filter((e) => e && e.key === key && e.file && (!pick.msgId || String(e.msgId) === String(pick.msgId))).pop();
+        if (hit) {
+          buffer = fs.readFileSync(hit.file);
+          mimeType = /\.gif$/i.test(hit.file) ? 'image/gif' : /\.png$/i.test(hit.file) ? 'image/png' : /\.webp$/i.test(hit.file) ? 'image/webp' : 'image/jpeg';
+        }
+      } catch {}
+      if (!buffer?.length) {
+        try {
+          const got = await Promise.race([
+            (media.kind === 'face' ? fetchFaceMedia(media) : fetchOneBotImage(media)),
+            new Promise((resolve) => { const t = setTimeout(() => resolve(null), 12000); t.unref?.(); }),
+          ]);
+          if (got?.buffer?.length) { buffer = got.buffer; mimeType = got.mimeType || 'image/jpeg'; }
+        } catch (e) {
+          log(`[autolook] 取图异常 ${key}: ${e?.message ?? e}`);
+        }
+      }
+      if (buffer?.length) {
+        parts.push({ type: 'image', mediaType: mimeType, data: buffer.toString('base64'), name: `auto-${media.kind}-${idx + 1}.${(mimeType.split('/')[1] || 'jpg')}` });
+        log(`[autolook] 已附图 ${key}（${label}，${buffer.length} 字节）`);
+      }
+    }
+    const more = pick.total > parts.length ? `（本条共 ${pick.total} 张，这次只附了 ${parts.length} 张）` : '';
+    if (parts.length) {
+      mediaStatsBump('looked');
+      return {
+        parts,
+        line: `\n\n【这条消息的图】${parts.length === 1 ? (picked[0].kind === 'sticker' ? '表情包' : picked[0].kind === 'face' ? '表情' : '图片') : `${parts.length} 张图`}${more}。图已随这条消息附上，直接看画面说话；画面里的字、长图/截图、多张拼图都按你看到的讲。如果屏幕上没有这些图，就说「图没加载出来」，不要猜。\n`,
+      };
+    }
+    mediaStatsBump('failed', 'autolook-fetch');
+    log(`[autolook] 取图失败 ${key}（${picked.length} 张都没取到）`);
+    return { parts: null, line: `\n\n【这条消息的图】${more || ''}这张图没加载出来，照实说「图没加载出来」，不要猜。\n` };
+  }
+
   function readMediaCache() {
     try { const j = JSON.parse(fs.readFileSync(MEDIA_CACHE_INDEX, 'utf8')); return Array.isArray(j) ? j : []; } catch { return []; }
   }
@@ -10502,7 +10580,7 @@ const fishGroupNames = new Map(); // groupId -> group_name（'' = 查不到）
     if (!Array.isArray(mediaList) || mediaList.length === 0 || !messageRef) return '';
     if (currentMode === 'reserved2') {
       // TASK-INPUT #1：从「如需要」改成硬规则，并把「调不到就明说」写死。
-      return `\n【图片/表情】本条消息包含 ${mediaList.length} 个图片/表情（消息ID=${messageRef}）。硬规则：只要这条需要你回应（主人/别人发图问你、@你，或你正要接这条），开口前必须先调用 mcp__snowluma__qq_get_message_images（key="${key}", messageId="${messageRef}"）看清图里是什么；没看到就不要描述图里的内容。调不到或失败就说「图没加载出来」，不要凭空猜。`;
+      return `\n【图片/表情】本条消息包含 ${mediaList.length} 个图片/表情（消息ID=${messageRef}）。如果本条已经附了「这条消息的图」就直接看那段，不用再调工具；没附图时才调用 mcp__snowluma__qq_get_message_images（key="${key}", messageId="${messageRef}"）看清图里是什么；没看到就不要描述图里的内容。调不到或失败就说「图没加载出来」，不要凭空猜。`;
     }
     return `\n【图片/表情】本条消息包含 ${mediaList.length} 个图片/表情（消息ID=${messageRef}）。`;
   }
@@ -13050,10 +13128,26 @@ const fishGroupNames = new Map(); // groupId -> group_name（'' = 查不到）
         });
       } catch {}
     }
-    let content = [{ type: 'text', text: withAlignmentContext(key, withSlangContext(promptText, key)) }];
-    if (Array.isArray(opts.media) && opts.media.length > 0) {
-      const imageParts = await resolveMediaList(opts.media);
-      content = [{ type: 'text', text: withAlignmentContext(key, withSlangContext(promptText, key)) }, ...imageParts];
+    // TASK-AUTO-LOOK：这次唤醒如果没显式带图，先看「触发消息里有没有图」，有就自动附一张。
+    let mediaList = Array.isArray(opts.media) ? opts.media.slice() : [];
+    let autoParts = null;
+    let autoLine = '';
+    if (opts.wakeReason && mediaList.length === 0) {
+      try {
+        const auto = await prepareAutoLookMedia(key, opts.wakeReason);
+        if (auto) { autoParts = auto.parts; autoLine = auto.line || ''; if (auto.media) mediaList = [auto.media]; }
+      } catch (e) {
+        log(`[autolook] 跳过 ${key}: ${e?.message ?? e}`);
+      }
+    }
+    // autoLine 压在最末尾（黑话表之后），保证「这条消息的图」是模型最后读到的一段。
+    const finalText = withAlignmentContext(key, withSlangContext(promptText, key) + autoLine);
+    let content = [{ type: 'text', text: finalText }];
+    if (autoParts?.length) {
+      content = [{ type: 'text', text: finalText }, ...autoParts];
+    } else if (mediaList.length > 0) {
+      const imageParts = await resolveMediaList(mediaList);
+      content = [{ type: 'text', text: finalText }, ...imageParts];
     }
     // 媒体解析成功后再标记退场，避免解析异常时残留退场标记。
     if (!isCurrentSession(key, sessionId)) throw new Error('投递前会话已重置或权限已变化');
@@ -14948,7 +15042,7 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
     const pendingMediaCount = (st.unread || []).filter((m) => m && Array.isArray(m.media) && m.media.length).length;
     if (pendingMediaCount > 0) mediaStatsBump('withMedia');
     const mediaRuleLine = pendingMediaCount
-      ? `【看图硬规则】未读里有 ${pendingMediaCount} 条带图片/表情。只要这条需要你回应（主人发图、别人发图问你、@你，或你正要接这条），开口前必须先调用 qq_get_message_images 看清图里是什么（key 用本会话，messageId/seq 用未读消息里的）；没看到就不要描述图里的内容。调不到或失败就说「图没加载出来」，不要猜。纯水群、没人点你、你也不打算接这条时，不必强行看图。\n\n`
+      ? `【看图硬规则】未读里有 ${pendingMediaCount} 条带图片/表情。只要这条需要你回应（主人发图、别人发图问你、@你，或你正要接这条）：如果提示词末尾已经附了「【这条消息的图】」，直接看那段附图和说明，不要再调用 qq_get_message_images（重复取图浪费钱）；没有附图时才调用它看清图里是什么，没看到就不要描述图里的内容。调不到或失败就说「图没加载出来」，不要猜。纯水群、没人点你、你也不打算接这条时，不必强行看图。\n\n`
       : '';
     const memoryText = formatMemoryV2(st);
     const memoryLine = memoryText ? `${memoryText}\n\n` : '';
