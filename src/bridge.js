@@ -10387,7 +10387,8 @@ const fishGroupNames = new Map(); // groupId -> group_name（'' = 查不到）
   function mediaHintFor(key, messageRef, mediaList) {
     if (!Array.isArray(mediaList) || mediaList.length === 0 || !messageRef) return '';
     if (currentMode === 'reserved2') {
-      return `\n【图片/表情】本条消息包含 ${mediaList.length} 个图片/表情（消息ID=${messageRef}）。如需要查看/识别，请调用 mcp__snowluma__qq_get_message_images，参数 key="${key}", messageId="${messageRef}"。`;
+      // TASK-INPUT #1：从「如需要」改成硬规则，并把「调不到就明说」写死。
+      return `\n【图片/表情】本条消息包含 ${mediaList.length} 个图片/表情（消息ID=${messageRef}）。硬规则：只要这条需要你回应（主人/别人发图问你、@你，或你正要接这条），开口前必须先调用 mcp__snowluma__qq_get_message_images（key="${key}", messageId="${messageRef}"）看清图里是什么；没看到就不要描述图里的内容。调不到或失败就说「图没加载出来」，不要凭空猜。`;
     }
     return `\n【图片/表情】本条消息包含 ${mediaList.length} 个图片/表情（消息ID=${messageRef}）。`;
   }
@@ -14829,6 +14830,11 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
     const adminLine = adminText ? `${adminText}\n\n` : '';
     const st = getSocialV2State(key);
     const tokenLine = `【会话令牌】${st.agentToken}（调用二代状态工具时请在参数中带上此令牌）\n\n`;
+    // TASK-INPUT #1：未读里带图时，把「先看图再开口」写成硬规则。
+    const pendingMediaCount = (st.unread || []).filter((m) => m && Array.isArray(m.media) && m.media.length).length;
+    const mediaRuleLine = pendingMediaCount
+      ? `【看图硬规则】未读里有 ${pendingMediaCount} 条带图片/表情。只要这条需要你回应（主人发图、别人发图问你、@你，或你正要接这条），开口前必须先调用 qq_get_message_images 看清图里是什么（key 用本会话，messageId/seq 用未读消息里的）；没看到就不要描述图里的内容。调不到或失败就说「图没加载出来」，不要猜。纯水群、没人点你、你也不打算接这条时，不必强行看图。\n\n`
+      : '';
     const memoryText = formatMemoryV2(st);
     const memoryLine = memoryText ? `${memoryText}\n\n` : '';
     // 注意：黑话表不在这里注入，deliverPromptNow 的 withSlangContext 会统一注入，
@@ -14918,7 +14924,7 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
       + tokenLine + antiAiLine + proactiveLine + closureLine + stickerLine + replyLine + preSleepLine
       + biliLine + memoryCardLine + initialPromptLine
       + stickerTodoBlock + walletLine + tokenGuardLine
-      + statusLine + wakeLine + memoryLine + participationLine + fishGuardLine + stickerMatchLine;
+      + statusLine + wakeLine + memoryLine + participationLine + fishGuardLine + stickerMatchLine + mediaRuleLine;
     lastWakePromptMeta = {
       role: roleLine.length,
       identity: identityLine.length,
@@ -14941,6 +14947,7 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
       fishGuard: fishGuardLine.length,
       tokenGuard: tokenGuardLine.length,
       preSleep: preSleepLine.length,
+      mediaRule: mediaRuleLine.length,
       base: base.length,
     };
     if (reason === 'bootstrap') {
