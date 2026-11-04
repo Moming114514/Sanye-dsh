@@ -140,3 +140,16 @@ export function evaluate(input = {}) {
 }
 
 export default { evaluate, SPEAK_PRIORITY };
+
+export const manifest = {
+  id: 'speak-policy',
+  layer: '判断',
+  title: '发言策略（只读对照）',
+  kind: 'tool',
+  enabledByDefault: true,
+  hot: true,
+  order: 180,
+  hooks: [],
+  config: [],
+  stateFiles: [],
+};

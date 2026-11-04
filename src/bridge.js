@@ -15249,7 +15249,7 @@ function speakPolicyState(key, cfgNow) {
   };
 }
 
-function logSpeakPolicy(key, reason) {
+function logSpeakPredict(key, reason) {
   try {
     const snap = speakPolicyState(key, cfg);
     const r = evaluateSpeakPolicy({
@@ -15262,21 +15262,42 @@ function logSpeakPolicy(key, reason) {
       state: snap,
       rng: Math.random,
     });
-    log(`[策略] key=${key} allow=${r.allow} source=${r.source} reason=${r.reason}${r.note ? ' note=' + r.note : ''}${r.maxSentences ? ' maxSentences=' + r.maxSentences : ''}`);
+    log(`[策略·预测] key=${key} allow=${r.allow} source=${r.source} reason=${r.reason}${r.note ? ' note=' + r.note : ''}${r.maxSentences ? ' maxSentences=' + r.maxSentences : ''}`);
   } catch (e) {
     log(`[策略] 计算失败：${e?.message || e}`);
   }
 }
 
+// 把 ext 拒绝理由归到 source 上（只用于 [策略·实际] 日志，不改判断）
+function speakSourceOf(reasonText) {
+  const t = String(reasonText || '');
+  if (t.includes('[静音]')) return 'mute';
+  if (t.includes('[学习模式]')) return 'learn';
+  if (t.includes('[省钱]')) return 'economy';
+  if (t.includes('[频繁度]')) return 'rate';
+  if (t.includes('[只回几人]') || t.includes('[注意力]')) return 'attention';
+  if (t.includes('[安全]')) return 'safe';
+  if (t.includes('[只跟我私聊]') || t.includes('[只听主人]')) return 'ownerOnly';
+  return t ? 'ext' : 'unknown';
+}
+
+function logSpeakActual(key, allow, source, reason) {
+  try {
+    log(`[策略·实际] key=${key} allow=${allow} source=${source} reason=${reason}`);
+  } catch {}
+}
+
   async function sendWakePromptV2(key, reason) {
-    if (cfg.socialV2?.enabled === false) return;
-    if (currentMode !== 'reserved2' || socialV2.paused) return;
-    logSpeakPolicy(key, reason); // SPEAK_POLICY_PATCH：旁路观测，不改判断
+    if (cfg.socialV2?.enabled === false) { logSpeakActual(key, false, 'config', 'socialV2.enabled=false'); return; }
+    if (currentMode !== 'reserved2' || socialV2.paused) { logSpeakActual(key, false, 'config', socialV2.paused ? 'paused' : 'mode=' + currentMode); return; }
+    logSpeakPredict(key, reason); // SPEAK_POLICY_PATCH：入口预测（不改判断）
     // EXT_PATCH：唤醒闸门交给扩展（只听主人等规则在 src/ext/*.js 里）
     const wakeGate = extWakeGate({ key: String(key), reason: String(reason), cfg, mode: qqMode(),
       economyOn: tokenGuardDowngrade().on }); // ECONOMY_PATCH
     if (wakeGate && wakeGate.allow === false) {
-      log(wakeGate.reason || `[ext] 跳过唤醒 ${key}（${reason}）`);
+      const extReason = wakeGate.reason || `[ext] 跳过唤醒 ${key}（${reason}）`;
+      log(extReason);
+      logSpeakActual(key, false, speakSourceOf(extReason), extReason);
       return;
     }
     const stForGuard = getSocialV2State(key);
@@ -15287,6 +15308,7 @@ function logSpeakPolicy(key, reason) {
         stForGuard.channelGateLoggedAt = Date.now();
         log(`[channel-gate] 跳过唤醒 ${key}（${reason}）：${channel.reason}；不创建 DSH 会话，避免空烧 token`);
       }
+      logSpeakActual(key, false, 'channel', channel.reason || '发送通道不可用');
       return;
     }
     if (autoWake) {
@@ -15295,11 +15317,13 @@ function logSpeakPolicy(key, reason) {
           stForGuard.channelGateLoggedAt = Date.now();
           log(`[channel-gate] 跳过唤醒 ${key}（${reason}）：发送失败后暂停中，约 ${Math.ceil((stForGuard.wakeSuspendedUntil - Date.now()) / 60000)} 分钟后重试`);
         }
+        logSpeakActual(key, false, 'channel', '发送失败后暂停中');
         return;
       }
     }
     if (!isSessionAllowedInCurrentMode(key)) {
       log(`[reserved2] 跳过唤醒 ${key}（${reason}）：会话已不在当前模式允许范围内`);
+      logSpeakActual(key, false, 'mode', '会话不在当前模式允许范围');
       return;
     }
     const st = stForGuard;
@@ -15313,6 +15337,7 @@ function logSpeakPolicy(key, reason) {
     });
     if (fishWake.blocked) {
       fishLogOnce(key, `[鱼群保护] 跳过唤醒 ${key}（${reason}）：${fishGuardReasonText(fishWake) || '保护冷却中'}`);
+      logSpeakActual(key, false, 'fishGuard', fishGuardReasonText(fishWake) || '保护冷却中');
       return;
     }
     // Token 防爆破：鱼群守则之后、真正投递之前。被拦时消息保留在未读，不烧模型回合。
@@ -15333,6 +15358,7 @@ function logSpeakPolicy(key, reason) {
         }, waitMs);
         st.tokenRetryTimer.unref?.();
       }
+      logSpeakActual(key, false, 'tokenGuard', tokenWake.error || 'token 额度拦截');
       return;
     }
     // 防重入：如果该会话已经有一个 DSH turn 在进行中（AI 正在思考/调用工具），
@@ -15346,6 +15372,7 @@ function logSpeakPolicy(key, reason) {
         if (st.pendingWakeReasons.length > 20) st.pendingWakeReasons.splice(0, st.pendingWakeReasons.length - 20);
       }
       log(`[reserved2] 会话繁忙，暂存唤醒原因 ${key}（${reason}@seq${seq}，原因=${busyReasonV2(key, st)}）`);
+      logSpeakActual(key, false, 'busy', '会话繁忙');
       return;
     }
     // 唤醒频率硬限制：超限则**延后重试**，不能直接丢弃。直接 return 的后果：
@@ -15388,6 +15415,7 @@ function logSpeakPolicy(key, reason) {
         st.rateLimitRetryTimer.unref?.();
       }
       log(`[reserved2] 唤醒频率超限，${Math.round(waitMs / 1000)}s 后重试 ${key}（${reason}）`);
+      logSpeakActual(key, false, 'wakeRate', '唤醒频率超限');
       return;
     }
     // Only a real new wake resets observation; skipped/busy candidates must
@@ -15437,10 +15465,14 @@ function logSpeakPolicy(key, reason) {
         rollbackWakeTime();
         restoreFiniteSleep();
         log(`[reserved2] 唤醒投递被拒 ${key}: ${result.error || '未知错误'}`);
+        logSpeakActual(key, false, 'deliver', result.error || '投递被拒');
       } else if (result && result.queued === true) {
         // 入队而非真正在途：保留 pendingWakeKeys，等 DSH 恢复后真正投递的 turn/end 再触发收尾保护；
         // 不能在这里删除，否则补投的唤醒回合会丢失“未设置唤醒配置”的安全兜底。
         log(`[reserved2] 唤醒已入队 ${key}（${reason}），等待 DSH 恢复后补投`);
+        logSpeakActual(key, true, 'queued', '已入队');
+      } else {
+        logSpeakActual(key, true, 'delivered', '投递成功');
       }
     } catch (error) {
       pendingWakeKeys.delete(key);
@@ -15453,6 +15485,7 @@ function logSpeakPolicy(key, reason) {
         setupSleepTimerV2(key);
       }
       log(`[reserved2] 唤醒投递失败 ${key}: ${error?.message ?? error}`);
+      logSpeakActual(key, false, 'deliver-error', error?.message || '投递失败');
     }
   }
 
