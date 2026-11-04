@@ -96,7 +96,7 @@ async function qzoneWatchTick() {
                   if (!c || String(c.uin ?? '') !== ownerUin) continue;
                   // QZONE_WATCH_REPLY_FIX：@ 别人的略过；@ 她本人的要算（那是他在回她）
                   const cText = String(c.content ?? '');
-                  if (cText.includes('@{uin:') && !cText.includes(`uin:${String(helpers.getSelfUserId() || '')},`)) continue;
+                  if (cText.includes('@{uin:') && !cText.includes(`uin:${String(getSelfUserId() || '')},`)) continue;
                   const key = `${m.tid}:${c.create_time ?? c.createTime ?? ''}:${String(c.content ?? '').slice(0, 20)}`;
                   if (st.comments.includes(key) || st.pending.some((p) => p.key === key)) continue;
                   if (seedOnly) { st.comments.push(key); continue; }
