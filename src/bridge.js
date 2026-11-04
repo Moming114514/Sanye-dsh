@@ -9189,6 +9189,7 @@ async function main() {
           }
           try {
             const images = await fetchMediaData(media);
+            if (images.some((item) => item && item.data)) mediaStatsBump('looked');
             sendJson({ ok: true, messageId, media, images });
           } catch (error) {
             log(`图片查询失败 ${key} ${messageId}: ${error?.message ?? error}`);
@@ -10030,6 +10031,49 @@ const fishGroupNames = new Map(); // groupId -> group_name（'' = 查不到）
   // 原因：自己发出的表情在历史里只有 gxh.vip 链接（404），只有收到的才有 multimedia 链接
   const MEDIA_CACHE_DIR = path.join(STATE_DIR, 'media-cache');
   const MEDIA_CACHE_INDEX = path.join(MEDIA_CACHE_DIR, 'index.json');
+  // TASK-INPUT #3：媒体观测。每次唤醒/看图/失败各记一笔，按天重置，写 state/media-stats.json。
+  const MEDIA_STATS_FILE = path.join(STATE_DIR, 'media-stats.json');
+  const mediaStatsDay = () => new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
+  let mediaStatsCache = null;
+  function mediaStatsLoad() {
+    if (mediaStatsCache && mediaStatsCache.day === mediaStatsDay()) return mediaStatsCache;
+    let j = null;
+    try { j = JSON.parse(fs.readFileSync(MEDIA_STATS_FILE, 'utf8')); } catch {}
+    if (!j || typeof j !== 'object' || j.day !== mediaStatsDay()) {
+      j = { day: mediaStatsDay(), withMedia: 0, looked: 0, failed: 0, reasons: {} };
+    }
+    if (!j.reasons || typeof j.reasons !== 'object') j.reasons = {};
+    mediaStatsCache = j;
+    return j;
+  }
+  function mediaStatsBump(field, reason = '') {
+    const j = mediaStatsLoad();
+    if (field === 'withMedia' || field === 'looked' || field === 'failed') {
+      j[field] = Number(j[field] || 0) + 1;
+    }
+    if (field === 'failed') {
+      const key = String(reason || 'unknown').slice(0, 60);
+      j.reasons[key] = Number(j.reasons[key] || 0) + 1;
+      const top = Object.entries(j.reasons).sort((a, b) => b[1] - a[1]).slice(0, 12);
+      j.reasons = Object.fromEntries(top);
+    }
+    j.at = Date.now();
+    try {
+      const tmp = MEDIA_STATS_FILE + '.tmp';
+      fs.writeFileSync(tmp, JSON.stringify(j));
+      fs.renameSync(tmp, MEDIA_STATS_FILE);
+    } catch (e) {
+      log(`[media] 统计写入失败：${e?.message ?? e}`);
+    }
+  }
+  function mediaFailReason(failures) {
+    const joined = (failures || []).join(' | ');
+    if (/图太大|超过大小限制/.test(joined)) return 'too-large';
+    if (/404/.test(joined)) return 'http-404';
+    if (/timeout|超时/i.test(joined)) return 'timeout';
+    if (/不是有效图片/.test(joined)) return 'not-image';
+    return 'fetch-failed';
+  }
   function readMediaCache() {
     try { const j = JSON.parse(fs.readFileSync(MEDIA_CACHE_INDEX, 'utf8')); return Array.isArray(j) ? j : []; } catch { return []; }
   }
@@ -10306,6 +10350,9 @@ const fishGroupNames = new Map(); // groupId -> group_name（'' = 查不到）
     if (result) return result;
     if (failures.length) {
       log(`[media] ${label}获取失败（${failures.length} 次尝试）：${failures.slice(0, 3).join(' | ')}`);
+      mediaStatsBump('failed', mediaFailReason(failures));
+    } else {
+      mediaStatsBump('failed', 'no-source');
     }
     return null;
   }
@@ -10332,6 +10379,7 @@ const fishGroupNames = new Map(); // groupId -> group_name（'' = 查不到）
       }
     } catch (error) {
       log(`fetchFaceEntity 失败: ${error?.message ?? error}`);
+      mediaStatsBump('failed', 'face-entity');
     }
     return { text: fallbackText };
   }
@@ -14898,6 +14946,7 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
     const tokenLine = `【会话令牌】${st.agentToken}（调用二代状态工具时请在参数中带上此令牌）\n\n`;
     // TASK-INPUT #1：未读里带图时，把「先看图再开口」写成硬规则。
     const pendingMediaCount = (st.unread || []).filter((m) => m && Array.isArray(m.media) && m.media.length).length;
+    if (pendingMediaCount > 0) mediaStatsBump('withMedia');
     const mediaRuleLine = pendingMediaCount
       ? `【看图硬规则】未读里有 ${pendingMediaCount} 条带图片/表情。只要这条需要你回应（主人发图、别人发图问你、@你，或你正要接这条），开口前必须先调用 qq_get_message_images 看清图里是什么（key 用本会话，messageId/seq 用未读消息里的）；没看到就不要描述图里的内容。调不到或失败就说「图没加载出来」，不要猜。纯水群、没人点你、你也不打算接这条时，不必强行看图。\n\n`
       : '';
