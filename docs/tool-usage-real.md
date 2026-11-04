@@ -85,3 +85,9 @@
 ## 4. 一句话结论
 
 高频的是聊天主链和看图：`qq_send_message`（514）、`qq_close_conversation`（442）、`qq_wait_for_messages`（398）；低频/0 次的是 qzone/资料/好友申请/语音/抽帧类工具。从真实数据看，**`qq_send_message` 是被调用最多的工具之一**，所以 A-2 的 lean 名单把它排除是危险的；core 档（保留 send/reply/wait/mark_read/close_conversation）与真实使用更吻合。
+
+## 补记：core-min 名单（2026-11-05）
+
+- `note_tech` 已加回 core-min（A-4 收敛时被漏掉，GitHub 每周学习依赖它记笔记）。
+- 当前 core-min 注册 **25 个工具 / 17,787 字符**（含 `qq_learn_from_owner`、`qq_diary`、`note_tech`）。
+- 实测命令：`SURFCORE_TOOL_PROFILE=core-min node /tmp/prof.mjs core-min`。

@@ -437,6 +437,9 @@ const CORE_MIN_TOOL_NAMES = new Set([
   // 其它
   'qq_get_message_detail', 'qq_list_stickers', 'qq_memory_append', 'qq_loop',
   'qq_status', 'qq_list_groups', 'qq_get_forward_msg',
+  'qq_learn_from_owner', // 主人教说话（低频但关键）
+  'qq_diary', // 日记（角色卡提到）
+  'note_tech', // 技术笔记（GitHub 每周学习要求用它，A-4 后被漏掉）
 ]);
 
 const EFFECTIVE_PROFILE = ['full', 'balanced', 'compact', 'core', 'core-min', 'lean'].includes(TOOL_PROFILE) ? TOOL_PROFILE : 'balanced';
