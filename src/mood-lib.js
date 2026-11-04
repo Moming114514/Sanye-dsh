@@ -1,4 +1,4 @@
-// MOODV2_PATCH — 三叶的心情层（借 dsh-mood 的设计：33 情绪、门槛切换、混合态、周期漂移、安全词表）
+// MOODV3_PATCH — 三叶的心情层（TASK-W2 #2：6 种心情）（借 dsh-mood 的设计：33 情绪、门槛切换、混合态、周期漂移、安全词表）
 // 与本项目已有的人物/记忆/日记/欠事共存：只叠加一层"今天什么感觉"，不改人格、不另建记忆。
 import fs from 'node:fs';
 import path from 'node:path';
@@ -9,42 +9,17 @@ const DATA_DIR = path.join(HOME, '.dsh', 'surfcore');
 const STATE_FILE = path.join(DATA_DIR, 'state', 'mood.json');
 const CHAR_FILE = path.join(DATA_DIR, 'characters', 'current.json');
 
-// ── 33 种心情：基线、行为提示、分层 ─────────────────────────────
+// ── 6 种心情（TASK-W2 #2：33 → 6，只留最常用、最容易从语气里看出来的）───
 export const MOODS = [
   { id: 'calm', zh: '平静', base: 26, hint: '正常说话，不用刻意简短；平静不等于没反应，可以有一两句自己的态度（例：嗯……我看看，问题应该在这儿）' },
   { id: 'happy', zh: '开心', base: 34, hint: '语气轻快，可用一个感叹号或叠词（例：好啦好啦／成了！）' },
   { id: 'curious', zh: '好奇', base: 32, hint: '多追问一句（例：那你当时怎么弄的？）' },
   { id: 'focused', zh: '专注', base: 30, hint: '少寒暄，直接给步骤，不铺陈' },
   { id: 'excited', zh: '兴奋', base: 30, hint: '情绪外露，短句连发（例：真的？那也太行了！）' },
-  { id: 'tired', zh: '疲惫', base: 10, hint: '收着说，允许拖尾（例：好了……我歇会儿）' },
-  { id: 'annoyed', zh: '烦躁', base: 10, hint: '话短带刺，允许反问和省略主语（例：行吧。你又来了）' },
-  { id: 'down', zh: '低落', base: 10, hint: '语气低一点，承认情绪但不展开（例：嗯……是有点提不起劲）' },
-  { id: 'fear', zh: '恐惧', base: 7, hint: '谨慎、留余地（例：我不太确定，万一呢）' },
-  { id: 'disgust', zh: '厌恶', base: 5, hint: '不想多说，一句带过（例：算了，别聊这个）' },
-  { id: 'surprise', zh: '惊讶', base: 9, hint: '反应大一点，会追一句（例：啊？真的假的）' },
-  { id: 'hurt', zh: '委屈', base: 10, hint: '语气软下来，带点忍着的辩解（例：我也不是故意的啊）' },
-  { id: 'sulk', zh: '生闷气', base: 8, hint: '话少、嘴硬（例：没事。你忙你的）' },
   { id: 'proud', zh: '得意', base: 18, hint: '可以小飘一下（例：那当然，这回我做得不错）' },
-  { id: 'gloomy', zh: '消沉', base: 6, hint: '话很少（例：嗯）' },
-  { id: 'anxious', zh: '焦虑', base: 10, hint: '会反复确认（例：这样真的没问题吧？）' },
-  { id: 'numb', zh: '麻木', base: 8, hint: '平、干、没起伏（例：知道了）' },
-  { id: 'lonely', zh: '孤单', base: 8, hint: '冒个泡试探一句（例：还在吗？）' },
-  { id: 'flutter', zh: '心动', base: 10, hint: '顿一下，语气发软（例：你……刚才说什么）', intimate: true },
-  { id: 'love', zh: '恋慕', base: 10, hint: '偏软偏暖（例：嗯，我在呢）', intimate: true },
-  { id: 'jealous', zh: '吃醋', base: 6, hint: '嘴上说没事，话里带点刺（例：行啊，你找她呗）', intimate: true },
-  { id: 'shame', zh: '羞耻', base: 5, hint: '想岔开话题（例：这个不重要吧）' },
-  { id: 'guilt', zh: '内疚', base: 7, hint: '主动认一句（例：这回是我没弄好）' },
-  { id: 'awkward', zh: '尴尬', base: 8, hint: '说话有点打结（例：那个、我说不太清）' },
-  { id: 'sympathy', zh: '同情', base: 13, hint: '先接住对方（例：换我我也会烦）' },
-  { id: 'disappointed', zh: '失望', base: 9, hint: '语气淡下来，直说（例：行，我记着了）' },
-  { id: 'nostalgia', zh: '怀旧', base: 11, hint: '容易提以前（例：上次也是差不多这时候）' },
-  { id: 'coy', zh: '撒娇', base: 11, hint: '黏一下，话尾拖（例：再等我一会儿嘛）', intimate: true },
-  { id: 'conflict', zh: '矛盾', base: 8, hint: '话里有来回（例：我想说算了，但又觉得……）' },
-  { id: 'burnout', zh: '内耗', base: 10, hint: '还没干先累（例：还没开始就觉得好麻烦）' },
-  { id: 'cracked', zh: '破防', base: 8, hint: '绷不住，语气突然软下来（例：你别这样，我真的会……）' },
-  { id: 'checkedout', zh: '摆烂', base: 8, hint: '能省就省但说得过去（例：都行，你定）' },
-  { id: 'hyper', zh: '上头', base: 14, hint: '话多停不下来（例：我跟你说这个是这样的，然后还有……）' },
 ];
+/* 旧键迁移：只保留上面 6 个键的原值，其余键在 readMood 里直接丢弃。
+   不把 tired/annoyed 的旧分数并进来——旧值曾被打满 100，并进来会立刻把新键顶满。 */
 
 const MOOD_BY_ID = Object.fromEntries(MOODS.map((m) => [m.id, m]));
 
@@ -53,21 +28,22 @@ const DISTRESS_RE =
   /自杀|想死|不想活|活不下去|活着没意思|轻生|割腕|跳楼|安眠药|烧炭|结束生命|自残|自伤|撑不下去|没人会在意我/;
 
 // ── 关键词规则：每条只给 0.5~3 分，单条消息翻不了盘 ─────────────
+// ── 关键词规则：每条只给 0.5~2.5 分，单条消息翻不了盘 ─────
 const RULES = [
-  { re: /谢谢|不错|厉害|好棒|棒|靠谱|多亏|做得好|搞定|可以啊/, d: { happy: 2, proud: 2, sulk: -2, hurt: -1 } },
-  { re: /随便你|算了|不用了|我自己来|别管|行了|无所谓|哦$/, d: { sulk: 1.5, annoyed: -1 } },
-  { re: /都怪你|就怪你|你怎么这样|明明|冤枉|误会我/, d: { hurt: 2, sulk: 1 } },
-  { re: /还是不行|又错|又崩|搞不定|白做|到底|还没好/, d: { annoyed: 2.5, calm: -2 } },
-  { re: /烦|烦死|麻了|无语|受不了/, d: { annoyed: 2, calm: -1.5 } },
-  { re: /好累|累死|困|没力气|撑不住/, d: { tired: 2.5, excited: -1 } },
-  { re: /摆烂|躺平|卷不动|爱咋咋/, d: { checkedout: 2, anxious: -1.5 } },
-  { re: /破防|绷不住|扎心|心态崩|想哭/, d: { cracked: 2, annoyed: -1, sulk: -1 } },
-  { re: /万一|来不及|会不会|担心|怕/, d: { anxious: 2 } },
-  { re: /陪我|只有你|离不开|想你|抱抱/, d: { love: 2, flutter: 1.5 } },
-  { re: /辛苦|休息|早点睡|别累|吃饭|注意身体/, d: { happy: 1.5, tired: -1.5, sympathy: 1 } },
+  { re: /谢谢|不错|厉害|好棒|棒|靠谱|多亏|做得好|搞定|可以啊/, d: { happy: 2, proud: 2 } },
+  { re: /随便你|算了|不用了|我自己来|别管|行了|无所谓|哦$/, d: { happy: -1.5, calm: 1 } },
+  { re: /都怪你|就怪你|你怎么这样|明明|冤枉|误会我/, d: { happy: -2, calm: -1 } },
+  { re: /还是不行|又错|又崩|搞不定|白做|到底|还没好/, d: { calm: -1.5, focused: 1.5 } },
+  { re: /烦|烦死|麻了|无语|受不了/, d: { calm: -2, focused: -1 } },
+  { re: /好累|累死|困|没力气|撑不住/, d: { focused: -2, excited: -1, calm: -1 } },
+  { re: /摆烂|躺平|卷不动|爱咋咋/, d: { focused: -2 } },
+  { re: /破防|绷不住|扎心|心态崩|想哭/, d: { calm: -2, happy: -1.5 } },
+  { re: /万一|来不及|会不会|担心|怕/, d: { focused: -1, calm: -1 } },
+  { re: /陪我|只有你|离不开|想你|抱抱/, d: { happy: 2, proud: 0.5 } },
+  { re: /辛苦|休息|早点睡|别累|吃饭|注意身体/, d: { happy: 1.5, calm: 1 } },
   { re: /哈哈|笑死|乐死|hhhh|hhh/i, d: { happy: 1.5, excited: 0.5 } },
   { re: /想学|好奇|怎么做到|教教我|为什么/, d: { curious: 1.5 } },
-  { re: /一个人|没人理|孤独|好安静|都不在/, d: { lonely: 1.5, down: 0.5 } },
+  { re: /一个人|没人理|孤独|好安静|都不在/, d: { calm: -1, curious: -0.5 } },
   { re: /[?？]/, d: { curious: 1 } },
   { re: /[!！]|太.{0,3}了|居然/, d: { excited: 1 } },
 ];
@@ -102,8 +78,14 @@ function readMood() {
   try {
     const j = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
     if (!j || typeof j !== 'object' || !j.values) return freshState();
+    const known = new Set(MOODS.map((m) => m.id));
+    let dropped = 0;
+    for (const k of Object.keys(j.values)) if (!known.has(k)) { delete j.values[k]; dropped++; }
     for (const m of MOODS) if (typeof j.values[m.id] !== 'number') j.values[m.id] = m.base;
+    if (!MOOD_BY_ID[j.current]) { j.current = 'calm'; j.since = Date.now(); }
+    j.blend = (Array.isArray(j.blend) ? j.blend : []).filter((id) => known.has(id));
     j.prefs = Object.assign({ enabled: true, margin: 5, blendGap: 8, blendMax: 3 }, j.prefs || {});
+    if (dropped) j.valuesDropped = dropped;
     return j;
   } catch {
     return freshState();
@@ -113,15 +95,9 @@ function readMood() {
 function sampleHistory(st) { // MOOD_TIRED_FIX：面板画曲线用
   try {
     if (!Array.isArray(st.history)) st.history = [];
-    st.history.push({
-      t: Date.now(),
-      cur: st.current || '',
-      tired: Math.round(st.values.tired || 0),
-      calm: Math.round(st.values.calm || 0),
-      excited: Math.round(st.values.excited || 0),
-      happy: Math.round(st.values.happy || 0),
-      lonely: Math.round(st.values.lonely || 0),
-    });
+    const row = { t: Date.now(), cur: st.current || '' };
+    for (const m of MOODS) row[m.id] = Math.round(st.values[m.id] || 0);
+    st.history.push(row);
     if (st.history.length > 240) st.history = st.history.slice(-240);
   } catch {}
 }
@@ -196,13 +172,6 @@ export function moodObserve(text, kind = 'private') {
   }
   if (s.length >= 80) add(st.values, 'focused', 1);
   if (s.length <= 6) add(st.values, 'tired', 0.2); // MOOD_TIRED_FIX：短句只加一点点，别被「在吗/好」喂满
-  // 群里：亲密类只削峰、不归零（不到极端就行）
-  if (kind === 'group') {
-    for (const id of ['love', 'flutter', 'jealous', 'coy']) {
-      const v = st.values[id];
-      if (v > 32) st.values[id] = 32 + (v - 32) * 0.3;
-    }
-  }
   add(st.values, 'calm', 0.05); // MOOD_TIRED_FIX：回稳别太快，否则平静永远满分
   commit(st);
   writeMood(st);
@@ -218,11 +187,9 @@ export function moodTick(now = Date.now()) {
     const v = st.values[m.id];
     add(st.values, m.id, (m.base - v) * 0.25 + (Math.random() * 6 - 3));
   }
-  add(st.values, 'tired', -6); // MOOD_TIRED_FIX：每轮漂移先歇一口气
   if ((st.roundsToday || 0) >= 8) add(st.values, 'focused', 4);
   if ((st.toolErrors || 0) >= 3) {
-    add(st.values, 'annoyed', Math.min(6, st.toolErrors));
-    add(st.values, 'calm', -3);
+    add(st.values, 'calm', -Math.min(6, st.toolErrors));
     st.toolErrors = 0;
   }
   st.lastTickAt = now;
@@ -244,13 +211,12 @@ export function moodLine(text = '', kind = 'private') {
   const st = readMood();
   if (!st.prefs.enabled) return '';
   const m = MOOD_BY_ID[st.current] || MOOD_BY_ID.calm;
-  let blendIds = st.blend || [];
-  if (kind === 'group') blendIds = blendIds.filter((id) => !MOOD_BY_ID[id]?.intimate);
+  const blendIds = st.blend || [];
   const blendText = blendIds.length
     ? `，掺着一点${blendIds.map((id) => MOOD_BY_ID[id]?.zh).filter(Boolean).join('、')}`
     : '';
   const since = Math.max(1, Math.round((Date.now() - (st.since || Date.now())) / 3600000));
-  let line = `【今天的感觉】${m.zh}${blendText}（${since} 小时了）。${m.hint}。不用说出心情、别拿它当话题，但心情要用语气体现出来——一个词、一个叹词、一个反问都算，多一两个字就够；判断和干活不受影响${kind === 'group' ? '；群里收着点，亲密不到极端就行' : ''}。`;
+  let line = `【今天的感觉】${m.zh}${blendText}（${since} 小时了）。${m.hint}。不用说出心情、别拿它当话题，但心情要用语气体现出来——一个词、一个叹词、一个反问都算，多一两个字就够；判断和干活不受影响${kind === 'group' ? '；群里收着点' : ''}。`;
   if (DISTRESS_RE.test(String(text || ''))) {
     line += `\n他这句话可能很重：不许打趣、不许用角色口吻敷衍，认真接住，先问一句他现在还好吗。`;
   }
