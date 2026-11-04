@@ -16,6 +16,8 @@ function ownerOnlyGroupAllowed(key, cfg) {
   return rec.uin === String(cfg?.ownerQQ ?? '');
 }
 
+export { ownerOnlyGroupAllowed };
+
 export default {
   id: 'owner-only',
   title: '只听主人',

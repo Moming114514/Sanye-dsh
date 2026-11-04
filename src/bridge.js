@@ -69,6 +69,7 @@ import { isLearnGroup, lastSpeakerAt } from './ext/learnmode.js'; // SPEAK_POLIC
 import { ecoForGroup, ecoState } from './ext/economy.js'; // SPEAK_POLICY_PATCH
 import { groupRates } from './ext/group-rate.js'; // SPEAK_POLICY_PATCH
 import { coolUntil as safeCoolUntil } from './ext/safe-talk.js'; // SPEAK_POLICY_PATCH
+import { ownerOnlyGroupAllowed } from './ext/owner-only.js'; // SPEAK_POLICY_PATCH
 
 // PLUGINS_PATCH（D 批，2026-11-03）：只读清单。数据源 = docs/generated/manifests.json（dump-manifests --json）
 // + extList() 的已注册实例（routes 只在实例上）。不碰任何状态，坏了最多返回空数组。
