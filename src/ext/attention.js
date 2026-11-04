@@ -65,16 +65,17 @@ export default function createAttention({ log }) {
         const why = String(reason || '');
         if (why === 'manual' || why === 'admin' || /style-learn/.test(why)) return true;
         const st = last.get(k);
-        if (!st || Date.now() - st.at > 10 * 60 * 1000) return true; // 没分数或太旧，不拦
-        // REPLYONLY_PATCH：某些群只接指定人的话（别人 @ 也不接，手动/管理员除外）
+        // REPLYONLY_PATCH（STALE_REPLY_FIX）：名单检查必须在"分数过期"之前，
+        // 否则冷场 10 分钟后名单外的人 @ 她也会被接话。
         const ro = (c.replyOnly || {})[k.replace('group:', '')];
-        if (Array.isArray(ro) && ro.length) {
+        if (Array.isArray(ro) && ro.length && st && st.uin) {
           const allowed = ro.map(String);
-          if (st.uin && !allowed.includes(String(st.uin))) {
+          if (!allowed.includes(String(st.uin))) {
             if (c.log !== false) log(`[只回几人] 跳过唤醒 ${k}（${why}）：${st.uin} 不在名单`);
             return { allow: false, reason: `[只回几人] ${st.uin} 不在 ${k} 的名单里` };
           }
         }
+        if (!st || Date.now() - st.at > 10 * 60 * 1000) return true; // 没分数或太旧，不拦
         const min = Number.isFinite(Number(c.minScore)) ? Number(c.minScore) : 2;
         if (st.score >= min) { active = { key: k, score: st.score, min, at: Date.now() }; return true; }
         // SAMPLE_PATCH：分数不够时按概率抽样放行（热闹群里「时不时说一句」），有每日上限
