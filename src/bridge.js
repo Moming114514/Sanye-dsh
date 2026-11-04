@@ -10164,9 +10164,41 @@ const fishGroupNames = new Map(); // groupId -> group_name（'' = 查不到）
     }
   }
 
+  // TASK-INPUT #2：超过 8MB 的图先降采样（1600px→960px，JPEG 压缩），仍超限就明确失败。
+  async function shrinkImageBuffer(buffer, mime) {
+    if (!buffer || !buffer.length) return null;
+    let tmp = '';
+    try {
+      const os = await import('node:os');
+      const fs = await import('node:fs');
+      const pathMod = await import('node:path');
+      const cp = await import('node:child_process');
+      tmp = pathMod.join(os.tmpdir(), 'shrink-' + Date.now() + '-' + process.pid + '.img');
+      fs.writeFileSync(tmp, buffer);
+      for (const [size, q] of [[1600, 6], [960, 10]]) {
+        const out = tmp + '.' + size + '.jpg';
+        try {
+          await new Promise((resolve, reject) => {
+            cp.execFile('ffmpeg', ['-y', '-v', 'error', '-i', tmp, '-vf', `scale=min(${size}\\,iw):-2`, '-q:v', String(q), '-frames:v', '1', out],
+              { timeout: 20000 }, (err) => (err ? reject(err) : resolve()));
+          });
+          const buf = fs.readFileSync(out);
+          fs.rmSync(out, { force: true });
+          if (buf && buf.length && buf.length <= MAX_MEDIA_BYTES) return { buffer: buf, mimeType: 'image/jpeg' };
+        } catch {}
+      }
+      return null;
+    } catch (e) {
+      log('[media] 降采样失败：' + (e?.message || e));
+      return null;
+    } finally {
+      if (tmp) { try { (await import('node:fs')).rmSync(tmp, { force: true }); } catch {} }
+    }
+  }
+
   async function fetchOneBotImage(media) {
-    // 表情包（市场/收藏表情）优先走 CDN：get_image 对市场表情必然失败
-    // （SnowLuma 缓存里没有该文件），先试 URL 能省一次失败往返，也更可靠。
+    // TASK-INPUT #2：统一先走 get_image（SnowLuma 本地缓存最可靠），失败再直连 CDN。
+    // 市场表情对 get_image 常常失败，但先本地后网络能少一次 404 往返。
     const emojiId = String(media.emojiId || emojiIdFromFileName(media.file) || '');
     const isSticker = media.kind === 'sticker' || !!emojiId || String(media.subType || '') === '1';
     const label = isSticker ? '表情' : '图片';
@@ -10181,6 +10213,7 @@ const fishGroupNames = new Map(); // groupId -> group_name（'' = 查不到）
     for (const candidate of emojiCdnCandidates(emojiId)) pushUrl(candidate);
 
     const tryUrls = async () => {
+      let sizeBlocked = false;
       for (const url of urls) {
         try {
           const fetched = await safeFetchBuffer(url, MAX_MEDIA_BYTES);
@@ -10188,7 +10221,19 @@ const fishGroupNames = new Map(); // groupId -> group_name（'' = 查不到）
           if (accepted) return { ...accepted, mimeType: accepted.mimeType || mimeFromUrl(url) };
           failures.push(`${url} 不是有效图片`);
         } catch (error) {
-          failures.push(`${url}: ${error?.message ?? error}`);
+          const msg = String(error?.message ?? error);
+          if (/超过大小限制/.test(msg) && !sizeBlocked) {
+            sizeBlocked = true;
+            try {
+              const big = await safeFetchBuffer(url, MAX_MEDIA_BYTES * 4);
+              const shrunk = await shrinkImageBuffer(big.buffer, big.mimeType || mimeFromUrl(url));
+              const accepted = shrunk && acceptImageBuffer(shrunk.buffer, `${label} 降采样`);
+              if (accepted) return { ...accepted, mimeType: shrunk.mimeType };
+            } catch {}
+            failures.push(`${url}: 图太大（>${Math.round(MAX_MEDIA_BYTES / 1024 / 1024)}MB），降采样后仍不行，已放弃`);
+            break;
+          }
+          failures.push(`${url}: ${msg}`);
         }
       }
       return null;
@@ -10206,8 +10251,14 @@ const fishGroupNames = new Map(); // groupId -> group_name（'' = 查不到）
           if (base64.length * 3 / 4 <= MAX_MEDIA_BYTES) {
             const accepted = acceptImageBuffer(Buffer.from(base64, 'base64'), 'get_image 返回的图片');
             if (accepted) return accepted;
+          } else if (base64.length * 3 / 4 <= MAX_MEDIA_BYTES * 4) {
+            const shrunk = await shrinkImageBuffer(Buffer.from(base64, 'base64'), 'image/jpeg');
+            const accepted = shrunk && acceptImageBuffer(shrunk.buffer, 'get_image 降采样');
+            if (accepted) return { ...accepted, mimeType: shrunk.mimeType };
+            failures.push(`get_image: 图太大（${Math.round(base64.length * 3 / 4 / 1024)}KB），降采样后仍不行`);
           } else {
             log(`get_image 返回的图片 base64 超限，已跳过（${Math.round(base64.length * 3 / 4 / 1024)}KB）`);
+            failures.push('get_image: 图太大，已跳过');
           }
         }
         if (obj.url) {
@@ -10216,13 +10267,30 @@ const fishGroupNames = new Map(); // groupId -> group_name（'' = 查不到）
             const accepted = acceptImageBuffer(fetched.buffer, 'get_image URL 图片');
             if (accepted) return { ...accepted, mimeType: accepted.mimeType || mimeFromUrl(obj.url) };
           } catch (error) {
-            failures.push(`get_image url: ${error?.message ?? error}`);
+            const msg = String(error?.message ?? error);
+            if (/超过大小限制/.test(msg)) {
+              try {
+                const big = await safeFetchBuffer(String(obj.url), MAX_MEDIA_BYTES * 4);
+                const shrunk = await shrinkImageBuffer(big.buffer, big.mimeType || mimeFromUrl(String(obj.url)));
+                const accepted = shrunk && acceptImageBuffer(shrunk.buffer, 'get_image URL 降采样');
+                if (accepted) return { ...accepted, mimeType: shrunk.mimeType };
+              } catch {}
+              failures.push('get_image url: 图太大，降采样后仍不行');
+            } else {
+              failures.push(`get_image url: ${msg}`);
+            }
           }
         }
         if (typeof obj.file === 'string' && !obj.file.startsWith('base64://') && fs.existsSync(obj.file) && isSafeLocalMediaPath(obj.file)) {
           const stat = fs.statSync(obj.file);
-          if (stat.size > MAX_MEDIA_BYTES) {
+          if (stat.size > MAX_MEDIA_BYTES && stat.size <= MAX_MEDIA_BYTES * 4) {
+            const shrunk = await shrinkImageBuffer(fs.readFileSync(obj.file), 'image/jpeg');
+            const accepted = shrunk && acceptImageBuffer(shrunk.buffer, '本地图片 降采样');
+            if (accepted) return { ...accepted, mimeType: shrunk.mimeType };
+            failures.push('本地图片: 图太大，降采样后仍不行');
+          } else if (stat.size > MAX_MEDIA_BYTES) {
             log(`本地图片文件超限，已跳过（${Math.round(stat.size / 1024)}KB）`);
+            failures.push('本地图片: 图太大，已跳过');
           } else {
             const accepted = acceptImageBuffer(fs.readFileSync(obj.file), '本地图片');
             if (accepted) return accepted;
@@ -10234,9 +10302,7 @@ const fishGroupNames = new Map(); // groupId -> group_name（'' = 查不到）
       return null;
     };
 
-    const result = isSticker
-      ? (await tryUrls()) ?? (await tryGetImage())
-      : (await tryGetImage()) ?? (await tryUrls());
+    const result = (await tryGetImage()) ?? (await tryUrls());
     if (result) return result;
     if (failures.length) {
       log(`[media] ${label}获取失败（${failures.length} 次尝试）：${failures.slice(0, 3).join(' | ')}`);
