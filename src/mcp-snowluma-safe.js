@@ -371,7 +371,18 @@ const TOOL_CONFIG_FLAGS = {
   qq_impression: 'impressions', // IMPR_PATCH
   qq_person_note: 'people', // NEXT_PATCH
 };
-const TOOL_PROFILE = String(cfg.socialV2?.toolProfile || (cfg.socialV2?.tools?.getSnapshot === false ? 'full' : 'balanced'));
+// 工具档位：full / balanced（默认）/ compact / core。
+// - balanced：隐藏 unread/recent/social_state/active_members/my_recent（有 context_snapshot 顶替）
+// - compact：再隐藏 group_members/group_history/list_stickers/list_voices
+// - core：只保留聊天主链与她的常用能力（见 CORE_TOOL_NAMES），其余全部不进 schema。
+// 环境变量 SURFCORE_TOOL_PROFILE 可临时覆盖（只读实验/回归用，不写配置）。
+const TOOL_PROFILE = String(
+  process.env.SURFCORE_TOOL_PROFILE || cfg.socialV2?.toolProfile ||
+  (cfg.socialV2?.tools?.getSnapshot === false ? 'full' : 'balanced')
+);
+if (!['full', 'balanced', 'compact', 'core'].includes(TOOL_PROFILE)) {
+  console.error(`[tool-profile] 未知档位 "${TOOL_PROFILE}"，按 balanced 处理`);
+}
 const PROFILE_HIDDEN = {
   balanced: new Set([
     'qq_get_unread_messages', 'qq_get_recent_messages', 'qq_social_state',
@@ -384,12 +395,36 @@ const PROFILE_HIDDEN = {
     'qq_list_stickers', 'qq_list_voices',
   ]),
 };
+// core 档位的保留清单：聊天主链 + 看图/表情/记忆/黑话/欠事/群信息。
+// 只列名字，不存在的名字会被静默跳过（例如 sendSticker 在表情功能关闭时根本不注册）。
+// 注意：preset 文案里点名过的工具若不在清单里，模型可能仍然会去调 → 开档前先对齐文案。
+const CORE_TOOL_NAMES = new Set([
+  'qq_send_message', 'qq_reply', 'qq_wait_for_messages', 'qq_mark_read',
+  'qq_get_prompt', 'qq_get_context_snapshot', 'qq_status', 'qq_set_wake_config',
+  'qq_get_message_images', 'qq_get_forward_msg', 'qq_get_message_detail',
+  'qq_list_stickers', 'qq_send_sticker', 'qq_get_sticker_image', 'qq_get_self_image',
+  'qq_slang_query', 'qq_slang_submit',
+  'qq_memory_append', 'qq_memory_query',
+  'qq_loop', 'qq_impression', 'qq_read_group_recent',
+  'qq_list_groups', 'qq_get_group_members',
+  'qq_close_conversation',
+  'qq_send_voice', 'qq_list_voices', 'qq_send_poke',
+]);
+// 实际生效的档位（未知值回落 balanced，避免配置手滑导致工具全空或全开）
+const EFFECTIVE_PROFILE = ['full', 'balanced', 'compact', 'core'].includes(TOOL_PROFILE) ? TOOL_PROFILE : 'balanced';
+const hiddenByProfile = (name) => {
+  if (EFFECTIVE_PROFILE === 'full') return false;
+  if (EFFECTIVE_PROFILE === 'core') return !CORE_TOOL_NAMES.has(name);
+  return PROFILE_HIDDEN[EFFECTIVE_PROFILE]?.has(name) ?? false;
+};
 const disabledTools = [];
+let toolSeen = 0;
 {
   const registerTool = server.tool.bind(server);
   server.tool = (name, ...rest) => {
-    if (TOOL_PROFILE !== 'full' && PROFILE_HIDDEN[TOOL_PROFILE]?.has(name)) {
-      disabledTools.push(`${name}(profile:${TOOL_PROFILE})`);
+    toolSeen += 1;
+    if (hiddenByProfile(name)) {
+      disabledTools.push(`${name}(profile:${EFFECTIVE_PROFILE})`);
       return undefined;
     }
     const flag = TOOL_CONFIG_FLAGS[name];
@@ -1745,6 +1780,15 @@ if (cfg.socialV2?.tools?.getForwardMsg !== false) {
         return { content: [{ type: 'text', text: `查看合并转发失败：${error?.message ?? error}` }], isError: true };
       }
     }
+  );
+}
+
+// 注册完打一行（stderr，不污染 MCP stdout）：一眼看出本次生效的档位与被隐藏的工具。
+{
+  const hiddenNames = disabledTools.map((x) => x.split('(')[0]).join(',');
+  console.error(
+    `[tool-profile] profile=${EFFECTIVE_PROFILE} 注册 ${toolSeen - disabledTools.length}/${toolSeen} 个工具` +
+    (disabledTools.length ? `，隐藏 ${disabledTools.length} 个：${hiddenNames}` : '')
   );
 }
 
