@@ -63,6 +63,12 @@ import {
 import { scopedMemoryText } from './ext/memory-scope.js'; // MEMSCOPE_PATCH
 import { fuzzyRecallFiles } from './recall-vec.js'; // RECALL_FUZZY_PATCH
 import { extDispatchRoute, extPromptBlocks, extStateKey, extWakeGate, extAfterSend, extOnGroupMessage, extOnPrivateMessage, extList, extManifests } from './ext/index.js'; // EXT_PATCH
+import { evaluate as evaluateSpeakPolicy } from './ext/speak-policy.js'; // SPEAK_POLICY_PATCH
+import { isMuted } from './ext/mute.js'; // SPEAK_POLICY_PATCH
+import { isLearnGroup, lastSpeakerAt } from './ext/learnmode.js'; // SPEAK_POLICY_PATCH
+import { ecoForGroup, ecoState } from './ext/economy.js'; // SPEAK_POLICY_PATCH
+import { groupRates } from './ext/group-rate.js'; // SPEAK_POLICY_PATCH
+import { coolUntil as safeCoolUntil } from './ext/safe-talk.js'; // SPEAK_POLICY_PATCH
 
 // PLUGINS_PATCH（D 批，2026-11-03）：只读清单。数据源 = docs/generated/manifests.json（dump-manifests --json）
 // + extList() 的已注册实例（routes 只在实例上）。不碰任何状态，坏了最多返回空数组。
@@ -15195,9 +15201,77 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
     return `${roleLine}${identityLine}${tokenLine}【提醒】你还没有完成回合收尾。请调用 qq_set_wake_config 设置下一次唤醒条件（例如继续潜水多久、@/名字/关键词/提问/概率/指定成员等），或者调用 qq_mark_read 表示你看过且决定不接。这是为了防止你忘记收尾后进入“永眠”。注意：设置潜水前先用 qq_wait_for_messages(timeoutMs=${preSleepMs}) 完成沉睡前观察；等待期间有人说话时查看 newMessages，判断不需要你参与即可收尾。`;
   }
 
+// SPEAK_POLICY_PATCH：只读快照 + 一行旁路日志。不改变 sendWakePromptV2 的任何 return。
+let speakPolicyAttention = null;
+function speakPolicyAttentionLast(key) {
+  try {
+    if (!speakPolicyAttention) speakPolicyAttention = extList().find((e) => e && e.id === 'attention') || null;
+    return speakPolicyAttention?.getLast ? speakPolicyAttention.getLast(String(key || '')) : null;
+  } catch {
+    return null;
+  }
+}
+
+function speakPolicyState(key, cfgNow) {
+  const k = String(key || '');
+  const isGroup = k.startsWith('group:');
+  const gid = isGroup ? k.slice('group:'.length).replace(/\D/g, '') : '';
+  const a = (cfgNow?.socialV2 || {}).attention || {};
+  const st = getSocialV2State(k);
+  const economyOn = Boolean(tokenGuardDowngrade()?.on);
+  let eco = { replyAt: true };
+  try { eco = ecoState(economyOn); } catch {}
+  let rate = { count: 0, lastAt: 0, level: 'normal', custom: null };
+  try { rate = groupRates().find((x) => x.gid === gid) || rate; } catch {}
+  let speakers = null;
+  try { speakers = lastSpeakerAt(k); } catch {}
+  const ownerQQ = String(cfgNow?.ownerQQ ?? cfgNow?.owner?.qq ?? '');
+  const lastAtt = speakPolicyAttentionLast(k);
+  return {
+    muted: (() => { try { return isMuted(k); } catch { return false; } })(),
+    learn: {
+      on: gid ? (() => { try { return isLearnGroup(gid); } catch { return false; } })() : false,
+      ownerSpoke: Boolean(speakers && ownerQQ && String(speakers.uin) === ownerQQ && Date.now() - Number(speakers.at || 0) < 10 * 60 * 1000),
+    },
+    economy: { on: gid ? Boolean(ecoForGroup(gid, economyOn)) : false, replyAt: eco.replyAt !== false },
+    rate: { count: Number(rate.count || 0), lastAt: Number(rate.lastAt || 0), custom: rate.custom || null, level: rate.level || 'normal' },
+    attention: {
+      score: lastAtt ? Number(lastAtt.score) : null,
+      uin: lastAtt ? String(lastAtt.uin || '') : '',
+      at: lastAtt ? Number(lastAtt.at || 0) : 0,
+      minScore: Number.isFinite(Number(a.minScore)) ? Number(a.minScore) : 2,
+      sample: a.sample || {},
+      replyOnly: gid ? ((a.replyOnly || {})[gid] || null) : null,
+    },
+    fish: { until: Number(st?.fishGuard?.until || 0) },
+    ownerOnly: { mode: qqMode(), groupAllowed: isGroup ? Boolean(ownerOnlyGroupAllowed(k, cfgNow)) : false },
+    safe: { coolUntil: (() => { try { return Number(safeCoolUntil(k)) || 0; } catch { return 0; } })() },
+  };
+}
+
+function logSpeakPolicy(key, reason) {
+  try {
+    const snap = speakPolicyState(key, cfg);
+    const r = evaluateSpeakPolicy({
+      key: String(key || ''),
+      gid: String(key || '').startsWith('group:') ? String(key).slice('group:'.length) : '',
+      text: '',
+      at: Date.now(),
+      reason: String(reason || ''),
+      mode: qqMode(),
+      state: snap,
+      rng: Math.random,
+    });
+    log(`[策略] key=${key} allow=${r.allow} source=${r.source} reason=${r.reason}${r.note ? ' note=' + r.note : ''}${r.maxSentences ? ' maxSentences=' + r.maxSentences : ''}`);
+  } catch (e) {
+    log(`[策略] 计算失败：${e?.message || e}`);
+  }
+}
+
   async function sendWakePromptV2(key, reason) {
     if (cfg.socialV2?.enabled === false) return;
     if (currentMode !== 'reserved2' || socialV2.paused) return;
+    logSpeakPolicy(key, reason); // SPEAK_POLICY_PATCH：旁路观测，不改判断
     // EXT_PATCH：唤醒闸门交给扩展（只听主人等规则在 src/ext/*.js 里）
     const wakeGate = extWakeGate({ key: String(key), reason: String(reason), cfg, mode: qqMode(),
       economyOn: tokenGuardDowngrade().on }); // ECONOMY_PATCH

@@ -144,6 +144,16 @@ export function noteSensitive(key, text, cfg, log) {
   return { hit: s.hits.length, words };
 }
 
+// 只读：某会话的降温截止时间（speak-policy 旁路观测用）
+export function coolUntil(key) {
+  try {
+    const s = readAll().sessions[String(key || '')];
+    return Number(s?.coolUntil || 0);
+  } catch {
+    return 0;
+  }
+}
+
 export default {
   id: 'safe-talk',
   title: '敏感话题守门',

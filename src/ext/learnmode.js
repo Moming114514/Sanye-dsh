@@ -61,6 +61,12 @@ export function learnGroups() {
   return [...loadGroups()];
 }
 
+// 只读：这个群最后说话的人（speak-policy 旁路观测用）
+export function lastSpeakerAt(key) {
+  const rec = lastSpeaker.get(String(key || ''));
+  return rec ? { uin: String(rec.uin || ''), at: Number(rec.at || 0) } : null;
+}
+
 export default {
   id: 'learnmode',
   title: '学习模式',

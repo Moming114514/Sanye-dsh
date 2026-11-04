@@ -100,6 +100,11 @@ export default function createAttention({ log }) {
       }
     },
     // 3TIER：分数刚过线（min ~ min+1）时，只允许一句短回，避免冷场又避免长篇
+    // 只读：最近一次打分的快照（speak-policy 旁路观测用，不改变判断）
+    getLast(key) {
+      const v = last.get(String(key || ''));
+      return v ? { score: v.score, uin: v.uin, at: v.at } : null;
+    },
     promptBlock(cfg) {
       try {
         const c = cfg?.socialV2?.attention ?? {};
