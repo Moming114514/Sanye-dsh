@@ -5,13 +5,9 @@
 
 const PAGES = [
   { id: 'overview', title: '概览', render: pageOverview },
-  { id: 'entry', title: '入口', render: pageEntry },
-  { id: 'features', title: '功能开关', render: pageFeatures },
   { id: 'commands', title: '命令', render: pageCommands },
   { id: 'people', title: '人', render: pagePeople },
-  { id: 'utter', title: '她说的话', render: pageUtter },
   { id: 'settings', title: '设置', render: pageSettingsHub },
-  { id: 'access', title: '白名单', render: pageAccess },
   { id: 'group-rules', title: '群规则', render: pageGroupRules }, // P2-A
   { id: 'safe', title: '安全', render: pageSafe }, // 频率 + 敏感话题
   { id: 'cost', title: '花费', render: pageCost },
@@ -19,27 +15,14 @@ const PAGES = [
   { id: 'personality', title: '性格', render: pagePersonality },
   { id: 'maintenance', title: '维护', render: pageMaintenance },
   { id: 'memory', title: '记忆', render: pageMemoryHub },
-  { id: 'memory-old', title: '记忆与情绪（旧）', render: pageMemory },
-  { id: 'impr', title: '她的看法', render: pageImpr },
   { id: 'style', title: '学说话', render: pageStyle }, // STYLE_GATE_PATCH
   { id: 'talk', title: '说话', render: pageTalk }, // P2-B
   { id: 'decisions', title: '决策记录', render: pageDecisions }, // P1
-  { id: 'starmap', title: '记忆星海', render: pageStarmap },
-  { id: 'memhealth', title: '记忆体检', render: pageMemHealth },
   { id: 'plugins', title: '插件', render: pagePlugins }, // P3-1：清单来自 /api/plugins
-  { id: 'diag', title: '排障', render: pageDiag },
 ];
 
 // NAV_GROUPS（W4）：按 5 层体系分组（感知/判断/表达/记忆/运维）+ 诊断
 // 组名是灰字不可点；手机端由 CSS 隐藏组名，仍是原来的横向导航
-const LEGACY_NAV = [
-  { title: '感知', ids: ['people'] },
-  { title: '判断', ids: ['features', 'access', 'group-rules', 'decisions', 'safe'] },
-  { title: '表达', ids: ['commands', 'utter', 'style'] },
-  { title: '记忆', ids: ['memory', 'impr', 'starmap', 'memhealth'] },
-  { title: '运维', ids: ['overview', 'entry', 'settings', 'cost', 'plugins'] },
-  { title: '诊断', ids: ['diag'] },
-];
 
 // P2-B 第3段：目标导航（3 组 12 项）；state._legacyNav / localStorage her.legacyNav=1 可恢复旧入口
 const NAV_GROUPS = [
@@ -48,8 +31,7 @@ const NAV_GROUPS = [
   { title: '系统', ids: ['settings', 'commands', 'maintenance'] },
 ];
 function navGroups() {
-  try { if (localStorage.getItem('her.legacyNav') === '1') return LEGACY_NAV; } catch (e) {}
-  return state._legacyNav ? LEGACY_NAV : NAV_GROUPS;
+  return NAV_GROUPS; // A3：导航定稿 12 项，回滚开关已删除
 }
 
 // PAGE_ADJUST（B 批）：每页第一张卡之前的一行说明——这页到底能调什么
@@ -394,13 +376,28 @@ function pageOverview() {
   // P2-B 2.2：概览只留四块（花费 / 她刚说的 / 待办与提醒 / 健康红绿灯）
   hideCardsIn(wrap, ['QQ 状态', '媒体', '运行', '她现在的心情', '端口', '记着的东西', '最近她说的']);
   const _sends = (d.sends || []).slice(0, 3);
+  // A2：把原始发送日志解析成「群名 · 内容」
   const _sendRows = _sends.length
     ? _sends.map((l) => {
-        const t = (l.match(/^(\d\d-\d\d)\s+(\d\d:\d\d(:\d\d)?)/) || []);
-        const body = String(l).replace(/^.*?\[info\]\s*/, '').replace(/^\S+\s+\S+\s+/, '').trim();
+        const str = String(l);
+        const tm = (str.match(/^(\d\d-\d\d)\s+(\d\d:\d\d)/) || []);
+        const m = str.match(/发送 -> (群聊|私聊)\s+(?:\[(.*?)\((\d+)\)\]\s*(?:\[(.*?)\((\d+)\)\])?|\((\d+)\))\s*([\s\S]*)$/);
+        let who = '', text = str;
+        if (m) {
+          const kind = m[1] === '群聊' ? 'group' : 'private';
+          const id = m[3] || m[6] || '';
+          const fallback = m[2] || '';
+          const row = (state.names && state.names[kind] && state.names[kind][id]) || null;
+          const nm = (row && (row.name || row)) || fallback || id;
+          who = nm + ' · ';
+          text = m[7] || '';
+        } else {
+          text = str.replace(/^.*?\[info\]\s*/, '').replace(/^\S+\s+\S+\s+/, '').trim();
+        }
+        const short = text.slice(0, 60) + (text.length > 60 ? '…' : '');
         return h('div', { class: 'kv', style: 'align-items:flex-start' },
-          h('span', { class: 'mono', style: 'font-size:11.5px;flex:0 0 92px;color:#7f8b99' }, (t[1] || '') + ' ' + (t[2] || '')),
-          h('span', { style: 'flex:1' }, body.slice(0, 140)));
+          h('span', { class: 'mono', style: 'font-size:11.5px;flex:0 0 64px;color:#7f8b99' }, (tm[1] || '') + ' ' + (tm[2] || '')),
+          h('span', { style: 'flex:1' }, who + short));
       })
     : [h('div', { class: 'muted' }, '日志里还没抓到发送记录')];
   wrap.append(h('div', { class: 'card', style: 'margin-top:14px' },
@@ -539,70 +536,6 @@ function healthCard() {
   );
 }
 
-function pageSettings() {
-  const wrap = h('div', {});
-  const items = state.features.filter((f) => f.kind === 'number' || f.kind === 'text');
-  const table = h('table', { class: 'tbl-fit nowrap-tbl' },
-    h('thead', {}, h('tr', {}, h('th', { style: 'width:34%' }, '项目'), h('th', { style: 'width:150px' }, '当前值'), h('th', {}, '生效方式'), h('th', {}, '配置键'))),
-    h('tbody', {}, ...items.map((f) => {
-      const input = h('input', {
-        type: f.kind === 'number' ? 'number' : 'text',
-        class: f.kind === 'number' ? 'inline-num' : '', value: f.value == null ? '' : String(f.value),
-        step: f.step || 'any', min: f.min, max: f.max,
-        onkeydown: (e) => { if (e.key === 'Enter') { e.preventDefault(); saveSetting(f, input.value); } },
-        onblur: () => { if (String(f.value ?? '') !== String(input.value)) saveSetting(f, input.value); },
-      });
-      return h('tr', {}, h('td', {}, f.name), h('td', {}, input),
-        h('td', {}, h('span', { class: 'tag ' + (f.effect || 'bridge') }, { hot: '立刻', bridge: '重启桥接', dsh: '重启面板' }[f.effect] || f.effect)),
-        h('td', { class: 'mono muted', style: 'font-size:11.5px' }, f.path));
-    })),
-  );
-  const pend = state.pending || { count: 0, items: [] };
-  if (pend.count > 0) {
-    wrap.append(h('div', { class: 'card', style: 'border-color:var(--warn)' },
-      h('h3', {}, '有 ' + pend.count + ' 处改动还没生效'),
-      h('div', { class: 'muted', style: 'font-size:12.5px;margin-bottom:8px' }, '这些是 config.json 改过、但桥接还在用启动时那份（' + (pend.at ? new Date(pend.at).toLocaleString() : '—') + ' 加载）。点下面的「重启桥接」就全生效。'),
-      h('table', {}, h('tbody', {}, ...(pend.items || []).slice(0, 10).map((d) => h('tr', {},
-        h('td', { class: 'mono', style: 'font-size:11.5px' }, d.path),
-        h('td', { class: 'muted', style: 'font-size:11.5px' }, String(JSON.stringify(d.from)).slice(0, 30) + ' → ' + String(JSON.stringify(d.to)).slice(0, 30)),
-      )))),
-      h('div', { class: 'muted', style: 'font-size:12px;margin-top:8px' }, '提示：页面上的「刷新」只是重新比对一次，不会让它们生效；要让改动进桥接，只能重启。'),
-      h('div', { class: 'toolbar', style: 'margin-top:6px' }, // PENDING_RESTART_UI
-        h('button', { class: 'btn', onclick: async () => {
-          try {
-            toast('正在重启桥接…');
-            const r = await fetch('/api/bridge/restart', { method: 'POST', headers: { 'x-her-token': TOKEN } });
-            const j = await r.json();
-            toast(j.ok ? ('已重启' + (j.pid ? '（pid ' + j.pid + '）' : '') + '，稍等十几秒待生效应清零') : ('重启失败：' + (j.error || '未知')));
-            setTimeout(async () => { try { await loadPending(); } catch (e) {} rerender(); }, 15000);
-          } catch (e) { toast('重启失败：' + e.message); }
-        } }, '立即重启让它们生效'),
-      ),
-    ));
-  }
-  wrap.append(healthCard());
-  wrap.append(h('div', { class: 'card' }, table));
-  wrap.append(h('div', { class: 'card' },
-    h('h3', {}, '改完配置怎么生效'),
-    h('div', { class: 'muted', style: 'font-size:12.5px;line-height:1.7' },
-      '标「立刻」的改完就生效；标「需重启桥接」的要重启一次（10 秒左右，她会自己恢复，不会发「断了 N 分钟」的汇报）。'
-      + '每天额度（socialV2.tokenGuard.maxDailyCostCNY）属于后者；它判的是「近 24 小时」不是自然日。'),
-    h('button', {
-      class: 'btn', style: 'margin-top:8px;padding:7px 16px',
-      onclick: async () => {
-        if (!confirm('重启桥接？约 10 秒，期间她不在线。')) return;
-        try {
-          toast('正在重启…');
-          const r = await fetch('/api/bridge/restart', { method: 'POST', headers: { 'x-her-token': TOKEN } });
-          const j = await r.json();
-          toast(j.ok ? '重启好了，新配置已生效' : '重启失败：' + j.error);
-          setTimeout(() => { state.cost = null; rerender(); }, 12000);
-        } catch (e) { toast('重启失败：' + e.message); }
-      },
-    }, '重启桥接'),
-  ));
-  return wrap;
-}
 
 function pageCost() {
   const c = state.cost;
@@ -1156,9 +1089,20 @@ function pageMaintenance() {
 function pageSettingsHub() {
   return tabbed('settings', [
     { title: '功能开关', render: pageFeatures },
-    { title: '待生效与重启', render: pageSettings },
+    { title: '待生效与重启', render: () => pendingSettingsCard() },
     { title: '工具档', render: pagePlugins },
   ]);
+}
+
+function pendingSettingsCard() {
+  const wrap = h('div', {});
+  const items = (state.pending && state.pending.items) || [];
+  const card = h('div', { class: 'card' }, h('h3', {}, '待生效的改动'));
+  if (!items.length) card.append(h('div', { class: 'muted' }, '没有待生效改动'));
+  for (const it of items) card.append(h('div', { class: 'kv' }, h('span', {}, String(it.path)), h('span', {}, String(it.to))));
+  card.append(h('div', { style: 'margin-top:10px' }, h('button', { class: 'btn', onclick: async () => { await api('/api/restart-bridge', 'POST', {}); toast('已请求重启桥接'); } }, '立即重启让它们生效')));
+  wrap.append(card);
+  return wrap;
 }
 
 function pageMemoryHub() {
@@ -2484,28 +2428,6 @@ function pageMemHealth() {
   return wrap;
 }
 
-function pageEntry() {
-  const wrap = h('div', { class: 'grid g2' });
-  if (!state.entry) {
-    loadEntry().catch(() => {}).finally(rerender);
-    wrap.append(h('div', { class: 'card muted' }, '正在查端口…'));
-    return wrap;
-  }
-  for (const it of state.entry.items || []) {
-    const label = it.self ? '本面板内页（同一个页面）' : it.local ? '本机服务（启动器自动开）' : (it.up ? '● 服务器在听 ' + it.port : '○ 没在听 ' + it.port);
-    const color = it.local ? 'color:var(--muted)' : (it.up ? 'color:var(--ok)' : 'color:var(--bad)');
-    wrap.append(h('div', { class: 'card' },
-      h('div', { style: 'display:flex;justify-content:space-between;align-items:baseline' },
-        h('h3', { style: 'margin:0' }, it.name),
-        h('span', { style: color + ';font-size:12.5px' }, label)),
-      h('div', { class: 'muted', style: 'font-size:12.5px;margin:8px 0 12px' }, it.hint || ''),
-      h('button', { class: 'btn', disabled: (!it.local && !it.up) ? 'disabled' : null, onclick: () => window.open(it.url, '_blank') }, (!it.local && !it.up) ? '未启动' : '打开'),
-    ));
-  }
-  wrap.append(h('div', { class: 'card muted', style: 'font-size:12.5px' },
-    '这四个都在服务器 127.0.0.1 上，浏览器要能打开得先有对应隧道。桌面「三叶面板」启动器会把 ', h('b', {}, '7800 / 3080 / 3100 / 6099'), ' 一起转出来；7788 是「看每次对话花了多少」的本机面板，启动器会顺带开；面板内「花费」记的是她（QQ）的账。'));
-  return wrap;
-}
 
 function activeWindowText() {
   const items = (state.aw && state.aw.items) || [];
@@ -2854,78 +2776,6 @@ function nameOf(kind, id) {
   return (m && m[String(id)]) || '';
 }
 
-function pageAccess() {
-  const wrap = h('div', {});
-  if (!state.access) { loadAccess().catch(() => {}).finally(rerender); return h('div', { class: 'card muted' }, '正在读配置…'); }
-  if (!state.namesLoaded) { loadNames().catch(() => {}).finally(rerender); }
-  const a = state.access;
-  const mk = (title, kind, list, hint) => h('div', { class: 'card', style: 'margin-bottom:14px' },
-    h('h3', {}, title),
-    h('div', { class: 'muted', style: 'font-size:12.5px;margin-bottom:10px' }, hint),
-    h('div', { class: 'chips', style: 'margin-bottom:12px' }, ...list.length
-      ? list.map((id) => {
-          const key = (kind === 'group' ? 'group:' : 'private:') + id;
-          const muted = isMutedKey(key);
-          const nm = nameOf(kind, id);
-          return h('span', { class: 'chip', style: 'display:inline-flex;gap:8px;align-items:center' + (muted ? ';opacity:.55' : '') }, nm ? (id + ' · ' + nm) : id,
-            h('a', {
-              href: '#',
-              style: 'color:' + (muted ? 'var(--ok)' : 'var(--warn)') + ';text-decoration:none;font-size:11.5px',
-              title: muted ? '点一下恢复（她在这个会话里照常说话）' : '点一下先静音（不删白名单，随时恢复）',
-              onclick: (e) => { e.preventDefault(); muteDo(key, !muted); },
-            }, muted ? '恢复' : '静音'),
-            ...(kind === 'group' ? [h('a', {
-              href: '#',
-              style: 'color:' + (isLearnGroup(id) ? 'var(--ok)' : 'var(--muted,#8a93a6)') + ';text-decoration:none;font-size:11.5px',
-              title: isLearnGroup(id) ? '点一下恢复聊天（她重新开始接话）' : '点一下进学习模式（她只看不聊，学说法照样能学）',
-              onclick: (e) => { e.preventDefault(); learnDo(id, !isLearnGroup(id)); },
-            }, isLearnGroup(id) ? '恢复聊' : '学习')] : []),
-            h('a', { href: '#', style: 'color:var(--bad);text-decoration:none', onclick: (e) => { e.preventDefault(); accessDo(kind, id, 'remove'); } }, '✕'));
-        })
-      : [h('span', { class: 'muted' }, '（空）')]),
-    h('div', { class: 'toolbar' },
-      h('input', { type: 'text', placeholder: kind === 'group' ? '群号，例如 1025377431' : 'QQ 号', id: 'acc-' + kind }),
-      h('button', { class: 'btn', onclick: () => accessDo(kind, $('#acc-' + kind).value, 'add') }, '加进去'),
-    ),
-  );
-  wrap.append(mk('群白名单', 'group', a.groups, '只有名单里的群，她才在里面说话（配合「只认 @」等规则）'));
-  wrap.append(mk('私聊白名单', 'private', a.private, '只有名单里的人私聊她才回'));
-
-  const mutedList = (state.muted || []);
-  wrap.append(h('div', { class: 'card' },
-    h('h3', {}, '暂时不理（静音）'),
-    h('div', { class: 'muted', style: 'font-size:12.5px;margin-bottom:10px' },
-      '点条目上的「静音」就只是先不跟她在这个群/这个人的会话里说话，白名单不动；想恢复点「恢复」。'
-      + '静音只挡「她自己醒来接话」，你手动让她说话或者管理员指令不受影响。改完立刻生效，不用重启。'),
-    h('div', { class: 'chips' }, ...(mutedList.length
-      ? mutedList.map((k) => h('span', { class: 'chip', style: 'display:inline-flex;gap:8px;align-items:center' }, k,
-          h('a', { href: '#', style: 'color:var(--ok);text-decoration:none;font-size:11.5px', onclick: (e) => { e.preventDefault(); muteDo(k, false); } }, '恢复')))
-      : [h('span', { class: 'muted' }, '（没有静音的会话）')])),
-  ));
-  const learnList = (state.learn || []);
-  wrap.append(h('div', { class: 'card' },
-    h('h3', {}, '学习模式（只看不聊）'),
-    h('div', { class: 'muted', style: 'font-size:12.5px;margin-bottom:10px' },
-      '开了之后，她在这个群里不接话、不发言，但学说法照样能进去看看她怎么说话。'
-      + '想让她正常聊天就点「恢复」，或者在这里关掉。只影响这一个群，改完立刻生效。'),
-    h('div', { class: 'chips' }, ...(learnList.length
-      ? learnList.map((g) => h('span', { class: 'chip', style: 'display:inline-flex;gap:8px;align-items:center' }, g,
-          h('a', { href: '#', style: 'color:var(--ok);text-decoration:none;font-size:11.5px', onclick: (e) => { e.preventDefault(); learnDo(g, false); } }, '恢复聊')))
-      : [h('span', { class: 'muted' }, '（没有开学习模式的群）')])),
-  ));
-  if ((a.seen || []).length) {
-    wrap.append(h('div', { class: 'card' },
-      h('h3', {}, '最近出现在日志里的群（点一下就加）'),
-      h('div', { class: 'chips' }, ...a.seen.map((g) => h('span', {
-        class: 'chip', style: 'cursor:pointer' + (a.groups.includes(g) ? ';opacity:.5' : ''),
-        onclick: () => { if (!a.groups.includes(g)) accessDo('group', g, 'add'); },
-      }, g))),
-    ));
-  }
-  // P2-B 1.1：静音/学习模式已挪到「群规则」页
-  hideCardsIn(wrap, ['暂时不理（静音）', '学习模式（只看不说）', '学习模式（只看不聊）']);
-  return wrap;
-}
 
 async function accessDo(kind, id, action) {
   try {
