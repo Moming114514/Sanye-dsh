@@ -63,6 +63,8 @@ import {
 import { scopedMemoryText } from './ext/memory-scope.js'; // MEMSCOPE_PATCH
 import { fuzzyRecallFiles } from './recall-vec.js'; // RECALL_FUZZY_PATCH
 import { extDispatchRoute, extPromptBlocks, extStateKey, extWakeGate, extAfterSend, extOnGroupMessage, extOnPrivateMessage, extList, extManifests, decisionMarkOutcome } from './ext/index.js'; // EXT_PATCH
+import { handleWrite as groupPolicyWrite } from './ext/group-policy.js'; // P2-1 群规则单一事实源（enabled=false 时无副作用）
+import { isEnabled as groupPolicyEnabled, set as groupPolicySet, project as groupPolicyProject } from './ext/group-policy.js'; // ATTNSET_PATCH
 import { touchActiveWindow, clearActiveWindow, isActiveWindowExit } from './ext/active-window.js'; // D-3 ACTIVE_WINDOW
 import { evaluate as evaluateSpeakPolicy } from './ext/speak-policy.js'; // SPEAK_POLICY_PATCH
 import { isMuted } from './ext/mute.js'; // SPEAK_POLICY_PATCH
@@ -7985,6 +7987,47 @@ async function main() {
                 return sendJson({ ok: false, error: String(error?.message || error) }, 500);
               }
             }
+            // ATTNSET_PATCH：面板「只回谁 / 抽样」统一入口；策略开启时先写 group-policy 再投影
+            if (url.pathname === '/api/socialV2/attn-set') {
+              const consoleOk = !!cfg.consoleToken && req.headers['x-console-token'] === cfg.consoleToken;
+              const localOk = /^(127\.0\.0\.1|::1|::ffff:127\.0\.0\.1)$/.test(String(req.socket?.remoteAddress || ''));
+              if (!consoleOk && !localOk) return sendJson({ ok: false, error: '未授权' }, 401);
+              const gid = String(body?.group || '').replace(/\D/g, '');
+              if (!gid) return sendJson({ ok: false, error: 'group 不能为空' }, 400);
+              const replyOnly = body?.replyOnly === undefined ? undefined : String(body.replyOnly || '').split(/[,，\s]+/).filter(Boolean);
+              const sample = body?.sample === undefined ? undefined : Math.max(0, Math.min(50, Number(body.sample) || 0));
+              if (!cfg.socialV2) cfg.socialV2 = {};
+              if (!cfg.socialV2.attention) cfg.socialV2.attention = {};
+              const at = cfg.socialV2.attention;
+              if (!at.replyOnly) at.replyOnly = {};
+              if (!at.sample) at.sample = {};
+              if (replyOnly !== undefined) { if (replyOnly.length) at.replyOnly[gid] = replyOnly; else delete at.replyOnly[gid]; }
+              if (sample !== undefined) { if (sample > 0) at.sample[gid] = sample; else delete at.sample[gid]; }
+              if (groupPolicyEnabled(cfg)) {
+                groupPolicySet(gid, { present: true, ...(replyOnly !== undefined ? { replyOnly } : {}), ...(sample !== undefined ? { sample } : {}) });
+                groupPolicyProject(cfg);
+              } else {
+                try {
+                  const file = path.join(ROOT, 'config.json');
+                  const disk = JSON.parse(fs.readFileSync(file, 'utf8'));
+                  disk.socialV2 = disk.socialV2 || {};
+                  disk.socialV2.attention = disk.socialV2.attention || {};
+                  const dAt = disk.socialV2.attention;
+                  dAt.replyOnly = dAt.replyOnly || {};
+                  dAt.sample = dAt.sample || {};
+                  if (replyOnly !== undefined) { if (replyOnly.length) dAt.replyOnly[gid] = replyOnly; else delete dAt.replyOnly[gid]; }
+                  if (sample !== undefined) { if (sample > 0) dAt.sample[gid] = sample; else delete dAt.sample[gid]; }
+                  const tmp = file + '.tmp-attnset';
+                  fs.writeFileSync(tmp, JSON.stringify(disk, null, 2) + '\n');
+                  fs.renameSync(tmp, file);
+                } catch (error) {
+                  return sendJson({ ok: false, error: '写 config 失败：' + String(error?.message || error) }, 500);
+                }
+              }
+              return sendJson({ ok: true, group: gid, replyOnly: at.replyOnly[gid] || [], sample: at.sample[gid] || 0 });
+            }
+            // P2-1：groupPolicyFile.enabled=true 时先写 group-policy.json 再 projection，未启用直接返回 false
+            if (await groupPolicyWrite({ pathname: url.pathname, body, cfg, sendJson, log })) return;
             // EXT_PATCH：扩展路由统一在这里分发（技术笔记等），命中即由扩展自行响应
             if (extDispatchRoute(url.pathname, { body, cfg, log, sendJson, economyOn: tokenGuardDowngrade().on })) return;
             if (!v2ToolEnabled('readGroup')) return sendJson({ ok: false, error: 'readGroup 已关闭' }, 403);
