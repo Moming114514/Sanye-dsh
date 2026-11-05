@@ -63,6 +63,7 @@ import {
 import { scopedMemoryText } from './ext/memory-scope.js'; // MEMSCOPE_PATCH
 import { fuzzyRecallFiles } from './recall-vec.js'; // RECALL_FUZZY_PATCH
 import { extDispatchRoute, extPromptBlocks, extStateKey, extWakeGate, extAfterSend, extOnGroupMessage, extOnPrivateMessage, extList, extManifests } from './ext/index.js'; // EXT_PATCH
+import { touchActiveWindow, clearActiveWindow, isActiveWindowExit } from './ext/active-window.js'; // D-3 ACTIVE_WINDOW
 import { evaluate as evaluateSpeakPolicy } from './ext/speak-policy.js'; // SPEAK_POLICY_PATCH
 import { isMuted } from './ext/mute.js'; // SPEAK_POLICY_PATCH
 import { isLearnGroup, lastSpeakerAt } from './ext/learnmode.js'; // SPEAK_POLICY_PATCH
@@ -16933,6 +16934,15 @@ function logSpeakActual(key, allow, source, reason) {
       // 二代同样收集群聊黑话学习素材（AI 自主提交之外，桥接仍自动提取高频陌生词）
       try { moodObserve(plainContent, String(key).startsWith('group:') ? 'group' : 'private'); } catch {} // MOODV2_OBS1
       if (kind === 'group') feedSlangWindow(key, sender, plainContent);
+      // D-3：主人在群里说「回去/安静/别说了/睡吧/闭嘴」→ 退出活跃期并回一句
+      if (kind === 'group' && isOwner && isActiveWindowExit(plainContent)) {
+        const had = clearActiveWindow(key);
+        appendActivity(key + ' [活跃期] 主人示意收声，退出活跃期' + (had ? '' : '（本来不在）'));
+        if (had) {
+          try { await bot.sendGroupMessage(Number(key.split(':')[1]), '好，我不说了'); } catch (error) { log('[活跃期] 收声回复失败：' + (error && error.message ? error.message : error)); }
+        }
+        return;
+      }
       if (socialV2.paused) {
         appendActivity(`${key} [reserved2] AI 已暂停，消息仅入库不唤醒：${textContent.slice(0, 80)}`);
         return;
@@ -16973,6 +16983,15 @@ function logSpeakActual(key, allow, source, reason) {
         scheduleWakeV2(key, 'bootstrap');
       } else {
         const reason = evaluateWakeTriggerV2(key, st, event, kind, textContent, plainContent, quoteTargetIsSelf);
+        // D-3：主人叫醒 → 该会话进入活跃期
+        if (reason && String(key).startsWith('group:')) {
+          const awSender = String((event && (event.user_id || (event.sender && event.sender.user_id))) || '');
+          if (awSender && awSender === String(cfg.ownerQQ || '') && ['atMention', 'nameMention', 'question', 'poke', 'manual', 'admin', 'askOwner'].includes(reason)) {
+            const mins = Math.max(1, Math.min(60, Number(cfg.socialV2 && cfg.socialV2.activeWindow && cfg.socialV2.activeWindow.minutes) || 10));
+            touchActiveWindow(key, mins, 'owner');
+            log('[活跃期] ' + key + ' 主人 ' + reason + ' 叫醒，开启 ' + mins + ' 分钟');
+          }
+        }
         if (reason === 'askOwner') {
           await askOwnerPeakPermission(key, event, textContent);
         } else if (reason) {

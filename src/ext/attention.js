@@ -1,6 +1,8 @@
 // 注意力判定（一级，纯本地零成本）：群消息在叫醒她接话之前先算一个分，
 // 明显跟她无关的直接不唤醒。被 @、手动指挥、管理员指令、学说法任务不参与评分。
 // 打分只在内存里记一份「最近一条消息的分」，wakeGate 时读它。
+import { getActiveWindow } from './active-window.js';
+
 export default function createAttention({ log }) {
   let active = null; // 3TIER：最近一次被放行的会话（供提示词用）
   const last = new Map(); // key -> { score, hits, at, text }
@@ -65,7 +67,13 @@ export default function createAttention({ log }) {
         const why = String(reason || '');
         if (why === 'manual' || why === 'admin' || /style-learn/.test(why)) return true;
         const st = last.get(k);
-        // REPLYONLY_PATCH（STALE_REPLY_FIX）：名单检查必须在"分数过期"之前，
+        // D-3：主人在这个会话叫醒后的活跃期内，普通消息直接放行（日上限/花费闸门在更早的 gate 里）
+    const aw = getActiveWindow(key);
+    if (aw) {
+      log('[活跃期] 放行 ' + key + '（主人开启，剩 ' + aw.minutesLeft + ' 分钟）');
+      return true;
+    }
+    // REPLYONLY_PATCH（STALE_REPLY_FIX）：名单检查必须在"分数过期"之前，
         // 否则冷场 10 分钟后名单外的人 @ 她也会被接话。
         const ro = (c.replyOnly || {})[k.replace('group:', '')];
         if (Array.isArray(ro) && ro.length && st && st.uin) {
