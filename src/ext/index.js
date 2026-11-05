@@ -1,3 +1,4 @@
+import { createDecisionLog } from './decision-log.js';
 // src/ext/index.js —— 扩展装配点（M2）
 //
 // bridge.js 只保留接线，功能都住在这个目录里。可用钩子：
@@ -205,14 +206,48 @@ export function extOnPrivateMessage(ctx) {
 }
 
 /** 唤醒闸门：任一扩展返回 { allow:false } 即拦下（不给模型烧 token）。 */
+// DECISION_LOG（P1）：判决书记录器。只读 ctx 与各扩展返回值，不改变任何判断。
+let decisionLog = null;
+let decisionLogDir = '';
+function decisionLogFor(ctx) {
+  try {
+    const cfg = ctx?.cfg?.socialV2?.decisionLog;
+    if (cfg && cfg.enabled === false) return null;
+    const stateDir = String(ctx?.stateDir || process.env.SURFCORE_STATE_DIR || '');
+    if (!stateDir) return null;
+    if (!decisionLog || decisionLogDir !== stateDir) {
+      decisionLog = createDecisionLog({ stateDir, log: (...a) => console.log(...a) });
+      decisionLogDir = stateDir;
+    }
+    return decisionLog;
+  } catch {
+    return null;
+  }
+}
+
+/** 发送成功后补结果；参数可以是 key（同一会话最近一次判断）。 */
+export function decisionMarkOutcome(key, info) {
+  try { decisionLog?.markOutcome(String(key || ''), info || {}); } catch {}
+}
+
 export function extWakeGate(ctx) {
+  const dlog = decisionLogFor(ctx);
+  const attn = dlog ? ASSEMBLED.rows.find((row) => row.name === 'attention')?.ext : null;
+  let score = null;
+  try { score = attn?.getLast ? (attn.getLast(String(ctx?.key || ''))?.score ?? null) : null; } catch {}
+  const layers = [];
   for (const row of ASSEMBLED.rows) {
     const ext = row.ext;
     if (typeof ext.wakeGate !== 'function') continue;
     const r = guardHook(ext, row.name, 'wakeGate', () => ext.wakeGate(ctx), { allow: true });
-    if (r && r.allow === false) return r;
+    if (dlog) layers.push({ id: row.name, allow: !(r && r.allow === false), reason: String(r?.reason || '') });
+    if (r && r.allow === false) {
+      if (dlog) dlog.record({ key: ctx?.key, reason: ctx?.reason, text: ctx?.text, score, allow: false, source: row.name, layers, cfg: ctx?.cfg });
+      return r;
+    }
     if (r && r.allow === true && r.reason) console.log(String(r.reason)); // F1：放行也留痕（如 [静音·主人直呼放行]）
   }
+  if (dlog) dlog.record({ key: ctx?.key, reason: ctx?.reason, text: ctx?.text, score, allow: true, source: 'ext', layers, cfg: ctx?.cfg });
   return { allow: true };
 }
 

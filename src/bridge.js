@@ -62,7 +62,7 @@ import {
   appendMemoryInboxEvent, looksNoteworthyMessage, resolveMemoryCardPaths, loadMemoryCard, saveMemoryCardOutputs, touchMemories } from './memory-card.js';
 import { scopedMemoryText } from './ext/memory-scope.js'; // MEMSCOPE_PATCH
 import { fuzzyRecallFiles } from './recall-vec.js'; // RECALL_FUZZY_PATCH
-import { extDispatchRoute, extPromptBlocks, extStateKey, extWakeGate, extAfterSend, extOnGroupMessage, extOnPrivateMessage, extList, extManifests } from './ext/index.js'; // EXT_PATCH
+import { extDispatchRoute, extPromptBlocks, extStateKey, extWakeGate, extAfterSend, extOnGroupMessage, extOnPrivateMessage, extList, extManifests, decisionMarkOutcome } from './ext/index.js'; // EXT_PATCH
 import { touchActiveWindow, clearActiveWindow, isActiveWindowExit } from './ext/active-window.js'; // D-3 ACTIVE_WINDOW
 import { evaluate as evaluateSpeakPolicy } from './ext/speak-policy.js'; // SPEAK_POLICY_PATCH
 import { isMuted } from './ext/mute.js'; // SPEAK_POLICY_PATCH
@@ -4273,6 +4273,8 @@ async function main() {
   }
 
   function noteSendSuccess(key) {
+    // DECISION_LOG（P1）：发送成功 → 给这次判决补「回了」。
+    try { decisionMarkOutcome(key, { replied: true, outbound: 1 }); } catch {}
     snowlumaHealth.lastSendOkAt = Date.now();
     snowlumaHealth.lastSendError = '';
     try {
@@ -15297,8 +15299,16 @@ function logSpeakActual(key, allow, source, reason) {
     if (currentMode !== 'reserved2' || socialV2.paused) { logSpeakActual(key, false, 'config', socialV2.paused ? 'paused' : 'mode=' + currentMode); return; }
     logSpeakPredict(key, reason); // SPEAK_POLICY_PATCH：入口预测（不改判断）
     // EXT_PATCH：唤醒闸门交给扩展（只听主人等规则在 src/ext/*.js 里）
+    const __decisionText = (() => {
+      try {
+        const st = getSocialV2State(key);
+        const arr = st.unread || [];
+        const last = arr[arr.length - 1];
+        return String((last && (last.plain || last.text)) || '');
+      } catch { return ''; }
+    })();
     const wakeGate = extWakeGate({ key: String(key), reason: String(reason), cfg, mode: qqMode(),
-      economyOn: tokenGuardDowngrade().on }); // ECONOMY_PATCH
+      economyOn: tokenGuardDowngrade().on, text: __decisionText, stateDir: STATE_DIR }); // ECONOMY_PATCH
     if (wakeGate && wakeGate.allow === false) {
       const extReason = wakeGate.reason || `[ext] 跳过唤醒 ${key}（${reason}）`;
       log(extReason);
