@@ -74,6 +74,24 @@ function deepDiff(a, b, prefix = '', out = []) {
   return out;
 }
 
+function personaInfo() {
+  try {
+    const home = path.join(DSH_HOME, 'surfcore');
+    let id = 'char-1';
+    try { const cur = JSON.parse(fs.readFileSync(path.join(home, 'characters', 'current.json'), 'utf8')); id = cur.id || cur.character || id; } catch {}
+    const dir = path.join(home, 'characters', id);
+    const files = [];
+    for (const n of ['persona.md', 'persona.tone.md']) {
+      try {
+        const st = fs.statSync(path.join(dir, n));
+        const txt = fs.readFileSync(path.join(dir, n), 'utf8');
+        files.push({ name: n, bytes: st.size, lines: txt.split('\n').length, chars: [...txt].length });
+      } catch {}
+    }
+    return { ok: true, id, files };
+  } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+}
+
 function awaitingRestart() {
   const now = readJSON(CFG_PATH, null);
   if (!now) return { ok: false, count: 0, items: [], error: '读不到 config.json' };
@@ -93,7 +111,7 @@ function awaitingRestart() {
   }
   const items = base ? deepDiff(base, now) : [];
   // HOT_KEYS：这些键桥接是热更新的（ALLOW_HOT_PATCH），改了立刻生效，不该再提示「重启后生效」
-  const HOT_KEYS = /^(?:(?:allow|deny|allowAllWhenEmpty)(?:\.|$)|socialV2\.styleLearn\.enabled$)/; // HOT_KEYS_FIX
+  const HOT_KEYS = /^(?:(?:allow|deny|allowAllWhenEmpty)(?:\.|$)|socialV2\.styleLearn\.enabled$|socialV2\.attention\.)/; // HOT_KEYS_FIX: attention 也是热更新
   const live = items.filter((x) => HOT_KEYS.test(String(x.path || '')));
   const pendingItems = items.filter((x) => !HOT_KEYS.test(String(x.path || '')));
   return { ok: true, count: pendingItems.length, items: pendingItems.slice(0, 20), appliedLive: live.length, at: snap.at };
@@ -1050,7 +1068,8 @@ const server = http.createServer(async (req, res) => {
       res.end('\ufeff' + rows.join('\r\n'));
       return;
     }
-    if (p === '/api/econ') { // 省钱模式（少说话，可按群）
+    if (p === '/api/persona') return sendJson(res, personaInfo());
+  if (p === '/api/econ') { // 省钱模式（少说话，可按群）
       if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
       if (req.method === 'POST') {
         const body = await readBody(req);

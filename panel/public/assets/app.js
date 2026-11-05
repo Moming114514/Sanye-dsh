@@ -4,17 +4,20 @@
 // ★ 加一个功能 = 在 /opt/her/features.json 加一行（页面自动出现，不用改这里）
 
 const PAGES = [
-  { id: 'overview', title: '总览', render: pageOverview },
+  { id: 'overview', title: '概览', render: pageOverview },
   { id: 'entry', title: '入口', render: pageEntry },
   { id: 'features', title: '功能开关', render: pageFeatures },
-  { id: 'commands', title: '命令大全', render: pageCommands },
-  { id: 'people', title: '人群档案', render: pagePeople },
+  { id: 'commands', title: '命令', render: pageCommands },
+  { id: 'people', title: '人', render: pagePeople },
   { id: 'utter', title: '她说的话', render: pageUtter },
-  { id: 'settings', title: '设置', render: pageSettings },
+  { id: 'settings', title: '设置', render: pageSettingsHub },
   { id: 'access', title: '白名单', render: pageAccess },
   { id: 'group-rules', title: '群规则', render: pageGroupRules }, // P2-A
   { id: 'safe', title: '安全', render: pageSafe }, // 频率 + 敏感话题
   { id: 'cost', title: '花费', render: pageCost },
+  { id: 'health', title: '健康', render: pageHealth },
+  { id: 'personality', title: '性格', render: pagePersonality },
+  { id: 'maintenance', title: '维护', render: pageMaintenance },
   { id: 'memory', title: '记忆', render: pageMemoryHub },
   { id: 'memory-old', title: '记忆与情绪（旧）', render: pageMemory },
   { id: 'impr', title: '她的看法', render: pageImpr },
@@ -29,7 +32,7 @@ const PAGES = [
 
 // NAV_GROUPS（W4）：按 5 层体系分组（感知/判断/表达/记忆/运维）+ 诊断
 // 组名是灰字不可点；手机端由 CSS 隐藏组名，仍是原来的横向导航
-const NAV_GROUPS = [
+const LEGACY_NAV = [
   { title: '感知', ids: ['people'] },
   { title: '判断', ids: ['features', 'access', 'group-rules', 'decisions', 'safe'] },
   { title: '表达', ids: ['commands', 'utter', 'style'] },
@@ -38,21 +41,37 @@ const NAV_GROUPS = [
   { title: '诊断', ids: ['diag'] },
 ];
 
+// P2-B 第3段：目标导航（3 组 12 项）；state._legacyNav / localStorage her.legacyNav=1 可恢复旧入口
+const NAV_GROUPS = [
+  { title: '现在', ids: ['overview', 'decisions', 'cost', 'health'] },
+  { title: '她', ids: ['personality', 'talk', 'memory', 'group-rules', 'people'] },
+  { title: '系统', ids: ['settings', 'commands', 'maintenance'] },
+];
+function navGroups() {
+  try { if (localStorage.getItem('her.legacyNav') === '1') return LEGACY_NAV; } catch (e) {}
+  return state._legacyNav ? LEGACY_NAV : NAV_GROUPS;
+}
+
 // PAGE_ADJUST（B 批）：每页第一张卡之前的一行说明——这页到底能调什么
 const PAGE_ADJUST = {
+  talk: '说话：学到的说法、她的看法、她说的话。',
+  health: '只读：自检、诊断、媒体与通道健康。',
+  personality: '只读：当前角色与人格文件大小。',
+  maintenance: '旧页面入口都在这里，只是没放进主导航。',
+
   'group-rules': '一屏看完每个群：在不在白名单、怎么回、发言量、只回谁、抽样多少；改完 60 秒内生效，白名单增删建议重启一次。',
   decisions: '每一条「要不要回」的判决都在这里：哪层拦的、分数多少、最后回没回。只读，不改任何判断。',
-  overview: '什么也调不了，只看今天的量：消息、唤醒、花费、心情。',
+  overview: '只读：今天的量——花费、她刚说的、欠着的事、自检结果。',
   entry: '入口通道的状态；改通道要去「设置」。',
   features: '全站的开关都在这里：拨完按右侧标记判断是「立即」还是「需重启」。',
   commands: '命令清单；前缀规则见页首（私聊 / 和 #，群里只能 # 和 ！）。',
   people: '按群看今天谁在说话、给谁打过标记；标记只影响她对那个人的态度。',
   utter: '她最近说过的话；可以删掉不想留的句子。',
-  settings: '运行参数（群限制、回复长度等）；改完多半要重启桥接。页面底部有「重启桥接」按钮。',
-  access: '白名单与准入；决定哪些群、哪些人能跟她说话。',
-  safe: '省钱模式、群频率、敏感词，三块都在这一页；按群规则已挪到「群规则」页。',
-  cost: '花费曲线与额度；省钱模式在「安全」页。',
-  memory: '记忆条目可以删；心情只能看，不能调。',
+  settings: '功能开关 / 待生效与重启 / 工具档，三个 Tab 都在这里。',
+  access: '白名单与准入：加/删群、加/删私聊。静音与学习模式已挪到「群规则」。',
+  safe: '敏感话题守门；省钱模式在花费页，群频率与按群规则在「群规则」页。',
+  cost: '省钱模式与花费曲线；改额度在「设置」里。',
+  memory: '只读为主：心情、记忆体检、记忆星海三个 Tab。',
   impr: '她对人的看法；可以删掉一条看法。',
   style: '她的说话框架；可以加一条、关掉一条。',
   starmap: '记忆星海的 3D 视图；只读，拖拽旋转、滚轮缩放。',
@@ -376,9 +395,13 @@ function pageOverview() {
   hideCardsIn(wrap, ['QQ 状态', '媒体', '运行', '她现在的心情', '端口', '记着的东西', '最近她说的']);
   const _sends = (d.sends || []).slice(0, 3);
   const _sendRows = _sends.length
-    ? _sends.map((l) => h('div', { class: 'kv', style: 'align-items:flex-start' },
-        h('span', { class: 'mono', style: 'font-size:11.5px;flex:0 0 92px;color:#7f8b99' }, (l.match(/^\S+\s+\S+\s+\S+/) || [''])[0]),
-        h('span', { style: 'flex:1' }, l.replace(/^\S+\s+\S+\s+\S+\s*/, '').slice(0, 160))))
+    ? _sends.map((l) => {
+        const t = (l.match(/^(\d\d-\d\d)\s+(\d\d:\d\d(:\d\d)?)/) || []);
+        const body = String(l).replace(/^.*?\[info\]\s*/, '').replace(/^\S+\s+\S+\s+/, '').trim();
+        return h('div', { class: 'kv', style: 'align-items:flex-start' },
+          h('span', { class: 'mono', style: 'font-size:11.5px;flex:0 0 92px;color:#7f8b99' }, (t[1] || '') + ' ' + (t[2] || '')),
+          h('span', { style: 'flex:1' }, body.slice(0, 140)));
+      })
     : [h('div', { class: 'muted' }, '日志里还没抓到发送记录')];
   wrap.append(h('div', { class: 'card', style: 'margin-top:14px' },
     h('h3', {}, '她刚说的'),
@@ -388,11 +411,11 @@ function pageOverview() {
     h('div', { class: 'kv' }, h('span', {}, '她记着要做的事'), h('span', {}, ((d.loops || []).length) + ' 条')),
     h('div', { class: 'kv' }, h('span', {}, '定时提醒'), h('span', {}, ((d.reminders || []).length) + ' 条'))));
   wrap.append(h('div', { class: 'card', style: 'margin-top:14px;display:flex;gap:16px;flex-wrap:wrap;font-size:13px' },
-    h('a', { href: '#health' }, '健康红绿灯 →'),
-    h('a', { href: '#cost' }, '花费明细 →'),
-    h('a', { href: '#group-rules' }, '群规则 →'),
-    h('a', { href: '#talk' }, '说话 →'),
-    h('a', { href: '#settings' }, '设置 →')));
+    h('a', { href: '#health', style: 'color:var(--accent)' }, '健康红绿灯 →'),
+    h('a', { href: '#cost', style: 'color:var(--accent)' }, '花费明细 →'),
+    h('a', { href: '#group-rules', style: 'color:var(--accent)' }, '群规则 →'),
+    h('a', { href: '#talk', style: 'color:var(--accent)' }, '说话 →'),
+    h('a', { href: '#settings', style: 'color:var(--accent)' }, '设置 →')));
   return wrap;
 }
 
@@ -1066,6 +1089,75 @@ function pageTalk() {
     { title: '学到的说法', render: pageStyle },
     { title: '她的看法', render: pageImpr },
     { title: '她说的话', render: pageUtter },
+  ]);
+}
+
+async function loadPersona() {
+  try { state.persona = await api('/api/persona'); } catch (e) { state.persona = { ok: false, error: String(e && e.message || e) }; }
+  rerender();
+}
+function pagePersonality() {
+  const wrap = h('div', {});
+  if (!state.persona) { loadPersona(); wrap.append(h('div', { class: 'card muted' }, '正在读人格卡…')); return wrap; }
+  const p = state.persona || {};
+  if (!p.ok) { wrap.append(h('div', { class: 'card warn' }, '读不到人格卡：' + (p.error || '未知错误'))); return wrap; }
+  wrap.append(h('div', { class: 'card' },
+    h('h3', {}, '当前角色'),
+    h('div', { class: 'kv' }, h('span', {}, '角色 ID'), h('span', {}, p.id || '—')),
+    h('div', { class: 'muted', style: 'margin-top:8px;font-size:12.5px' },
+      '人格是她的底座，面板只显示不修改；改人格要走仓库里的人格卡文件，改完约 ¥0.1 重建一次缓存。')));
+  wrap.append(h('div', { class: 'card', style: 'margin-top:14px' },
+    h('h3', {}, '人格文件'),
+    ...(p.files || []).map((f) => h('div', { class: 'kv' },
+      h('span', {}, f.name),
+      h('span', {}, `${f.chars} 字 · ${f.lines} 行 · ${(f.bytes / 1024).toFixed(1)} KB`))),
+    (p.files || []).length ? null : h('div', { class: 'muted' }, '没有找到 persona.md / persona.tone.md')));
+  return wrap;
+}
+
+function pageHealth() {
+  return tabbed('health', [
+    { title: '自检', render: () => {
+      const w = h('div', {});
+      w.append(h('div', { style: 'margin-bottom:14px' }, selfcheckCard()));
+      w.append(h('div', { style: 'margin-bottom:14px' }, mediaStatsCard()));
+      w.append(healthCard());
+      return w;
+    } },
+    { title: '诊断', render: pageDiag },
+  ]);
+}
+
+function pageMaintenance() {
+  const links = [
+    ['入口（通道状态）', 'entry'],
+    ['白名单（旧页直接编辑）', 'access'],
+    ['安全（敏感词守门）', 'safe'],
+    ['记忆与情绪（旧）', 'memory-old'],
+    ['记忆体检（旧）', 'memhealth'],
+    ['记忆星海（旧）', 'starmap'],
+    ['学说话（旧）', 'style'],
+    ['她的看法（旧）', 'impr'],
+    ['她说的话（旧）', 'utter'],
+  ];
+  return h('div', {},
+    h('div', { class: 'card' },
+      h('h3', {}, '旧页面入口'),
+      h('div', { class: 'muted', style: 'margin-bottom:10px;font-size:12.5px' },
+        '这些页面没有删除，只是收进了维护区；点进去可以照常使用。'),
+      h('div', { style: 'display:flex;gap:10px;flex-wrap:wrap' },
+        ...links.map(([t, id]) => h('a', { class: 'chip', href: '#' + id, style: 'text-decoration:none' }, t)))),
+    h('div', { class: 'card', style: 'margin-top:14px' },
+      h('h3', {}, '回滚'),
+      h('div', { class: 'muted', style: 'font-size:12.5px' },
+        '想看旧版导航：在浏览器控制台执行 localStorage.setItem("her.legacyNav","1") 后刷新；删除该键恢复。）')));
+}
+
+function pageSettingsHub() {
+  return tabbed('settings', [
+    { title: '功能开关', render: pageFeatures },
+    { title: '待生效与重启', render: pageSettings },
+    { title: '工具档', render: pagePlugins },
   ]);
 }
 
@@ -2901,6 +2993,8 @@ function decisionConvName(x) {
   const hit = state.names && state.names[bucket] && state.names[bucket][m[2]];
   const nm = hit && hit.name ? hit.name + ' · ' : '';
   return nm + (m[1] === 'group' ? '群 ' : '私聊 ') + m[2];
+  const _n = (state.names && state.names.group && state.names.group[id]);
+  if (typeof _n === 'string' && _n) return _n + ' · ' + id;
 }
 
 
@@ -3375,7 +3469,7 @@ function renderPills() {
 
 function renderNav() {
   const nodes = [];
-  for (const g of NAV_GROUPS) {
+  for (const g of navGroups()) {
     nodes.push(h('div', { class: 'nav-group-title' }, g.title));
     for (const id of g.ids) {
       const p = PAGES.find((x) => x.id === id);
@@ -3395,7 +3489,7 @@ function rerender() {
   const page = PAGES.find((p) => p.id === state.page) || PAGES[0];
   const _view = page.render();
   const _adj = PAGE_ADJUST[page.id];
-  if (_adj) $('#view').replaceChildren(h('div', { class: 'page-adjust' }, '本页能调：' + _adj), _view);
+  if (_adj) $('#view').replaceChildren(h('div', { class: 'page-adjust' }, (_adj.indexOf('只读') === 0 ? '本页只读：' : '本页能改：') + _adj.replace(/^只读[:：]?\s*/, '')), _view);
   else $('#view').replaceChildren(_view);
   $('#conn').className = 'conn ok';
   $('#conn').textContent = '已连接 · ' + (state.overview?.cfgMeta?.mode || '');
