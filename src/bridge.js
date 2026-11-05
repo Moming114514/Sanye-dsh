@@ -62,6 +62,7 @@ import {
   appendMemoryInboxEvent, looksNoteworthyMessage, resolveMemoryCardPaths, loadMemoryCard, saveMemoryCardOutputs, touchMemories } from './memory-card.js';
 import { scopedMemoryText } from './ext/memory-scope.js'; // MEMSCOPE_PATCH
 import { fuzzyRecallFiles } from './recall-vec.js'; // RECALL_FUZZY_PATCH
+import { isSidecarTask, buildSidecarPrompt } from './ext/sidecar-task.js'; // SIDECAR_PATCH
 import { extDispatchRoute, extPromptBlocks, extStateKey, extWakeGate, extAfterSend, extOnGroupMessage, extOnPrivateMessage, extList, extManifests, decisionMarkOutcome } from './ext/index.js'; // EXT_PATCH
 import { handleWrite as groupPolicyWrite } from './ext/group-policy.js'; // P2-1 群规则单一事实源（enabled=false 时无副作用）
 import { isEnabled as groupPolicyEnabled, set as groupPolicySet, project as groupPolicyProject } from './ext/group-policy.js'; // ATTNSET_PATCH
@@ -15090,6 +15091,13 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
   }
 
   function buildWakePromptV2(key, reason) {
+    // SIDECAR_PATCH：后台学习类任务不注入人格/记忆，只给工具 + 最小输出要求
+    if (isSidecarTask(reason, cfg)) {
+      const st0 = getSocialV2State(key);
+      const sidecar = buildSidecarPrompt(reason, key, st0.agentToken);
+      log(`[task] 副手模式（无persona）reason=${reason} promptChars=${sidecar.length}`);
+      return sidecar;
+    }
     const roleState = readRoleState();
     const roleLine = roleState.role ? `【当前角色】${roleState.role}（完整角色卡请调用 qq_get_prompt 查看）\n\n` : '';
     // PERSONA_V2_INJECT：二代原本不注入完整人格卡，只让 AI 自己调 qq_get_prompt，
