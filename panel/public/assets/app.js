@@ -1267,29 +1267,44 @@ function pluginTable(mods) {
 function pagePlugins() {
   const wrap = h('div', {});
   if (!state.plugins) { loadPlugins(); wrap.append(h('div', { class: 'card muted' }, '正在读插件清单…')); return wrap; }
+  const LAYERS = ['感知', '判断', '表达', '记忆', '运维'];
   const mods = state.plugins.slice().sort((a, b) => (a.order || 0) - (b.order || 0));
-  const w1 = mods.filter((m) => m.wave === 1).length;
-  const w2 = mods.filter((m) => m.wave === 2).length;
-  wrap.append(h('div', { class: 'toolbar' },
-    h('span', { class: 'muted' }, `共 ${mods.length} 个模块 · wave1 ${w1} · wave2 ${w2}`),
-    h('span', { class: 'muted', style: 'margin-left:auto;font-size:12px' }, state.pluginsAt ? '清单时间 ' + state.pluginsAt : ''),
-    h('button', { class: 'btn ghost', onclick: () => loadPlugins(true) }, '刷新清单')));
-  if (state.pluginsFallback) {
-    wrap.append(h('div', { class: 'card', style: 'border-color:var(--warn)' },
-      h('div', { style: 'color:var(--warn);font-size:12.5px' }, `读 /api/plugins 失败（${state.pluginsErr}），下面是面板内置快照，可能过期；点「刷新清单」重试。`)));
+  const hooksTotal = mods.reduce((n, m) => n + (m.hooks || []).length, 0);
+  const routesTotal = mods.reduce((n, m) => n + (m.routes || []).length, 0);
+  wrap.append(h('div', { class: 'card' }, [
+    h('div', { class: 'card-h' }, '插件清单'),
+    h('div', { style: 'font-size:13px' }, `共 ${mods.length} 个扩展，钩子 ${hooksTotal} 个，命中路由 ${routesTotal} 条`),
+    h('div', { class: 'muted', style: 'font-size:12px;margin-top:4px' }, '按五层分组；点一行展开钩子、配置与状态文件。'),
+  ]));
+  for (const layer of LAYERS) {
+    const list = mods.filter((m) => (m.layer || '运维') === layer);
+    if (!list.length) continue;
+    const rows = [];
+    for (const m of list) {
+      const open = state._pluginOpen === m.id;
+      rows.push(h('tr', { style: 'cursor:pointer', onclick: () => { state._pluginOpen = open ? null : m.id; rerender(); } }, [
+        h('td', {}, h('b', {}, m.title || m.id), h('span', { class: 'mono muted', style: 'font-size:11px' }, ' ' + m.id)),
+        h('td', {}, m.kind || '-'),
+        h('td', { class: 'num' }, String((m.hooks || []).length)),
+        h('td', {}, m.hot ? '是' : '否'),
+        h('td', { class: 'num' }, String((m.config || []).length)),
+      ]));
+      if (open) rows.push(h('tr', {}, h('td', { colspan: 5, style: 'background:rgba(255,255,255,.03);padding:8px 12px' }, [
+        h('div', { style: 'font-size:12.5px' }, '钩子：' + ((m.hooks || []).map((x) => PLUGIN_HOOK_LABEL[x] || x).join('、') || '无')),
+        h('div', { style: 'font-size:12.5px;margin-top:4px' }, '配置：' + ((m.config || []).join('、') || '无')),
+        h('div', { style: 'font-size:12.5px;margin-top:4px' }, '状态文件：' + ((m.stateFiles || []).join('、') || '无')),
+      ])));
+    }
+    wrap.append(h('div', { class: 'card', style: 'padding:8px 12px' }, [
+      h('div', { class: 'card-h', style: 'margin:6px 2px 6px' }, `${layer} · ${list.length} 个`),
+      h('table', { class: 'tbl-fit nowrap-tbl', style: 'width:100%;font-size:13px' },
+        h('thead', {}, h('tr', {}, ['扩展', 'kind', '钩子', '热生效', '配置'].map((t) => h('th', {}, t)))),
+        h('tbody', {}, ...rows)),
+    ]));
   }
-  wrap.append(h('div', { class: 'card' }, pluginTable(mods)));
   return wrap;
 }
 
-// ---------- 记忆星海（3D 星海，可拖动旋转 / 缩放 / 飞行聚焦 / 时间流动） ----------
-const starCam = { yaw: 0.6, pitch: -0.22, dist: 2.45, yawT: null, pitchT: null, distT: 2.45, vx: 0, vy: 0, auto: true };
-let starSel = null;
-let starAnim = 0;
-let starFlow = 0; // 0 = 正常布局，1 = 按时间铺开
-// STARTIME_PATCH：时间轴——拖到 0.5 就只看前半段长出来的星（视频里那种「记忆一点点长出来」）
-let starT = (window.__dshStarT == null) ? 1 : Math.max(0, Math.min(1, Number(window.__dshStarT)));
-let starCutCache = { t: -1, n: -1, cut: Infinity };
 function starCutoff() {
   if (starT >= 0.999) return Infinity;
   const recs = (state.mem && state.mem.records) || [];
@@ -3278,12 +3293,29 @@ function pageDiag() {
 // ---------- 动作 ----------
 async function toggleFeature(f, next) {
   try {
-    const r = await api('/api/feature', { method: 'POST', body: { id: f.id, value: next } });
+    // P2F_F1：按 features.json 的 implies/conflicts 收集联动项，一次请求写回
+    const reg = state.features || [];
+    const also = [];
+    const byPath = (p) => reg.find((x) => x.path === p);
+    const push = (path, value) => {
+      const x = byPath(path);
+      if (!x || x.id === f.id) return;
+      if ((x.value === true) === value) return;
+      if (also.some((a) => a.id === x.id)) return;
+      also.push({ id: x.id, value });
+    };
+    if (next) {
+      for (const pth of (f.implies || [])) push(pth, true);
+      for (const pth of (f.conflicts || [])) push(pth, false);
+    }
+    const r = await api('/api/feature', { method: 'POST', body: { id: f.id, value: next, also } });
     f.value = r.value;
-    toast(`${f.name} → ${next ? '开' : '关'}（${r.effectText}）`);
-    if (r.effect !== 'hot') toast(`${f.name} 已写入，需要${r.effectText.replace('需', '')}才生效`, 3600);
+    let msg = `${f.name} → ${next ? '开' : '关'}（${r.effectText}）`;
+    if (Array.isArray(r.changed) && r.changed.length > 1) msg += `｜已同时调整 ${r.changed.length - 1} 项`;
+    if (Array.isArray(r.notes) && r.notes.length) msg += '｜' + r.notes.join('；');
+    toast(msg, 4200);
     await loadFeatures();
-    await loadPending(); // PENDING_FIX：拨完立刻刷新顶栏「待生效」，别等整页刷新
+    await loadPending();
     rerender();
   } catch (e) { toast('失败：' + e.message, 3600); rerender(); }
 }

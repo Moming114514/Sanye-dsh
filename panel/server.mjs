@@ -610,6 +610,14 @@ const server = http.createServer(async (req, res) => {
       if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
       const r = await api('/api/plugins');
       if (!r || r.ok === false) return send(res, 502, { ok: false, error: (r && r.error) || '桥接没返回清单' });
+      // P2F_F2：桥接不返回 layer，面板从仓库里的 manifest 快照补上
+      try {
+        const gen = readJSON(path.join(SURFCORE, 'docs/generated/manifests.json'), { modules: [] });
+        const byId = new Map((gen.modules || []).map((m) => [m.id, m.layer]));
+        for (const m of (r.modules || [])) {
+          if (!m.layer) m.layer = byId.get(m.id) || (m.kind === 'core' ? '运维' : '判断');
+        }
+      } catch {}
       return send(res, 200, r);
     }
     if (p === '/api/health') { // HEALTH_PATCH
@@ -1384,28 +1392,41 @@ const server = http.createServer(async (req, res) => {
 
       if (p === '/api/feature') {
         const reg = readJSON(FEAT_PATH, { features: [] }).features || [];
-        const f = reg.find((x) => x.id === body.id);
-        if (!f) return send(res, 400, { ok: false, error: '没有这个功能 id' });
-        // PENDING_FIX：暂停写在桥接的社交状态里，写 config.json 永远不会生效
-        if (f.id === 'paused') {
-          const on = body.value === true || body.value === 'true';
-          const r = await api('/api/socialV2/activity', 'POST', { paused: on });
-          return send(res, 200, { ok: true, id: f.id, value: on, effect: 'hot', effectText: on ? '已暂停（立刻生效）' : '已恢复（立刻生效）' });
-        }
-        // PENDING_FIX：@video: 的配置在 video 配置文件里，和 /api/setting 一致
-        if (f.path.startsWith('@video:')) {
-          const val = coerce(f, body.value);
-          const v = readJSON(VIDEO_JSON, {}) || {};
-          setPath(v, f.path.slice(7), val);
-          writeJsonAtomic(VIDEO_JSON, v);
-          return send(res, 200, { ok: true, id: f.id, value: val, effect: 'hot', effectText: '立刻生效' });
-        }
-        if (f.path.startsWith('@')) return send(res, 400, { ok: false, error: '这一项不能在这里改' });
-        const val = coerce(f, body.value);
+        const items = [{ id: body.id, value: body.value }, ...(Array.isArray(body.also) ? body.also : [])];
         const cfg = readCfgStrict();
-        setPath(cfg, f.path, val);
+        const changed = [];
+        const notes = [];
+        const bp = path.join(QQ_STATE, 'paused-sample-backup.json');
+        let mainValue = null;
+        for (const it of items) {
+          const f = reg.find((x) => x.id === it.id);
+          if (!f) continue;
+          if (f.id === 'paused') {
+            const on = it.value === true || it.value === 'true';
+            await api('/api/socialV2/activity', 'POST', { paused: on });
+            if (!cfg.socialV2) cfg.socialV2 = {};
+            if (!cfg.socialV2.attention) cfg.socialV2.attention = {};
+            if (on) {
+              try { fs.writeFileSync(bp, JSON.stringify({ at: Date.now(), sample: cfg.socialV2.attention.sample || {} }, null, 2)); } catch {}
+              cfg.socialV2.attention.sample = {};
+              notes.push('各群抽样已临时清零，取消暂停时还原');
+            } else {
+              try {
+                const b = JSON.parse(fs.readFileSync(bp, 'utf8'));
+                if (b && b.sample) { cfg.socialV2.attention.sample = b.sample; notes.push('抽样已恢复'); }
+                fs.unlinkSync(bp);
+              } catch {}
+            }
+            mainValue = on; changed.push(f.id); continue;
+          }
+          if (f.path.startsWith('@')) continue;
+          const val = coerce(f, it.value);
+          setPath(cfg, f.path, val);
+          changed.push(f.id);
+          if (mainValue === null) mainValue = val;
+        }
         writeCfg(cfg);
-        return send(res, 200, { ok: true, id: f.id, value: val, effect: f.effect, effectText: EFFECT_TEXT[f.effect] });
+        return send(res, 200, { ok: true, id: body.id, value: mainValue, changed, notes, effect: 'hot', effectText: '立刻生效' });
       }
       if (p === '/api/setting') {
         const reg = readJSON(FEAT_PATH, { features: [] }).features || [];

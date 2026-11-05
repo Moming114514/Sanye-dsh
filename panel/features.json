@@ -1,0 +1,410 @@
+{
+  "version": 1,
+  "note": "功能注册表：TUI 与将来的网页都读这一份。加功能 = 加一行。kind: bool|number|text|info；effect: hot(立刻生效)|bridge(需重启桥接)|dsh(需重启 DSH 面板工具)",
+  "features": [
+    {
+      "id": "paused",
+      "group": "安全：总开关",
+      "name": "AI 暂停（全局静默）",
+      "path": "socialV2.paused",
+      "kind": "bool",
+      "effect": "hot",
+      "hint": "打开后她完全不回复",
+      "conflicts": [
+        "allowAllWhenEmpty"
+      ]
+    },
+    {
+      "id": "allowAll",
+      "group": "安全：白名单",
+      "name": "白名单为空时也响应",
+      "path": "allowAllWhenEmpty",
+      "kind": "bool",
+      "effect": "hot",
+      "conflicts": [
+        "socialV2.paused"
+      ]
+    },
+    {
+      "id": "gentle",
+      "group": "安全",
+      "name": "管理员·温柔模式",
+      "path": "admin.gentle",
+      "kind": "bool",
+      "effect": "bridge"
+    },
+    {
+      "id": "reminders",
+      "group": "记忆：提醒",
+      "name": "定时提醒",
+      "path": "socialV2.reminders.enabled",
+      "kind": "bool",
+      "effect": "bridge"
+    },
+    {
+      "id": "loops",
+      "group": "记忆：欠事",
+      "name": "欠着的事（前瞻记忆）",
+      "path": "socialV2.loops.enabled",
+      "kind": "bool",
+      "effect": "bridge"
+    },
+    {
+      "id": "report",
+      "group": "自动任务：日报",
+      "name": "每日日报",
+      "path": "socialV2.report.enabled",
+      "kind": "bool",
+      "effect": "bridge"
+    },
+    {
+      "id": "qzoneWatch",
+      "group": "自动任务：QQ 空间",
+      "name": "自动看他 QQ 空间",
+      "path": "socialV2.qzone.watchOwner",
+      "kind": "bool",
+      "effect": "bridge"
+    },
+    {
+      "id": "styleLearn",
+      "group": "学习：学说话",
+      "name": "学说话（每天两轮）",
+      "path": "socialV2.styleLearn.enabled",
+      "kind": "bool",
+      "effect": "hot"
+    },
+    {
+      "id": "biliStudy",
+      "group": "学习：B站",
+      "name": "B站每天学一个",
+      "path": "socialV2.biliStudy.enabled",
+      "kind": "bool",
+      "effect": "bridge"
+    },
+    {
+      "id": "purpose",
+      "group": "自动任务：目的机制",
+      "name": "目的机制（自己找事做）",
+      "path": "purpose.enabled",
+      "kind": "bool",
+      "effect": "bridge"
+    },
+    {
+      "id": "morning",
+      "group": "自动化",
+      "name": "早安问候",
+      "path": "greetings.morning.enabled",
+      "kind": "bool",
+      "effect": "bridge"
+    },
+    {
+      "id": "biliBridge",
+      "group": "自动化",
+      "name": "B站动态/记忆同步",
+      "path": "biliBridge.enabled",
+      "kind": "bool",
+      "effect": "bridge"
+    },
+    {
+      "id": "slang",
+      "group": "自动化",
+      "name": "群黑话学习",
+      "path": "slang.enabled",
+      "kind": "bool",
+      "effect": "bridge"
+    },
+    {
+      "id": "toolSendGroup",
+      "group": "QQ 工具",
+      "name": "群聊发言",
+      "path": "socialV2.tools.sendGroup",
+      "kind": "bool",
+      "effect": "dsh"
+    },
+    {
+      "id": "toolSendPrivate",
+      "group": "QQ 工具",
+      "name": "私聊发言",
+      "path": "socialV2.tools.sendPrivate",
+      "kind": "bool",
+      "effect": "dsh"
+    },
+    {
+      "id": "toolSticker",
+      "group": "QQ 工具",
+      "name": "发收藏表情",
+      "path": "socialV2.tools.sendSticker",
+      "kind": "bool",
+      "effect": "dsh"
+    },
+    {
+      "id": "toolCollectSticker",
+      "group": "QQ 工具",
+      "name": "收藏表情",
+      "path": "socialV2.tools.collectSticker",
+      "kind": "bool",
+      "effect": "dsh"
+    },
+    {
+      "id": "toolViewSticker",
+      "group": "QQ 工具",
+      "name": "看动图（抽帧）",
+      "path": "socialV2.tools.viewSticker",
+      "kind": "bool",
+      "effect": "dsh",
+      "hint": "关了以后她读不了动图"
+    },
+    {
+      "id": "toolSendVoice",
+      "group": "QQ 工具",
+      "name": "发语音",
+      "path": "socialV2.tools.sendVoice",
+      "kind": "bool",
+      "effect": "dsh"
+    },
+    {
+      "id": "toolQzone",
+      "group": "QQ 工具",
+      "name": "发/删空间说说",
+      "path": "socialV2.tools.sendQzone",
+      "kind": "bool",
+      "effect": "dsh"
+    },
+    {
+      "id": "toolLoops",
+      "group": "QQ 工具",
+      "name": "记欠事",
+      "path": "socialV2.tools.loops",
+      "kind": "bool",
+      "effect": "dsh"
+    },
+    {
+      "id": "toolPeople",
+      "group": "QQ 工具",
+      "name": "记人物表",
+      "path": "socialV2.tools.people",
+      "kind": "bool",
+      "effect": "dsh"
+    },
+    {
+      "id": "toolMemory",
+      "group": "QQ 工具",
+      "name": "记忆读写",
+      "path": "socialV2.tools.memory",
+      "kind": "bool",
+      "effect": "dsh"
+    },
+    {
+      "id": "toolPoke",
+      "group": "QQ 工具",
+      "name": "拍一拍",
+      "path": "socialV2.tools.sendPoke",
+      "kind": "bool",
+      "effect": "dsh"
+    },
+    {
+      "id": "tgEnabled",
+      "group": "成本：额度",
+      "name": "防爆破总开关",
+      "path": "socialV2.tokenGuard.enabled",
+      "kind": "bool",
+      "effect": "bridge"
+    },
+    {
+      "id": "cap",
+      "group": "成本：额度",
+      "name": "每日额度（元）",
+      "path": "socialV2.tokenGuard.maxDailyCostCNY",
+      "kind": "number",
+      "min": 1,
+      "max": 100,
+      "step": 1,
+      "effect": "bridge"
+    },
+    {
+      "id": "ratio",
+      "group": "成本：额度",
+      "name": "花到几成降级（0-1）",
+      "path": "socialV2.tokenGuard.downgradeAtRatio",
+      "kind": "number",
+      "min": 0.1,
+      "max": 1,
+      "step": 0.05,
+      "effect": "bridge"
+    },
+    {
+      "id": "wakes",
+      "group": "成本：额度",
+      "name": "群每天最多醒几次",
+      "path": "socialV2.tokenGuard.maxWakesPerDay",
+      "kind": "number",
+      "min": 10,
+      "max": 500,
+      "step": 10,
+      "effect": "bridge"
+    },
+    {
+      "id": "pwakes",
+      "group": "成本：额度",
+      "name": "私聊每天最多醒几次",
+      "path": "socialV2.tokenGuard.privateMaxWakesPerDay",
+      "kind": "number",
+      "min": 10,
+      "max": 500,
+      "step": 10,
+      "effect": "bridge"
+    },
+    {
+      "id": "gap",
+      "group": "成本：额度",
+      "name": "两次唤醒最短间隔（秒）",
+      "path": "socialV2.tokenGuard.minWakeGapMs",
+      "kind": "number",
+      "min": 30000,
+      "max": 3600000,
+      "step": 30000,
+      "effect": "bridge"
+    },
+    {
+      "id": "learnRounds",
+      "group": "学习：学说话",
+      "name": "学说话时间（时:分, 时:分）",
+      "path": "socialV2.styleLearn.rounds",
+      "kind": "info",
+      "effect": "bridge",
+      "hint": "改时间要改配置文件或让我改"
+    },
+    {
+      "id": "learnTarget",
+      "group": "学习：学说话",
+      "name": "只学谁（QQ 号）",
+      "path": "socialV2.styleLearn.targetQQ",
+      "kind": "text",
+      "effect": "bridge"
+    },
+    {
+      "id": "learnPer",
+      "group": "学习：学说话",
+      "name": "每轮记几条",
+      "path": "socialV2.styleLearn.perRound",
+      "kind": "number",
+      "min": 1,
+      "max": 4,
+      "step": 1,
+      "effect": "bridge"
+    },
+    {
+      "id": "slangMin",
+      "group": "学习与记忆",
+      "name": "黑话：攒够多少条才学",
+      "path": "slang.extractMinMessages",
+      "kind": "number",
+      "min": 10,
+      "max": 200,
+      "step": 10,
+      "effect": "bridge"
+    },
+    {
+      "id": "videoQuota",
+      "group": "学习：B站",
+      "name": "每天最多看几个视频",
+      "path": "@video:quota.daily",
+      "kind": "number",
+      "min": 1,
+      "max": 20,
+      "step": 1,
+      "effect": "hot",
+      "hint": "写在 ~/.dsh/video.json"
+    },
+    {
+      "id": "loopsMax",
+      "group": "记忆：欠事",
+      "name": "欠事最多记几条",
+      "path": "socialV2.loops.maxItems",
+      "kind": "number",
+      "min": 3,
+      "max": 30,
+      "step": 1,
+      "effect": "bridge"
+    },
+    {
+      "id": "reportTime",
+      "group": "自动任务：日报",
+      "name": "日报时间（时:分）",
+      "path": "@report:time",
+      "kind": "info",
+      "effect": "bridge"
+    },
+    {
+      "id": "stickerMax",
+      "group": "时间点",
+      "name": "表情库上限",
+      "path": "socialV2.sticker.maxItems",
+      "kind": "number",
+      "min": 5,
+      "max": 200,
+      "step": 5,
+      "effect": "bridge"
+    },
+    {
+      "id": "biliPerDay",
+      "group": "学习：B站",
+      "name": "B站每天最多学几个",
+      "path": "socialV2.biliStudy.dailyMax",
+      "kind": "number",
+      "effect": "bridge",
+      "min": 1,
+      "max": 6,
+      "step": 1,
+      "hint": "学一个约 ¥0.15（抽帧+字幕）"
+    },
+    {
+      "id": "styleExempt",
+      "group": "学习：学说话",
+      "name": "省钱模式也照学说法",
+      "path": "socialV2.styleLearn.exemptEconomy",
+      "kind": "bool",
+      "effect": "bridge",
+      "hint": "开着就每天 2 轮不受降级影响（约 ¥0.06/天）"
+    },
+    {
+      "id": "proactive",
+      "group": "自动任务：主动找话",
+      "name": "自己找话说",
+      "path": "socialV2.proactive.enabled",
+      "kind": "bool",
+      "effect": "bridge",
+      "hint": "关掉她只在被叫到时说话"
+    },
+    {
+      "id": "proactiveP",
+      "group": "自动任务：主动找话",
+      "name": "自己找话的概率",
+      "path": "socialV2.proactive.probability",
+      "kind": "number",
+      "effect": "bridge",
+      "min": 0,
+      "max": 1,
+      "step": 0.05,
+      "hint": "每 30~90 分钟掷一次骰子；0.3 = 三成机会会开口"
+    },
+    {
+      "id": "moodEnabled",
+      "group": "记忆：情绪",
+      "name": "情绪状态",
+      "path": "socialV2.mood.enabled",
+      "kind": "bool",
+      "effect": "bridge",
+      "hint": "关掉提示词里不再注入心情"
+    },
+    {
+      "id": "biliTellOwner",
+      "group": "学习：B站",
+      "name": "看完视频要跟他说",
+      "path": "socialV2.biliStudy.tellOwner",
+      "kind": "bool",
+      "effect": "bridge",
+      "hint": "关掉后她照样学、照样记笔记，但看完不来跟你汇报"
+    }
+  ]
+}
