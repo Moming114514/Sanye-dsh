@@ -10099,7 +10099,7 @@ const fishGroupNames = new Map(); // groupId -> group_name（'' = 查不到）
     if (!c.autoLook) return null;
     const isPrivate = String(key).startsWith('private:');
     if (!isPrivate && c.groupOnlyWhenMentioned) {
-      const okReason = ['atMention', 'nameMention', 'private', 'askOwner'].includes(String(reason));
+      const okReason = ['atMention', 'nameMention', 'ownerMention', 'private', 'askOwner'].includes(String(reason));
       if (!okReason) return null;
     }
     if (c.skipWhenPeek && /peek/i.test(String(reason))) return null;
@@ -11896,7 +11896,7 @@ const fishGroupNames = new Map(); // groupId -> group_name（'' = 查不到）
   // 小群恢复原来的积极 direct 语义（question 也算）；大群才用严格策略。
   function isSmallGroupDirectWake(reason) {
     const base = String(reason ?? '').split(':')[0];
-    return ['atMention', 'nameMention', 'question', 'poke', 'admin', 'bootstrap'].includes(base);
+    return ['atMention', 'nameMention', 'ownerMention', 'question', 'poke', 'admin', 'bootstrap'].includes(base);
   }
 
   function isDirectFishGuardWake(reason) {
@@ -14771,6 +14771,9 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
 
   function evaluateWakeTriggerV2(key, st, event, kind, textContent, plainContent, quoteTargetIsSelf) {
     refreshCfgFromDisk('wake');
+    // F1_OWNER_MENTION：主人亲自 @ / 叫名字 → ownerMention（静音闸门据此放行，别人 @ 仍然是 atMention）
+    const _trigSender = String(event?.user_id ?? event?.sender?.user_id ?? '');
+    const _byOwner = !!_trigSender && _trigSender === String(cfg.ownerQQ ?? '');
     if (kind === 'private') return 'private';
     // QQ_MODE_ONLY_OWNER：只听主人——群里别人说话一律不叫模型（比关机轻、比全开省）
     // PRIVATEONLY_PATCH：只跟我私聊——群里任何消息都不叫模型
@@ -14778,7 +14781,7 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
     if (kind === 'group' && qqMode() === 'owneronly') {
       const modeSpeaker = String(event?.user_id ?? event?.sender?.user_id ?? '');
       if (!modeSpeaker || modeSpeaker !== String(cfg.ownerQQ ?? '')) return null;
-      return 'atMention';
+      return 'ownerMention';
     }
     // GUEST_SLASH_CHAT：群友发的斜杠内容不执行命令，但当作「在跟她说话」照常回（2026-10-31）
     if (kind === 'group') {
@@ -14794,7 +14797,7 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
       if (atSelfPeak || quoteTargetIsSelf) {
         const peakSender = String(event?.user_id ?? event?.sender?.user_id ?? '');
         // 管理员自己在群里 @ 她：正常回；别人 @：先私信问管理员要不要回
-        if (peakSender && peakSender === String(cfg.ownerQQ ?? '')) return 'atMention';
+        if (peakSender && peakSender === String(cfg.ownerQQ ?? '')) return 'ownerMention';
         return 'askOwner';
       }
       return null;
@@ -14805,13 +14808,13 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
     if (tr.anyMessage && !large) return 'anyMessage';
     if (tr.atMention) {
       const atSelf = Array.isArray(event?.message) && event.message.some((seg) => seg?.type === 'at' && String(seg.data?.qq) === String(event?.self_id ?? ''));
-      if (atSelf || quoteTargetIsSelf) return 'atMention';
+      if (atSelf || quoteTargetIsSelf) return _byOwner ? 'ownerMention' : 'atMention';
     }
     if (tr.nameMention && selfNickname) {
       // 用 plainContent（当前消息自己的文字）：textContent 含 `[引用 某人：原文]`，
       // 引用一条恰好提到机器人昵称的旧消息不该算「叫了名字」（那是被动触发的付费回合）。
       const lower = String(plainContent ?? '').toLowerCase();
-      if (lower.includes('@' + selfNickname.toLowerCase()) || lower.includes(selfNickname.toLowerCase())) return 'nameMention';
+      if (lower.includes('@' + selfNickname.toLowerCase()) || lower.includes(selfNickname.toLowerCase())) return _byOwner ? 'ownerMention' : 'nameMention';
     }
     if (!large && Array.isArray(tr.keywords) && tr.keywords.length) {
       const lower = String(plainContent ?? '').toLowerCase();
@@ -16986,7 +16989,7 @@ function logSpeakActual(key, allow, source, reason) {
         // D-3：主人叫醒 → 该会话进入活跃期
         if (reason && String(key).startsWith('group:')) {
           const awSender = String((event && (event.user_id || (event.sender && event.sender.user_id))) || '');
-          if (awSender && awSender === String(cfg.ownerQQ || '') && ['atMention', 'nameMention', 'question', 'poke', 'manual', 'admin', 'askOwner'].includes(reason)) {
+          if (awSender && awSender === String(cfg.ownerQQ || '') && ['atMention', 'nameMention', 'ownerMention', 'ownerCall', 'question', 'poke', 'manual', 'admin', 'askOwner'].includes(reason)) {
             const mins = Math.max(1, Math.min(60, Number(cfg.socialV2 && cfg.socialV2.activeWindow && cfg.socialV2.activeWindow.minutes) || 10));
             touchActiveWindow(key, mins, 'owner');
             log('[活跃期] ' + key + ' 主人 ' + reason + ' 叫醒，开启 ' + mins + ' 分钟');

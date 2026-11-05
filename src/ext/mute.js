@@ -70,6 +70,8 @@ export default {
     const why = String(reason || '');
     if (!k) return true;
     if (why === 'manual' || why === 'admin' || why.startsWith('style-learn')) return true; // MUTE_LEARN_PASS：学样只看不聊，静音不拦
+    // F1_OWNER_CALL：主人亲自叫（ownerMention/ownerCall）时不拦；别人 @ 仍是 atMention，照拦
+    if (['ownerMention', 'ownerCall'].includes(why)) return { allow: true, reason: `[静音·主人直呼放行] ${k}（${why}）` };
     if (!isMuted(k)) return true;
     return { allow: false, reason: `[静音] 跳过唤醒 ${k}（${why}）：面板里设了先不理这个会话` };
   },

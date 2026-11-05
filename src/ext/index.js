@@ -211,6 +211,7 @@ export function extWakeGate(ctx) {
     if (typeof ext.wakeGate !== 'function') continue;
     const r = guardHook(ext, row.name, 'wakeGate', () => ext.wakeGate(ctx), { allow: true });
     if (r && r.allow === false) return r;
+    if (r && r.allow === true && r.reason) console.log(String(r.reason)); // F1：放行也留痕（如 [静音·主人直呼放行]）
   }
   return { allow: true };
 }

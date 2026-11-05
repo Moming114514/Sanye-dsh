@@ -12,7 +12,7 @@
  *   · unread 里的严格 direct 只认 owner / 引用自己 / 真正 @ 或叫到名字，
  *     不用宽泛的“你+疑问”启发式。
  */
-const HARD_DIRECT_REASONS = new Set(['atMention', 'nameMention', 'poke', 'private', 'admin']);
+const HARD_DIRECT_REASONS = new Set(['atMention', 'nameMention', 'ownerMention', 'poke', 'private', 'admin']);
 
 export function isHardDirectWakeReason(reason) {
   const base = String(reason ?? '').split(':')[0];
