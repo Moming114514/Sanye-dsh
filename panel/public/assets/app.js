@@ -3591,9 +3591,11 @@ function addWhitelistRow(kinds) {
 }
 
 // PEOPLE_AVA：QQ 头像（浏览器直连 qlogo，加载失败就露首字母，不占额外请求）
+const PPL_AVA_COLORS = ['#4f7cff', '#22a06b', '#d98a26', '#b455c8', '#2fa8c9', '#d05061'];
 function avatarOf(uin, name) {
   const initial = String(name || uin || '?').trim().slice(0, 1).toUpperCase();
-  return h('span', { class: 'ppl-ava' },
+  const ci = Number(String(uin || '').replace(/\D/g, '').slice(-4) || 0) % PPL_AVA_COLORS.length;
+  return h('span', { class: 'ppl-ava', style: 'background:' + PPL_AVA_COLORS[ci] + ';color:#fff' },
     h('i', {}, initial),
     h('img', {
       src: 'https://q1.qlogo.cn/g?b=qq&nk=' + encodeURIComponent(String(uin)) + '&s=100',
@@ -3604,6 +3606,7 @@ function avatarOf(uin, name) {
 
 function pagePeople() {
   const wrap = h('div', {});
+  wrap.append(h('div', { class: 'card', style: 'margin-bottom:10px' }, h('div', { class: 'kv', style: 'align-items:center;gap:10px' }, [h('b', {}, '添加'), addWhitelistRow(['private'])])));
   if (!state.peopleStarted) {
     state.peopleStarted = true;
     loadPeople().then(() => rerender()).catch((e) => { state.peopleErr = String(e && e.message || e); rerender(); });
@@ -3631,14 +3634,14 @@ function pagePeople() {
     wrap.append(h('div', { class: 'card muted' }, '这个群今天还没有统计到消息（或刚重启过）。' + (state.peopleErr ? ' 错误：' + state.peopleErr : '')));
     return wrap;
   }
-  const tr = (r) => h('tr', {},
+  const tr = (r) => h('tr', { id: 'pr-' + r.uin },
     h('td', {}, avatarOf(r.uin, r.name), h('span', {}, r.name || '-')),
     h('td', { class: 'mono', style: 'font-size:12px' }, r.uin),
     h('td', { class: 'num' }, String(r.n)),
     h('td', { class: 'num' }, r.avgLen + ' 字'),
     h('td', { class: 'num' }, r.dup + '%'),
     h('td', { class: 'num' }, String(r.skips || 0)),
-    h('td', {}, r.verdict + (r.score ? `（${r.score} 分）` : '')),
+    h('td', { id: 'pv-' + r.uin }, r.verdict + (r.score ? `（${r.score} 分）` : '')),
     h('td', {}, ...['human', 'bot', ''].map((m) => h('label', { style: 'margin-right:8px;font-size:12px;cursor:pointer' },
       h('input', { type: 'radio', name: 'mk-' + r.uin, checked: (r.mark || '') === m,
         onchange: () => { // PEOPLE_MARK_REFRESH：标完立刻重拉，分数/系统判断当场更新
@@ -3647,9 +3650,15 @@ function pagePeople() {
           api('/api/people-mark', { method: 'POST', body: { uin: r.uin, mark: m } })
             .then(async () => {
               r.mark = m;
+              const rowEl = document.getElementById('pr-' + r.uin);
+              if (rowEl) rowEl.style.background = m === 'bot' ? 'rgba(239,68,68,.12)' : m === 'human' ? 'rgba(34,197,94,.12)' : '';
+              const vEl = document.getElementById('pv-' + r.uin);
+              if (vEl) vEl.textContent = m === 'bot' ? '噪音机器人（手动）' : '真人（手动）';
               toast('已标记：' + (m === 'human' ? '人' : m === 'bot' ? '机器' : '未标'));
+              const sy = window.scrollY;
               await loadPeople();
               rerender();
+              window.scrollTo(0, sy);
             })
             .catch((e) => toast('没存上：' + e.message))
             .finally(() => { r._saving = false; });
