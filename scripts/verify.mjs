@@ -60,7 +60,8 @@ function walk(dir, acc = []) {
 
 function toolsList() {
   return new Promise((resolve) => {
-    const p = spawn(NODE, [path.join(ROOT, 'src/mcp-snowluma-safe.js')], { stdio: ['pipe', 'pipe', 'inherit'] });
+    // 基线探针固定 balanced 档：config.socialV2.toolProfile 是运行期选择，不该让代码快照随配置变红。
+    const p = spawn(NODE, [path.join(ROOT, 'src/mcp-snowluma-safe.js')], { env: { ...process.env, SURFCORE_TOOL_PROFILE: 'balanced' }, stdio: ['pipe', 'pipe', 'inherit'] });
     let buf = '';
     const timer = setTimeout(() => { try { p.kill(); } catch {} resolve({ count: 0, names: [] }); }, 15000);
     p.stdout.on('data', (c) => {
