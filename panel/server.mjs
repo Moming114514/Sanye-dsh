@@ -93,7 +93,7 @@ function awaitingRestart() {
   }
   const items = base ? deepDiff(base, now) : [];
   // HOT_KEYS：这些键桥接是热更新的（ALLOW_HOT_PATCH），改了立刻生效，不该再提示「重启后生效」
-  const HOT_KEYS = /^(allow|deny|allowAllWhenEmpty)(\.|$)/;
+  const HOT_KEYS = /^(?:(?:allow|deny|allowAllWhenEmpty)(?:\.|$)|socialV2\.styleLearn\.enabled$)/; // HOT_KEYS_FIX
   const live = items.filter((x) => HOT_KEYS.test(String(x.path || '')));
   const pendingItems = items.filter((x) => !HOT_KEYS.test(String(x.path || '')));
   return { ok: true, count: pendingItems.length, items: pendingItems.slice(0, 20), appliedLive: live.length, at: snap.at };
@@ -161,6 +161,11 @@ async function overview() {
   ]);
   const svc = {};
   for (const u of ['dsh-web', 'asr-shim', 'surfcore-bridge-watch.timer', 'snowluma']) svc[u] = (await sh('systemctl', ['is-active', u])).trim() || 'unknown';
+  // ASR_SOCKET_HEALTH（2026-11-03）：socket 按需激活，socket 在监听就算正常
+  if (svc['asr-shim'] !== 'active') {
+    const _asrSock = (await sh('systemctl', ['is-active', 'asr-shim.socket'])).trim();
+    if (_asrSock === 'active') svc['asr-shim'] = 'socket';
+  }
   const ss = await sh('ss', ['-lnt']);
   const ports = {};
   for (const p of [3080, 3100, 3001, 6099, 8765, 7800]) ports[p] = ss.includes(':' + p + ' ');
@@ -193,11 +198,13 @@ async function overview() {
   };
 }
 
-function featuresDTO() {
+function featuresDTO(live = {}) {
   const reg = readJSON(FEAT_PATH, { features: [] }).features || [];
   const cfg = readJSON(CFG_PATH, {}) || {};
   const video = readJSON(VIDEO_JSON, {}) || {};
   return reg.map((f) => {
+    // PENDING_FIX：暂停状态在桥接内存/社交状态文件里，不在 config.json
+    if (f.id === 'paused' && typeof live.paused === 'boolean') return { ...f, value: live.paused };
     let v;
     if (f.path.startsWith('@video:')) v = getPath(video, f.path.slice(7));
     else if (f.path.startsWith('@')) v = getPath(cfg, 'socialV2.report.' + 'hour') !== undefined ? '见排期' : '—';
@@ -351,10 +358,30 @@ function backupCfg() {
   const files = fs.readdirSync(dir).filter((n) => n.startsWith('config-')).sort();
   while (files.length > 30) { try { fs.unlinkSync(path.join(dir, files.shift())); } catch {} }
 }
+// PENDING_FIX：原子写（tmp + rename）——半截 JSON 被桥接读到会「改了不生效」
+function writeJsonAtomic(file, obj) {
+  const tmp = file + '.tmp-' + process.pid + '-' + Date.now();
+  try {
+    fs.writeFileSync(tmp, JSON.stringify(obj, null, 2) + '\n', { mode: 0o600 });
+    fs.renameSync(tmp, file);
+  } finally {
+    try { if (fs.existsSync(tmp)) fs.unlinkSync(tmp); } catch {}
+  }
+  fs.chmodSync(file, 0o600);
+  try { fs.chownSync(file, 1000, 1000); } catch {}
+}
+// PENDING_FIX：写之前严格读，配置坏了就拒绝写，避免用 {} 覆盖整份配置
+function readCfgStrict() {
+  let text;
+  try { text = fs.readFileSync(CFG_PATH, 'utf8'); } catch (e) { throw new Error('读不到 config.json：' + e.message); }
+  let cfg;
+  try { cfg = JSON.parse(text); } catch (e) { throw new Error('config.json 不是合法 JSON，已拒绝改写（先修好配置）：' + e.message); }
+  if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) throw new Error('config.json 顶层不是对象，已拒绝改写');
+  return cfg;
+}
 function writeCfg(cfg) {
   backupCfg();
-  fs.writeFileSync(CFG_PATH, JSON.stringify(cfg, null, 2), { mode: 0o600 });
-  fs.chownSync(CFG_PATH, 1000, 1000);
+  writeJsonAtomic(CFG_PATH, cfg);
 }
 function coerce(f, raw) {
   if (f.kind === 'number') {
@@ -455,7 +482,7 @@ function healthInfo() {
       web: unitState('dsh-web'),
       bridge: unitState('surfcore-bridge'),
       panel: unitState('her-console'),
-      asr: unitState('asr-shim'),
+      asr: unitState('asr-shim') === 'active' ? 'active' : (unitState('asr-shim.socket') === 'active' ? 'socket' : unitState('asr-shim')),
       snowluma: unitState('snowluma'),
       napcat: shOut("docker inspect napcat --format '{{.State.Status}}'") || 'unknown',
       wdTimer: unitState('surfcore-bridge-watch.timer'),
@@ -557,7 +584,15 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/features') {
       if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
-      return send(res, 200, { ok: true, features: featuresDTO() });
+      let live = {};
+      try { const act = await api('/api/socialV2/activity'); if (act && typeof act.paused === 'boolean') live.paused = act.paused; } catch {}
+      return send(res, 200, { ok: true, features: featuresDTO(live) });
+    }
+    if (p === '/api/plugins') { // P3-1：插件清单直通桥接（只读；桥接读 docs/generated/manifests.json + 实例补 routes）
+      if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
+      const r = await api('/api/plugins');
+      if (!r || r.ok === false) return send(res, 502, { ok: false, error: (r && r.error) || '桥接没返回清单' });
+      return send(res, 200, r);
     }
     if (p === '/api/health') { // HEALTH_PATCH
       send(res, 200, { ok: true, ...healthInfo() });
@@ -664,6 +699,201 @@ const server = http.createServer(async (req, res) => {
       const r = await api('/api/socialV2/learnmode', 'POST', { action: 'list' });
       return send(res, 200, r || { ok: false });
     }
+    if (p === '/api/attn-get') { // ATTNGET_PATCH
+      if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
+      const CFG = process.env.SURFCORE_CONFIG || '/home/dsh/apps/surfcore/config.json';
+      let cfg = {};
+      try { cfg = JSON.parse(fs.readFileSync(CFG, 'utf8')); } catch {}
+      const at = (cfg.socialV2 && cfg.socialV2.attention) || {};
+      return send(res, 200, { ok: true, replyOnly: at.replyOnly || {}, sample: at.sample || {}, maxPerDay: at.maxPerDay || 0 });
+    }
+
+    if (p === '/api/attn-set') { // ATTNSET_PATCH：按群规则（只回谁 / 抽样%）
+      if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
+      const body = req.method === 'POST' ? await readBody(req) : {};
+      const gid = String(body.group || '').replace('group:', '');
+      if (!gid) return send(res, 400, { ok: false, error: 'group 不能为空' });
+      const CFG = process.env.SURFCORE_CONFIG || '/home/dsh/apps/surfcore/config.json';
+      let cfg = {};
+      try { cfg = JSON.parse(fs.readFileSync(CFG, 'utf8')); } catch (e) { return send(res, 500, { ok: false, error: 'config 读取失败' }); }
+      cfg.socialV2 = cfg.socialV2 || {};
+      const at = (cfg.socialV2.attention = cfg.socialV2.attention || {});
+      at.replyOnly = at.replyOnly || {};
+      at.sample = at.sample || {};
+      if (body.replyOnly !== undefined) {
+        const list = String(body.replyOnly || '').split(/[,，\s]+/).filter(Boolean);
+        if (list.length) at.replyOnly[gid] = list; else delete at.replyOnly[gid];
+      }
+      if (body.sample !== undefined) {
+        const n = Math.max(0, Math.min(50, Number(body.sample) || 0));
+        if (n > 0) at.sample[gid] = n; else delete at.sample[gid];
+      }
+      try {
+        fs.writeFileSync(CFG, JSON.stringify(cfg, null, 2));
+      } catch (e) { return send(res, 500, { ok: false, error: String(e.message || e) }); }
+      return send(res, 200, { ok: true, group: gid, replyOnly: at.replyOnly[gid] || [], sample: at.sample[gid] || 0 });
+    }
+
+    if (p === '/api/utts' || p === '/api/utts-mark') { // UTTS_PATCH：她说的话
+      if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
+      const body = req.method === 'POST' ? await readBody(req) : {};
+      const SURF = process.env.SURFCORE_DIR || '/home/dsh/apps/surfcore';
+      const convFile = path.join(SURF, 'state', 'social-v2.json');
+      const markFile = path.join(STATE, 'utterance-marks.json');
+      const readJson = (f, d) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return d; } };
+      const marks = readJson(markFile, {});
+      if (p === '/api/utts-mark') {
+        const id = String(body.id || '');
+        if (!id) return send(res, 400, { ok: false, error: 'id 不能为空' });
+        const tag = String(body.tag || '').slice(0, 20);
+        const note = String(body.note || '').slice(0, 200);
+        if (!tag && !note) delete marks[id]; else marks[id] = { tag, note, at: Date.now() };
+        try { fs.writeFileSync(markFile, JSON.stringify(marks)); } catch (e) { return send(res, 500, { ok: false, error: String(e.message || e) }); }
+        return send(res, 200, { ok: true });
+      }
+      const conv = readJson(convFile, {});
+      const convs = conv.conversations || {};
+      const since = Date.now() - Math.max(1, Number(body.sinceHours) || 72) * 3600 * 1000;
+      const wantKey = String(body.key || '');
+      const wantTag = String(body.tag || '');
+      const out = [];
+      for (const [ck, c] of Object.entries(convs)) {
+        if (wantKey && ck !== wantKey) continue;
+        const ms = (c && (c.recentMessages || c.messages)) || [];
+        for (const m of ms) {
+          if (!m) continue;
+          const sname = typeof m.sender === 'string' ? m.sender : String((m.sender && (m.sender.name || m.sender.nickname)) || '');
+          const isSelf2 = m.isSelf === true || sname === '我' || sname === '三叶' || Number(m.userId || 0) === 3042876599;
+          if (!isSelf2) continue;
+          const t = Number(m.time || m.at || 0);
+          if (t && t < since) continue;
+          const id = String(m.messageId || m.id || m.seq || (ck + ':' + t));
+          const mk = marks[id] || {};
+          if (wantTag && (mk.tag || '') !== wantTag) continue;
+          out.push({ id, key: ck, at: t, text: String(m.plain || m.text || ''), tag: mk.tag || '', note: mk.note || '' });
+        }
+      }
+      out.sort((a, b) => b.at - a.at);
+      const tags = {};
+      out.forEach((x) => { if (x.tag) tags[x.tag] = (tags[x.tag] || 0) + 1; });
+      return send(res, 200, { ok: true, total: out.length, tags, items: out.slice(0, Math.max(1, Math.min(500, Number(body.limit) || 200))) });
+    }
+
+    if (p === '/api/people') { // PEOPLE_PROXY
+      if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
+      const body = req.method === 'POST' ? await readBody(req) : {};
+      const r = await api('/api/socialV2/people', 'POST', body);
+      return send(res, r?.ok ? 200 : 400, r || { ok: false });
+    }
+    if (p === '/api/people-mark') { // PEOPLE_PROXY
+      if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
+      const body = await readBody(req);
+      const r = await api('/api/socialV2/people-mark', 'POST', body);
+      return send(res, r?.ok ? 200 : 400, r || { ok: false });
+    }
+    if (p === '/api/names') { // NAMES_PROXY：把号码翻成名字
+      if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
+      const body = req.method === 'POST' ? await readBody(req) : {};
+      const r = await api('/api/socialV2/names', 'POST', body);
+      return send(res, r?.ok ? 200 : 400, r || { ok: false });
+    }
+    if (p === '/api/style-bulk') { // STYLE_BULK_UI
+      if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
+      const body = await readBody(req);
+      const raw = String(body?.text || '');
+      const lines = raw.split(/\r?\n/).map((x) => x.replace(/^\s*[-*\d.、)）]+\s*/, '').trim()).filter((x) => x.length >= 6 && x.length <= 120);
+      if (!lines.length) return send(res, 400, { ok: false, error: '没识别到句子（每行一句，6~120 字）' });
+      let added = 0, dup = 0, bad = 0;
+      for (const t of lines.slice(0, 40)) {
+        const r = await api('/api/socialV2/style-note', 'POST', { text: t, from: '亚托莉', why: '手动导入（我转的聊天记录）' });
+        if (r && r.ok) { if (r.duplicated) dup++; else added++; } else bad++;
+      }
+      return send(res, 200, { ok: true, added, dup, bad, total: lines.length });
+    }
+    if (p === '/api/style-short') { // 从长句里拆一条能直接说的短句
+      if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
+      if (req.method !== 'POST') return send(res, 405, { ok: false });
+      const body = await readBody(req);
+      const id = String(body.id || '');
+      const file = path.join(STATE, 'style-samples.json');
+      const data = readJSON(file, { samples: [] });
+      const item = (data.samples || []).find((x) => x.id === id);
+      if (!item) return send(res, 404, { ok: false, error: '没有这条样本' });
+      const parts = String(item.text || '')
+        .split(/[，。！？；、…\n]+/)
+        .map((x) => x.trim())
+        .filter((x) => x.length >= 6 && x.length <= 24);
+      const short = parts[0] || String(item.text || '').slice(0, 20);
+      item.short = short;
+      item.updatedAt = new Date().toISOString();
+      fs.writeFileSync(file, JSON.stringify(data, null, 2));
+      return send(res, 200, { ok: true, id, short });
+    }
+    if (p === '/api/style-now') { // STYLE_NOW_UI
+      if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
+      try {
+        fs.writeFileSync(path.join(QQ_STATE, 'style-learn-now.json'), JSON.stringify({ at: Date.now() }));
+        return send(res, 200, { ok: true, hint: '一分钟内她会去群里翻一轮' });
+      } catch (e) { return send(res, 500, { ok: false, error: String(e && e.message || e) }); }
+    }
+    if (p === '/api/style-add') { // STYLE_NOW_UI
+      if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
+      const body = await readBody(req);
+      const text = String(body?.text || '').trim();
+      if (!text) return send(res, 400, { ok: false, error: '写一句话' });
+      const r = await api('/api/socialV2/style-note', 'POST', { text, from: '亚托莉', why: body?.why || '手动添加（我看上了）' });
+      return send(res, r?.ok ? 200 : 400, r || { ok: false });
+    }
+    if (p === '/api/selfcheck') { // SELFCHECK_PATCH
+      if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
+      const f = path.join(STATE, 'selfcheck.json');
+      const d = readJSON(f, null);
+      return send(res, 200, d || { ok: null, items: [], error: '还没跑过自检' });
+    }
+    if (p === '/api/media-stats') { // TASK-INPUT #4：媒体观测（bridge 写 state/media-stats.json）
+      if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
+      const d = readJSON(path.join(QQ_STATE, 'media-stats.json'), null);
+      return send(res, 200, d || { day: '', withMedia: 0, looked: 0, failed: 0, reasons: {}, missing: true });
+    }
+    if (p === '/api/commands') { // 命令大全（静态表，与桥接里的 /帮助 保持一致）
+      if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
+      const LIST = [
+        ['常用', '/花费', '今天花了多少（额度、峰谷、各群）'],
+        ['常用', '/花费', '/cost 同义'],
+        ['常用', '/心情', '她现在的情绪'],
+        ['常用', '/状态', '开关、今日花费、静音列表、桥接运行时长'],
+        ['常用', '/静音 本群', '这个群不接话（在群里发，不用输号）'],
+        ['常用', '/静音 群名', '按群名静音，如「/静音 学术部」'],
+        ['常用', '/静音 QQ号', '这个人私聊不接话'],
+        ['常用', '/恢复 本群', '取消静音'],
+        ['常用', '/恢复 群名', '按群名恢复'],
+        ['常用', '/静音列表', '看现在关了哪些'],
+        ['常用', '/全开', '群里按规则回'],
+        ['常用', '/只听主人', '群里只回你'],
+        ['常用', '/关机', '彻底静默（5 分钟内再发一次确认）'],
+        ['常用', '/开机', '从关机恢复'],
+        ['群与人', '/好友', '看待处理的好友申请'],
+        ['群与人', '/同意好友 QQ号', '通过好友'],
+        ['群与人', '/拒绝好友 QQ号', '拒绝好友'],
+        ['群与人', '/同意头像', '允许她换头像'],
+        ['群与人', '/不同意头像', '拒绝换头像'],
+        ['群与人', '/学', '现在就学一个技术视频'],
+        ['群与人', '/学习', '今天的学习任务状态'],
+        ['群与人', '/reset', '清空这个会话的上下文'],
+        ['群与人', '/重启', '重启桥接（约 20 秒）'],
+        ['其它', '/加油 N', '今天临时加 N 元额度'],
+        ['其它', '/谷价', '今天整天按谷价算'],
+        ['其它', '/谷价关', '取消今天的谷价'],
+        ['其它', '/谷价表', '看人工谷价日'],
+        ['其它', '/silent', '只回你、不回群友（旧版，等同 /只听主人）'],
+        ['其它', '/active', '取消 /silent'],
+        ['其它', '/帮助', '分页帮助（/帮助 2、/帮助 3、/帮助 开关）'],
+        ['自然语言（私聊）', '今天花了多少', '直接回花费，不调模型'],
+        ['自然语言（私聊）', '她什么状态', '直接回状态，不调模型'],
+      ].map(([g, cmd, desc]) => ({ g, cmd, desc }));
+      return send(res, 200, { ok: true, items: LIST });
+    }
+
     if (p === '/api/gr') { // 群发言频率
       if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
       if (req.method === 'POST') {
@@ -673,6 +903,139 @@ const server = http.createServer(async (req, res) => {
       }
       const r = await api('/api/socialV2/grouprate', 'POST', { action: 'list' });
       return send(res, 200, r || { ok: false });
+    }
+    if (p === '/api/active-window') { // D-3：活跃期（只读）
+      if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
+      let items = [];
+      try {
+        const raw = JSON.parse(fs.readFileSync(path.join(QQ_STATE, 'active-window.json'), 'utf8') || '{}');
+        const now = Date.now();
+        items = Object.keys(raw)
+          .filter((k) => Number(raw[k] && raw[k].until) > now)
+          .map((k) => ({ key: k, by: (raw[k] && raw[k].by) || 'owner', minutesLeft: Math.max(0, Math.ceil((Number(raw[k].until) - now) / 60000)) }));
+      } catch {}
+      return send(res, 200, { ok: true, items });
+    }
+    if (p === '/api/preset') { // E-3：三档总览（只写现有字段，不改判断逻辑）
+      if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
+      const rdj = (f, d) => { try { return JSON.parse(fs.readFileSync(f, 'utf8') || 'null') || d; } catch { return d; } };
+      const cfgNow = rdj(CFG_PATH, {});
+      const at0 = (((cfgNow.socialV2 || {}).attention) || {});
+      const sampleMap = at0.sample || {};
+      const capCfg = ((cfgNow.socialV2 || {}).tokenGuard || {}).maxDailyCostCNY;
+      if (req.method === 'GET') {
+        const rates = await api('/api/socialV2/grouprate', 'POST', { action: 'list' });
+        const muted = rdj(path.join(STATE, 'muted-keys.json'), {}).items || {};
+        const learn = (rdj(path.join(STATE, 'learn-mode.json'), {}).groups) || {};
+        let pm = null;
+        try { pm = await import('file:///home/dsh/apps/surfcore/scripts/preset-mode.mjs'); } catch {}
+        const groups = ((rates && rates.rates) || []).map((r) => {
+          const key = 'group:' + r.gid;
+          // F-2：与单测共用 scripts/preset-mode.mjs 的推导，避免两处各写一份
+          const smp = Number(sampleMap[r.gid] || 0);
+          const mode = pm ? pm.derivePresetMode({ learned: !!learn[r.gid], muted: !!muted[key] }) : (learn[r.gid] ? 'watch' : (muted[key] ? 'called' : 'normal'));
+          const activity = pm ? pm.derivePresetActivity({ sample: smp, level: r.level }) : (smp >= 1 ? 'active' : (smp > 0 ? 'normal' : (r.level === 'active' ? 'active' : (r.level === 'quiet' ? 'quiet' : 'normal'))));
+          return { gid: r.gid, mode, activity, level: r.level, sample: smp, count: r.count || 0, maxPerDay: r.maxPerDay, minGapMs: r.minGapMs, lastAt: r.lastAt || 0 };
+        });
+        return send(res, 200, { ok: true, groups, dailyLimit: capCfg ?? null });
+      }
+      const body = await readBody(req);
+      const gid = String(body.group || '').replace('group:', '');
+      if (!/^\d+$/.test(gid)) return send(res, 400, { ok: false, error: 'group 必须是群号' });
+      const applied = {};
+      if (body.mode === 'normal' || body.mode === 'called' || body.mode === 'watch') {
+        const key = 'group:' + gid;
+        await api('/api/socialV2/mute', 'POST', { action: body.mode === 'called' ? 'mute' : 'unmute', key });
+        await api('/api/socialV2/learnmode', 'POST', { action: body.mode === 'watch' ? 'on' : 'off', group: gid });
+        applied.mode = body.mode;
+      }
+      if (body.activity === 'quiet' || body.activity === 'normal' || body.activity === 'active') {
+        await api('/api/socialV2/grouprate', 'POST', { action: 'set', group: gid, level: body.activity });
+        const cfg2 = rdj(CFG_PATH, {});
+        cfg2.socialV2 = cfg2.socialV2 || {};
+        cfg2.socialV2.attention = cfg2.socialV2.attention || {};
+        cfg2.socialV2.attention.sample = cfg2.socialV2.attention.sample || {};
+        const pct = body.activity === 'active' ? 1 : (body.activity === 'normal' ? 0.3 : 0);
+        if (pct > 0) cfg2.socialV2.attention.sample[gid] = pct; else delete cfg2.socialV2.attention.sample[gid];
+        writeJsonAtomic(CFG_PATH, cfg2);
+        applied.activity = body.activity;
+      }
+      return send(res, 200, { ok: true, group: gid, applied });
+    }
+
+    // ---------- P1 决策记录 ----------
+    if (p === '/api/decisions') { // DECISION_UI
+      if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
+      const day = (url.searchParams.get('day') || '').trim() || new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);
+      const q = (k) => (url.searchParams.get(k) || '').trim();
+      const file = path.join(QQ_STATE, 'decision', day + '.jsonl');
+      const lines = (() => { try { return fs.readFileSync(file, 'utf8').split('\n').filter(Boolean); } catch { return []; } })();
+      const byId = new Map();
+      for (const line of lines) {
+        let r; try { r = JSON.parse(line); } catch { continue; }
+        if (r.type === 'outcome') { const b = byId.get(r.id); if (b) { b.replied = r.replied; b.outbound = r.outbound; b.latencyMs = r.latencyMs; } continue; }
+        byId.set(r.id, r);
+      }
+      let items = [...byId.values()];
+      const allowQ = q('allow');
+      if (allowQ === 'true' || allowQ === 'false') items = items.filter((x) => String(x.allow) === allowQ);
+      if (q('key')) items = items.filter((x) => String(x.key || '').includes(q('key')));
+      if (q('source')) items = items.filter((x) => String(x.source || '') === q('source'));
+      const minS = q('minScore'); const maxS = q('maxScore');
+      if (minS !== '') items = items.filter((x) => Number(x.score) >= Number(minS));
+      if (maxS !== '') items = items.filter((x) => Number(x.score) <= Number(maxS));
+      items.sort((a, b) => b.ts - a.ts);
+      const marksPath = path.join(STATE, 'decision-marks.json');
+      let marks = {}; try { marks = JSON.parse(fs.readFileSync(marksPath, 'utf8')) || {}; } catch {}
+      const markOf = (id) => marks[id] || '';
+      if (q('unmarked') === '1') items = items.filter((x) => !markOf(x.id));
+      const total = byId.size;
+      const allow = [...byId.values()].filter((x) => x.allow).length;
+      const replied = [...byId.values()].filter((x) => x.replied === true).length;
+      const marked = [...byId.values()].filter((x) => markOf(x.id)).length;
+      const top = new Map();
+      for (const x of byId.values()) { if (x.allow) continue; const k = x.source || 'unknown'; top.set(k, (top.get(k) || 0) + 1); }
+      const topSources = [...top.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
+      return send(res, 200, { ok: true, day, total: items.length, items: items.slice(0, 300), marks, stats: { total, allow, block: total - allow, replied, marked, topSources } });
+    }
+    if (p === '/api/decisions/mark') { // DECISION_MARK
+      if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
+      const body = await readBody(req);
+      const id = String(body.id || '').trim();
+      const mark = String(body.mark || '').trim();
+      const ALLOWED = ['正常', '该回没回', '不该回却回', '答非所问', ''];
+      if (!id || !ALLOWED.includes(mark)) return send(res, 400, { ok: false, error: 'id/mark 不合法' });
+      const marksPath = path.join(STATE, 'decision-marks.json');
+      let marks = {}; try { marks = JSON.parse(fs.readFileSync(marksPath, 'utf8')) || {}; } catch {}
+      if (mark) marks[id] = mark; else delete marks[id];
+      writeJsonAtomic(marksPath, marks);
+      return send(res, 200, { ok: true, id, mark });
+    }
+    if (p === '/api/decisions/export') { // DECISION_CSV
+      if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
+      const day = (url.searchParams.get('day') || '').trim() || new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);
+      const file = path.join(QQ_STATE, 'decision', day + '.jsonl');
+      const byId = new Map();
+      try {
+        for (const line of fs.readFileSync(file, 'utf8').split('\n').filter(Boolean)) {
+          let r; try { r = JSON.parse(line); } catch { continue; }
+          if (r.type === 'outcome') { const b = byId.get(r.id); if (b) { b.replied = r.replied; b.latencyMs = r.latencyMs; } continue; }
+          byId.set(r.id, r);
+        }
+      } catch {}
+      const marksPath = path.join(STATE, 'decision-marks.json');
+      let marks = {}; try { marks = JSON.parse(fs.readFileSync(marksPath, 'utf8')) || {}; } catch {}
+      const esc = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+      const rows = ['时间,会话,消息摘要,分数,最终,拦截来源,是否回了,延迟ms,标注,经过层'];
+      for (const x of [...byId.values()].sort((a, b) => a.ts - b.ts)) {
+        rows.push([new Date(x.ts).toLocaleString('zh-CN'), x.key, x.text, x.score == null ? '' : x.score,
+          x.allow ? '放行' : '拦截', x.source, x.replied === true ? '是' : (x.replied === false ? '否' : '未知'),
+          x.latencyMs == null ? '' : x.latencyMs, marks[x.id] || '',
+          (x.layers || []).map((l) => l.id + ':' + (l.allow ? 'pass' : 'block')).join(' ')].map(esc).join(','));
+      }
+      res.writeHead(200, { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': 'attachment; filename="decisions-' + day + '.csv"' });
+      res.end('\ufeff' + rows.join('\r\n'));
+      return;
     }
     if (p === '/api/econ') { // 省钱模式（少说话，可按群）
       if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
@@ -689,13 +1052,16 @@ const server = http.createServer(async (req, res) => {
       if (req.method === 'POST') {
         const body = await readBody(req);
         if (body.action === 'setcfg') {
-          const cfg = readJSON(CFG_PATH, {}) || {};
+          const cfg = readCfgStrict();
           cfg.socialV2 = cfg.socialV2 || {};
           cfg.socialV2.safeTalk = cfg.socialV2.safeTalk || {};
           if (typeof body.mode === 'string') cfg.socialV2.safeTalk.mode = body.mode;
           if (body.hits != null) cfg.socialV2.safeTalk.hits = Math.max(1, Math.min(20, Number(body.hits) || 3));
           if (body.windowMin != null) cfg.socialV2.safeTalk.windowMin = Math.max(1, Math.min(1440, Number(body.windowMin) || 30));
           if (body.coolMin != null) cfg.socialV2.safeTalk.coolMin = Math.max(1, Math.min(1440, Number(body.coolMin) || 30));
+          if (Array.isArray(body.words)) { // SAFEWORDS_PATCH：面板里直接编词表
+            cfg.socialV2.safeTalk.words = body.words.map((x) => String(x || '').trim().toLowerCase()).filter(Boolean).slice(0, 200);
+          }
           writeCfg(cfg);
           return send(res, 200, { ok: true, note: '已写入 config.json，重启桥接后生效' });
         }
@@ -704,6 +1070,17 @@ const server = http.createServer(async (req, res) => {
       }
       const r = await api('/api/socialV2/safetalk', 'POST', { action: 'list' });
       return send(res, 200, r || { ok: false });
+    }
+    if (p === '/api/mood/plus') { // MOODPLUS_PATCH：面板点气泡加心情
+      if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
+      const body = await readBody(req);
+      const r = await api('/api/socialV2/mood', 'POST', { action: 'bump', key: body.key, delta: Number(body.delta) || 5 });
+      return send(res, r?.ok ? 200 : 400, r || { ok: false });
+    }
+    if (p === '/api/mood/history') { // MOODHIST_PATCH：面板画情绪曲线
+      if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
+      const d = readJSON(path.join(STATE, 'mood.json'), {}) || {};
+      return send(res, 200, { ok: true, history: Array.isArray(d.history) ? d.history.slice(-240) : [], current: d.current || '', values: d.values || {} });
     }
     if (p === '/api/pending') { // PENDING_PATCH
       if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
@@ -714,7 +1091,7 @@ const server = http.createServer(async (req, res) => {
       if (req.method === 'POST') {
         const body = await readBody();
         if (body.action === 'setcfg') { // STYLECFG_PATCH：改「学谁 / 在哪学」
-          const cfg = readJSON(CFG_PATH, {}) || {};
+          const cfg = readCfgStrict();
           cfg.socialV2 = cfg.socialV2 || {};
           cfg.socialV2.styleLearn = cfg.socialV2.styleLearn || {};
           const qq = String(body.targetQQ || '').replace(/\D/g, '');
@@ -755,12 +1132,15 @@ const server = http.createServer(async (req, res) => {
         { name: 'DSH 主界面', port: 3080, hint: '跟她在 DSH 里对话 / 改插件设置' },
         { name: 'QQ 桥接控制台', port: 3100, hint: '人格卡、白名单、花费、测试发送' },
         { name: 'NapCat 面板', port: 6099, hint: '扫码登录、OneBot、好友请求' },
-        { name: '花费面板', port: 7788, hint: '每次任务花了多少（跑在你自己电脑上，启动器会顺带开）', local: true },
+        { name: '花费面板（本机）', port: 7788, hint: '每次对话花了多少（跑在你自己电脑上，启动器会顺带开）', local: true },
       ];
       const out = [];
       for (const it of items) {
         const up = it.local ? null : await portUp(it.port);
         out.push({ ...it, up, url: `http://127.0.0.1:${it.port}/${it.port === 6099 ? 'webui/' : ''}` });
+      }
+      {
+        // ENTRY_COST_SELF：原来指向本机 7788，已废
       }
       return send(res, 200, { ok: true, items: out, self: PORT });
     }
@@ -881,9 +1261,23 @@ const server = http.createServer(async (req, res) => {
         const reg = readJSON(FEAT_PATH, { features: [] }).features || [];
         const f = reg.find((x) => x.id === body.id);
         if (!f) return send(res, 400, { ok: false, error: '没有这个功能 id' });
+        // PENDING_FIX：暂停写在桥接的社交状态里，写 config.json 永远不会生效
+        if (f.id === 'paused') {
+          const on = body.value === true || body.value === 'true';
+          const r = await api('/api/socialV2/activity', 'POST', { paused: on });
+          return send(res, 200, { ok: true, id: f.id, value: on, effect: 'hot', effectText: on ? '已暂停（立刻生效）' : '已恢复（立刻生效）' });
+        }
+        // PENDING_FIX：@video: 的配置在 video 配置文件里，和 /api/setting 一致
+        if (f.path.startsWith('@video:')) {
+          const val = coerce(f, body.value);
+          const v = readJSON(VIDEO_JSON, {}) || {};
+          setPath(v, f.path.slice(7), val);
+          writeJsonAtomic(VIDEO_JSON, v);
+          return send(res, 200, { ok: true, id: f.id, value: val, effect: 'hot', effectText: '立刻生效' });
+        }
         if (f.path.startsWith('@')) return send(res, 400, { ok: false, error: '这一项不能在这里改' });
         const val = coerce(f, body.value);
-        const cfg = readJSON(CFG_PATH, {}) || {};
+        const cfg = readCfgStrict();
         setPath(cfg, f.path, val);
         writeCfg(cfg);
         return send(res, 200, { ok: true, id: f.id, value: val, effect: f.effect, effectText: EFFECT_TEXT[f.effect] });
@@ -896,12 +1290,11 @@ const server = http.createServer(async (req, res) => {
         if (f.path.startsWith('@video:')) {
           const v = readJSON(VIDEO_JSON, {}) || {};
           setPath(v, f.path.slice(7), val);
-          fs.writeFileSync(VIDEO_JSON, JSON.stringify(v, null, 2), { mode: 0o600 });
-          fs.chownSync(VIDEO_JSON, 1000, 1000);
+          writeJsonAtomic(VIDEO_JSON, v);
           return send(res, 200, { ok: true, value: val, effect: 'hot', effectText: '立刻生效' });
         }
         if (f.path.startsWith('@')) return send(res, 400, { ok: false, error: '这一项不能在这里改' });
-        const cfg = readJSON(CFG_PATH, {}) || {};
+        const cfg = readCfgStrict();
         setPath(cfg, f.path, val);
         writeCfg(cfg);
         return send(res, 200, { ok: true, value: val, effect: f.effect, effectText: EFFECT_TEXT[f.effect] });
@@ -1065,7 +1458,7 @@ const server = http.createServer(async (req, res) => {
         }
         if (target === 'dsh') { await sh('systemctl', ['restart', 'dsh-web'], 60000); await new Promise((r) => setTimeout(r, 5000)); return send(res, 200, { ok: true, msg: 'DSH 已重启' }); }
         if (target === 'napcat') { await sh('docker', ['restart', 'napcat'], 90000); await new Promise((r) => setTimeout(r, 6000)); return send(res, 200, { ok: true, msg: 'NapCat 已重启（如需扫码去 6099 面板）' }); }
-        if (target === 'asr') { await sh('systemctl', ['restart', 'asr-shim'], 30000); return send(res, 200, { ok: true, msg: 'ASR 已重启' }); }
+        if (target === 'asr') { await sh('systemctl', ['stop', 'asr-shim.service'], 30000); await sh('systemctl', ['restart', 'asr-shim.socket'], 30000); return send(res, 200, { ok: true, msg: 'ASR 已重启（socket 已重开，下次请求自动拉起）' }); }
         return send(res, 400, { ok: false, error: '未知目标' });
       }
       if (p === '/api/access') {
@@ -1073,7 +1466,7 @@ const server = http.createServer(async (req, res) => {
         const id = String(body.id || '').replace(/\D/g, '');
         const action = String(body.action || 'add');
         if (!id) return send(res, 400, { ok: false, error: '号码不对' });
-        const cfg = readJSON(CFG_PATH, {}) || {};
+        const cfg = readCfgStrict();
         cfg.allow = cfg.allow || {};
         const field = kind === 'group' ? 'groups' : 'private';
         const list = new Set((cfg.allow[field] || []).map(String));
@@ -1114,4 +1507,4 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, '127.0.0.1', () => console.log(`her-console on http://127.0.0.1:${PORT}  token→ ${path.join(ROOT, 'token.txt')}`));
+server.listen(PORT, process.env.HER_HOST || '0.0.0.0', () => console.log(`her-console on http://${process.env.HER_HOST || '0.0.0.0'}:${PORT}  token→ ${path.join(ROOT, 'token.txt')}`)); // PUBLIC_BIND_PATCH

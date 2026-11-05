@@ -7,6 +7,9 @@ const PAGES = [
   { id: 'overview', title: '总览', render: pageOverview },
   { id: 'entry', title: '入口', render: pageEntry },
   { id: 'features', title: '功能开关', render: pageFeatures },
+  { id: 'commands', title: '命令大全', render: pageCommands },
+  { id: 'people', title: '人群档案', render: pagePeople },
+  { id: 'utter', title: '她说的话', render: pageUtter },
   { id: 'settings', title: '设置', render: pageSettings },
   { id: 'access', title: '白名单', render: pageAccess },
   { id: 'safe', title: '安全', render: pageSafe }, // 频率 + 敏感话题
@@ -14,12 +17,47 @@ const PAGES = [
   { id: 'memory', title: '记忆与情绪', render: pageMemory },
   { id: 'impr', title: '她的看法', render: pageImpr },
   { id: 'style', title: '学说话', render: pageStyle }, // STYLE_GATE_PATCH
+  { id: 'decisions', title: '决策记录', render: pageDecisions }, // P1
   { id: 'starmap', title: '记忆星海', render: pageStarmap },
   { id: 'memhealth', title: '记忆体检', render: pageMemHealth },
+  { id: 'plugins', title: '插件', render: pagePlugins }, // P3-1：清单来自 /api/plugins
   { id: 'diag', title: '排障', render: pageDiag },
 ];
 
-const MOOD_CN = { calm: '平静', happy: '开心', curious: '好奇', focused: '专注', excited: '兴奋', tired: '有点累', annoyed: '有点烦', down: '低落', fear: '不安', disgust: '厌恶', surprise: '惊讶', hurt: '受伤', sulk: '闹别扭', proud: '小得意', gloomy: '闷闷的', anxious: '焦躁', numb: '发木', lonely: '孤单', flutter: '心动', love: '喜欢', shy: '害羞', content: '满足', bored: '无聊', grateful: '感激', guilty: '内疚', hopeful: '期待', irritated: '烦躁', jealous: '吃醋', playful: '俏皮', relaxed: '放松', sad: '难过', sleepy: '困', awkward: '尴尬', burnout: '累死了', checkedout: '心不在这', conflict: '心里打架', coy: '别扭的甜', cracked: '绷不住了', disappointed: '失望', guilt: '有点愧疚', hyper: '上头', nostalgia: '怀念', shame: '羞耻', sympathy: '心疼' }; // MOOD_CN_FULL
+// NAV_GROUPS（W4）：按 5 层体系分组（感知/判断/表达/记忆/运维）+ 诊断
+// 组名是灰字不可点；手机端由 CSS 隐藏组名，仍是原来的横向导航
+const NAV_GROUPS = [
+  { title: '感知', ids: ['people'] },
+  { title: '判断', ids: ['features', 'access', 'decisions', 'safe'] },
+  { title: '表达', ids: ['commands', 'utter', 'style'] },
+  { title: '记忆', ids: ['memory', 'impr', 'starmap', 'memhealth'] },
+  { title: '运维', ids: ['overview', 'entry', 'settings', 'cost', 'plugins'] },
+  { title: '诊断', ids: ['diag'] },
+];
+
+// PAGE_ADJUST（B 批）：每页第一张卡之前的一行说明——这页到底能调什么
+const PAGE_ADJUST = {
+  decisions: '每一条「要不要回」的判决都在这里：哪层拦的、分数多少、最后回没回。只读，不改任何判断。',
+  overview: '什么也调不了，只看今天的量：消息、唤醒、花费、心情。',
+  entry: '入口通道的状态；改通道要去「设置」。',
+  features: '全站的开关都在这里：拨完按右侧标记判断是「立即」还是「需重启」。',
+  commands: '命令清单；前缀规则见页首（私聊 / 和 #，群里只能 # 和 ！）。',
+  people: '按群看今天谁在说话、给谁打过标记；标记只影响她对那个人的态度。',
+  utter: '她最近说过的话；可以删掉不想留的句子。',
+  settings: '运行参数（群限制、回复长度等）；改完多半要重启桥接。页面底部有「重启桥接」按钮。',
+  access: '白名单与准入；决定哪些群、哪些人能跟她说话。',
+  safe: '省钱模式、群频率、敏感词、按群规则，四块都在这一页。',
+  cost: '花费曲线与额度；省钱模式在「安全」页。',
+  memory: '记忆条目可以删；心情只能看，不能调。',
+  impr: '她对人的看法；可以删掉一条看法。',
+  style: '她的说话框架；可以加一条、关掉一条。',
+  starmap: '记忆星海的 3D 视图；只读，拖拽旋转、滚轮缩放。',
+  memhealth: '记忆体检：查重复、过期、孤儿；只读，发现问题再去「记忆与情绪」处理。',
+  diag: '排障用的日志、备份、服务状态；不改变任何业务设置。',
+  plugins: '只读：装了哪些扩展、各挂几个钩子、迁到第几波；改开关去「功能开关」。',
+};
+
+const MOOD_CN = { calm: '平静', happy: '开心', curious: '好奇', focused: '专注', excited: '兴奋', proud: '得意' }; // MOOD_CN_6（TASK-W2 #2）
 
 let TOKEN = localStorage.getItem('her.token') || '';
 // 允许启动器用 #t=<口令> 直接带进来（本地 127.0.0.1 使用，读完即从地址栏抹掉）
@@ -30,7 +68,8 @@ let TOKEN = localStorage.getItem('her.token') || '';
   try { const _st0 = new URLSearchParams(location.search).get('starT'); if (_st0 != null && _st0 !== '') window.__dshStarT = Number(_st0); } catch {} // starT_EARLY
   if (m) { TOKEN = decodeURIComponent(m[1]); localStorage.setItem('her.token', TOKEN); history.replaceState(null, '', location.pathname); }
 })();
-let state = { page: 'overview', overview: null, features: [], logs: [], logName: 'bridge', filterOnlyOff: false, q: '' };
+let state = { names: { group: {}, private: {} }, namesLoaded: false, // NAMES_UI
+  page: 'overview', overview: null, features: [], logs: [], logName: 'bridge', filterOnlyOff: false, q: '' };
 // 允许 ?page=starmap 直接落到某页（调试 / 截图用；正常点击导航不受影响）
 if (window.__dshPage) state.page = window.__dshPage;
 
@@ -60,15 +99,18 @@ function toast(msg, ms = 2600) {
   const t = $('#toast'); t.textContent = msg; t.classList.add('show');
   clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), ms);
 }
-async function api(path, { method = 'GET', body } = {}) {
-  const r = await fetch(path, { method, headers: { 'content-type': 'application/json', 'x-her-token': TOKEN }, body: body ? JSON.stringify(body) : null });
+async function api(path, { method = 'GET', body, okAny = false } = {}) {
+  const url = method === 'GET' ? path + (path.includes('?') ? '&' : '?') + '_t=' + Date.now() : path; // CACHEBUST：刷新必须拿最新
+  const r = await fetch(url, { method, cache: 'no-store', headers: { 'content-type': 'application/json', 'x-her-token': TOKEN }, body: body ? JSON.stringify(body) : null });
   if (r.status === 401) { showGate(); throw new Error('401'); }
   const j = await r.json().catch(() => ({ ok: false }));
-  if (!j.ok) throw new Error(j.error || '请求失败');
+  // okAny：/api/selfcheck 的 ok:false 是「自检有项不正常」，payload 本身有效，不该当请求失败丢掉
+  if (!j.ok && !okAny) throw new Error(j.error || '请求失败');
   return j;
 }
 function showGate() { $('#tokenGate').classList.remove('hidden'); }
-const fmtCny = (v) => (typeof v !== 'number' ? '—' : v > 0 && v < 0.01 ? '¥' + v.toFixed(4) : '¥' + v.toFixed(2));
+const fmtCny4 = (v) => (typeof v !== 'number' ? '—' : '¥' + v.toFixed(4)); // PREC4
+const fmtCny = (v) => (typeof v !== 'number' ? '—' : (v >= 1 ? '¥' + v.toFixed(2) : '¥' + v.toFixed(4))); // PREC4：小于 1 元的都显示 4 位
 const fmtTime = (ts) => new Date(ts).toLocaleTimeString('zh-CN', { hour12: false });
 
 // ---------- 页面 ----------
@@ -86,6 +128,7 @@ function qqStatusCard() {
     const out = await api('/api/qqmode', { method: 'POST', body: { mode: m } });
     state.qqmode = out.mode;
     await loadOverview();
+    loadNames().catch(() => {}); // 全局拉一次群名/昵称，其他页直接用
     rerender();
   };
   const groups = (st.groups || []).slice(0, 6);
@@ -137,6 +180,95 @@ function qqStatusCard() {
   );
 }
 
+const SC_CACHE = 'her.selfcheck.last';
+function scCached() {
+  try { const j = JSON.parse(localStorage.getItem(SC_CACHE) || 'null'); return (j && j.items && j.items.length) ? j : null; } catch { return null; }
+}
+async function loadSelfcheck(force) {
+  if (state.selfcheck && !force) return;
+  try {
+    const j = await api('/api/selfcheck', { okAny: true });
+    state.selfcheck = j;
+    state.selfcheckErr = '';
+    if (j && j.items && j.items.length) { try { localStorage.setItem(SC_CACHE, JSON.stringify(j)); } catch {} }
+  } catch (e) {
+    const last = scCached();
+    state.selfcheckErr = (e && e.message) || '读取失败';
+    state.selfcheck = last || { ok: null, items: [], error: state.selfcheckErr };
+  }
+  rerender();
+}
+
+let mediaLoading = false;
+async function loadMediaStats() {
+  if (mediaLoading) return;
+  mediaLoading = true;
+  try {
+    state.media = await api('/api/media-stats', { okAny: true });
+    state.mediaErr = '';
+  } catch (e) {
+    state.mediaErr = (e && e.message) || '读取失败';
+  } finally {
+    mediaLoading = false;
+    rerender();
+  }
+}
+
+function mediaStatsCard() {
+  const m = state.media;
+  if (!m) { loadMediaStats(); return h('div', { class: 'card muted' }, '正在读媒体统计…'); }
+  const withMedia = Number(m.withMedia || 0);
+  const looked = Number(m.looked || 0);
+  const failed = Number(m.failed || 0);
+  const rate = withMedia ? Math.round((looked / withMedia) * 100) : 0;
+  const reasons = Object.entries(m.reasons || {}).sort((x, y) => y[1] - x[1]).slice(0, 3);
+  const card = h('div', { class: 'card' },
+    h('div', { style: 'display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap' },
+      h('h3', { style: 'margin:0' }, '媒体（今天）'),
+      h('span', { class: 'muted', style: 'font-size:12px' }, (m.day || '—') + (state.mediaErr ? ' · 这次没读到' : '')),
+    ),
+    h('div', { class: 'chips', style: 'margin-top:10px' },
+      h('span', { class: 'chip' }, '有图 ', h('b', {}, String(withMedia))),
+      h('span', { class: 'chip' }, '看了 ', h('b', {}, String(looked)), h('span', { class: 'muted' }, ' (' + rate + '%)')),
+      h('span', { class: 'chip' }, '失败 ', h('b', { style: failed ? 'color:var(--warn)' : '' }, String(failed))),
+    ),
+    h('div', { class: 'muted', style: 'margin-top:8px;font-size:12px' },
+      failed ? '有失败：她看图时可能拿不到画面。' : '没有失败，看图链路正常。'),
+  );
+  if (failed > 0) {
+    card.append(h('div', { style: 'margin-top:8px;padding:8px 10px;border-radius:8px;background:rgba(234,179,8,.12);color:var(--warn);font-size:12.5px;line-height:1.6' },
+      '失败原因：' + (reasons.length ? reasons.map(([k, v]) => k + '×' + v).join('，') : '见日志 [media]'),
+      h('span', { style: 'margin-left:8px' }, h('a', { href: '#diag', style: 'color:var(--warn);text-decoration:underline' }, '看最近错误'))),
+    );
+  }
+  return card;
+}
+
+function selfcheckCard() {
+  const sc = state.selfcheck;
+  if (!sc) { loadSelfcheck(); return h('div', { class: 'card muted' }, '正在自检…'); }
+  if (!sc.items || !sc.items.length) {
+    return h('div', { class: 'card' },
+      h('div', { class: 'muted' }, (state.selfcheckErr || sc.error || '还没跑过自检（每天会自动跑）')),
+      h('div', { style: 'margin-top:8px' }, h('button', { class: 'btn ghost', onclick: () => { state.selfcheck = null; loadSelfcheck(true); } }, '重新读一次')));
+  }
+  const stale = state.selfcheckErr ? ` · 这次没读到（${state.selfcheckErr}），下面是上次数据` : '';
+  const bad = sc.items.filter((i) => !i.ok);
+  const color = bad.length ? 'var(--bad)' : 'var(--ok)';
+  const when = sc.at ? new Date(sc.at).toLocaleString('zh-CN', { hour12: false }) : '';
+  return h('div', { class: 'card' },
+    h('div', { style: 'display:flex;justify-content:space-between;align-items:baseline' },
+      h('h3', { style: 'margin:0' }, '自检'),
+      h('span', { style: `color:${color};font-size:12.5px` }, bad.length ? `⚠️ ${bad.length} 项异常` : '✅ 全部正常')),
+    h('div', { class: 'muted', style: 'font-size:12px;margin:6px 0 10px' }, (when ? '上次自检 ' + when : '') + stale),
+    h('div', { style: 'display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:4px 14px' },
+      ...sc.items.map((i) => h('div', { style: 'font-size:12.5px;display:flex;gap:6px' },
+        h('span', { style: `color:${i.ok ? 'var(--ok)' : 'var(--bad)'}` }, i.ok ? '●' : '✗'),
+        h('span', {}, i.name),
+        h('span', { class: 'muted', style: 'margin-left:auto;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap' }, i.detail || '')))),
+  );
+}
+
 function pageOverview() {
   const d = state.overview || {};
   const hlt = d.health || {};
@@ -144,9 +276,11 @@ function pageOverview() {
   const cost = d.cost || {};
   const ratio = cost.cap ? Math.min(1, (cost.today || 0) / cost.cap) : 0;
   const by = cost.by || {};
-  const mood = Object.entries(d.mood || {}).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const mood = Object.entries(d.mood || {}).filter(([k]) => MOOD_CN[k]).sort((a, b) => b[1] - a[1]).slice(0, 6);
   const wrap = h('div', {});
   wrap.append(qqStatusCard());
+  wrap.append(h('div', { style: 'margin:12px 0' }, selfcheckCard()));
+  wrap.append(h('div', { style: 'margin:12px 0' }, mediaStatsCard()));
 
   wrap.append(h('div', { class: 'grid g4' },
     h('div', { class: 'card' },
@@ -204,6 +338,36 @@ function pageOverview() {
   return wrap;
 }
 
+function pageCommands() {
+  const wrap = h('div', {});
+  if (!state.cmds) {
+    loadCmds().catch(() => {}).finally(rerender);
+    wrap.append(h('div', { class: 'card' }, [h('div', { class: 'muted' }, '正在读命令表…')]));
+    return wrap;
+  }
+  const groups = {};
+  for (const it of state.cmds) (groups[it.g] = groups[it.g] || []).push(it);
+  wrap.append(h('div', { class: 'card' }, [
+    h('div', { class: 'card-title' }, '命令大全'),
+    h('div', { class: 'muted', style: 'margin-bottom:10px' },
+      '复制命令发给她（要带斜杠）。自然语言两条只在私聊、且是主人的时候生效。'),
+  ]));
+  for (const [g, arr] of Object.entries(groups)) {
+    wrap.append(h('div', { class: 'card' }, [
+      h('div', { class: 'card-title' }, g),
+      h('table', { class: 'tbl-fit nowrap-tbl' }, [
+        h('thead', {}, h('tr', {}, h('th', {}, '命令'), h('th', {}, '说明'))),
+        h('tbody', {}, ...arr.map((it) => h('tr', {}, h('td', { style: 'font-family:monospace' }, it.cmd), h('td', {}, it.desc)))),
+      ]),
+    ]));
+  }
+  return wrap;
+}
+
+function loadCmds() {
+  return api('/api/commands').then((d) => { state.cmds = (d && d.items) || []; });
+}
+
 function pageFeatures() {
   const wrap = h('div', {});
   const bar = h('div', { class: 'toolbar' },
@@ -213,6 +377,19 @@ function pageFeatures() {
     h('span', { class: 'muted', style: 'margin-left:auto' }, '改动会写配置并自动备份'),
   );
   wrap.append(bar);
+  wrap.append(h('div', { class: 'muted', style: 'font-size:12.5px;margin:2px 0 10px;line-height:1.8' },
+    '绿色「立即」= 拨完马上生效；橙色「需重启」= 要先重启对应服务（桥接：本页下方「设置」页底部有「重启桥接」；面板自己：systemctl restart her-console）。'));
+  if (!state.plugins) loadPlugins();
+  const _mods = state.plugins || [];
+  wrap.append(h('div', { class: 'card' },
+    h('div', { style: 'display:flex;justify-content:space-between;align-items:baseline' },
+      h('h3', { style: 'margin:0' }, '插件清单'),
+      h('span', { class: 'muted', style: 'font-size:12px' }, _mods.length ? `${_mods.length} 个模块 · 来自 /api/plugins` : '正在读…')),
+    h('div', { class: 'muted', style: 'font-size:12px;margin:6px 0 8px' }, '开关管「开不开」，这里看「装了哪些模块、各挂几个钩子、迁到第几波」。新增扩展会自动出现在下表。'),
+    ...(_mods.slice().sort((a, b) => (a.order || 0) - (b.order || 0)).map((m) => h('div', { class: 'kv' },
+      h('span', {}, m.title || m.id),
+      h('span', { class: 'muted', style: 'font-size:12px' }, `W${m.wave || '?'} · ${m.migrated ? '已迁移' : '未迁移'} · ${(m.hooks || []).length} 钩子 · ${(m.routes || []).length} 路由`)))),
+    h('div', { style: 'margin-top:8px' }, h('a', { href: '#plugins', class: 'muted', style: 'font-size:12px' }, '看完整清单 →'))));
 
   const groups = {};
   for (const f of state.features) {
@@ -223,14 +400,14 @@ function pageFeatures() {
   }
   if (!Object.keys(groups).length) wrap.append(h('div', { class: 'card muted' }, '没有匹配的功能'));
   for (const [g, items] of Object.entries(groups)) {
-    const table = h('table', { class: 'nowrap-tbl' },
-      h('thead', {}, h('tr', {}, h('th', { style: 'width:38%' }, g), h('th', { style: 'width:110px' }, '状态'), h('th', {}, '生效方式'), h('th', {}, '说明'))),
+    const table = h('table', { class: 'tbl-fit nowrap-tbl' },
+      h('thead', {}, h('tr', {}, h('th', { style: 'width:38%' }, g), h('th', { style: 'width:110px' }, '状态'), h('th', { style: 'width:92px' }, '生效'), h('th', {}, '说明'))),
       h('tbody', {}, ...items.map((f) => h('tr', {},
         h('td', {}, f.name, f.path ? h('div', { class: 'mono muted', style: 'font-size:11px' }, f.path) : null),
         h('td', {}, f.kind === 'bool'
           ? h('label', { class: 'sw' }, h('input', { type: 'checkbox', checked: f.value !== false ? 'checked' : null, onchange: (e) => toggleFeature(f, e.target.checked) }), h('i'))
           : h('span', { class: 'muted' }, f.value == null ? '—' : String(f.value))),
-        h('td', {}, h('span', { class: 'tag ' + (f.effect || 'bridge') }, { hot: '立刻', bridge: '重启桥接', dsh: '重启面板' }[f.effect] || f.effect)),
+        h('td', {}, h('span', { class: 'tag ' + (f.effect === 'hot' ? 'hot' : 'bridge') }, f.effect === 'hot' ? '立即' : (f.effect === 'dsh' ? '重启面板' : '需重启'))),
         h('td', { class: 'muted', style: 'font-size:12px' }, f.hint || ''),
       ))),
     );
@@ -265,7 +442,7 @@ function healthCard() {
   const chip = (name, st) => h('span', { class: 'tag ' + (st === 'active' || st === 'running' ? 'ok' : 'warn'), style: 'margin-right:6px' }, name + ' ' + st);
   return h('div', { class: 'card' },
     h('h3', {}, '通道健康', h('span', { class: 'muted', style: 'font-size:11.5px;font-weight:400;margin-left:8px' }, d.at ? new Date(d.at).toLocaleTimeString() : '')),
-    h('table', { class: 'nowrap-tbl' }, h('tbody', {},
+    h('table', { class: 'tbl-fit nowrap-tbl' }, h('tbody', {},
       row(alive(d.dsh), '云端 DSH（3080）', d.dsh === '401' ? '401 正常（要口令）' : String(d.dsh)),
       row(alive(d.bridge), '桥接控制台（3100）', d.bridge === '401' ? '401 正常（要口令）' : String(d.bridge)),
       row(!!d.onebot, 'OneBot 连接（3001）', d.onebot ? '已连接' : '未连接（QQ 可能掉线）'),
@@ -284,7 +461,7 @@ function healthCard() {
 function pageSettings() {
   const wrap = h('div', {});
   const items = state.features.filter((f) => f.kind === 'number' || f.kind === 'text');
-  const table = h('table', { class: 'nowrap-tbl' },
+  const table = h('table', { class: 'tbl-fit nowrap-tbl' },
     h('thead', {}, h('tr', {}, h('th', { style: 'width:34%' }, '项目'), h('th', { style: 'width:150px' }, '当前值'), h('th', {}, '生效方式'), h('th', {}, '配置键'))),
     h('tbody', {}, ...items.map((f) => {
       const input = h('input', {
@@ -308,6 +485,18 @@ function pageSettings() {
         h('td', { class: 'mono', style: 'font-size:11.5px' }, d.path),
         h('td', { class: 'muted', style: 'font-size:11.5px' }, String(JSON.stringify(d.from)).slice(0, 30) + ' → ' + String(JSON.stringify(d.to)).slice(0, 30)),
       )))),
+      h('div', { class: 'muted', style: 'font-size:12px;margin-top:8px' }, '提示：页面上的「刷新」只是重新比对一次，不会让它们生效；要让改动进桥接，只能重启。'),
+      h('div', { class: 'toolbar', style: 'margin-top:6px' }, // PENDING_RESTART_UI
+        h('button', { class: 'btn', onclick: async () => {
+          try {
+            toast('正在重启桥接…');
+            const r = await fetch('/api/bridge/restart', { method: 'POST', headers: { 'x-her-token': TOKEN } });
+            const j = await r.json();
+            toast(j.ok ? ('已重启' + (j.pid ? '（pid ' + j.pid + '）' : '') + '，稍等十几秒待生效应清零') : ('重启失败：' + (j.error || '未知')));
+            setTimeout(async () => { try { await loadPending(); } catch (e) {} rerender(); }, 15000);
+          } catch (e) { toast('重启失败：' + e.message); }
+        } }, '立即重启让它们生效'),
+      ),
     ));
   }
   wrap.append(healthCard());
@@ -414,11 +603,26 @@ function pageCost() {
   // ③ 24 小时 + 7 天
   const bars = (buckets, fmt) => {
     const mx = Math.max(...buckets.map((b) => b.cost || 0), 0.0001);
-    return h('div', { class: 'spark' }, ...buckets.map((b) => h('div', {
-      class: 'spark-bar' + (b.tier === 'peak' ? ' peak' : ''),
-      title: fmt(b.t) + ` ¥${(b.cost || 0).toFixed(4)} · ${(b.tokens || 0).toLocaleString()} tok`,
-      style: `height:${Math.max(6, ((b.cost || 0) / mx) * 100)}%`,
-    })));
+    const total = buckets.reduce((a, b) => a + (b.cost || 0), 0);
+    const avg = total / Math.max(1, buckets.length);
+    const pick = state.barPick; // BAR_PICK：手机点柱子看数值
+    return h('div', { class: 'spark-wrap' },
+      h('div', { class: 'muted', style: 'font-size:11.5px;margin-bottom:4px' },
+        pick ? `${pick.label} · ${fmtCny(pick.cost)} · ${pick.tok} tok` : '点一下柱子看那一格的数值（手机也能点）'),
+      h('div', { class: 'spark' }, ...buckets.map((b) => h('div', {
+        class: 'spark-bar' + (b.tier === 'peak' ? ' peak' : ''),
+        title: fmt(b.t) + ` ¥${(b.cost || 0).toFixed(4)} · ${(b.tokens || 0).toLocaleString()} tok`,
+        style: `height:${Math.max(6, ((b.cost || 0) / mx) * 100)}%`,
+        onclick: () => {
+          const lab = fmt(b.t);
+          state.barPick = (pick && pick.label === lab) ? null
+            : { label: lab, cost: b.cost || 0, tok: (b.tokens || 0).toLocaleString() };
+          rerender();
+        },
+      }))),
+      h('div', { class: 'spark-avg', style: `bottom:${Math.min(96, (avg / mx) * 100)}%` },
+        h('b', {}, '平均 ' + fmtCny(avg))),
+    );
   };
   wrap.append(card('最近 24 小时（每格 1 小时，红=高峰时段）',
     bars(c.series?.h24 || [], (t) => new Date(t).toLocaleString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }))));
@@ -679,19 +883,28 @@ function pageStyle() { // STYLE_GATE_PATCH
     return wrap;
   }
   const c = data.counts || {};
+  async function styleShort(id) {
+    try {
+      const rr = await api('/api/style-short', { method: 'POST', body: { id } });
+      if (rr && rr.ok) { toast('短句：' + rr.short); await reload(); }
+      else toast('拆短句失败：' + ((rr && rr.error) || '未知'));
+    } catch (e) { toast('拆短句失败：' + e.message); }
+  }
+
   const setStatus = async (id, status) => {
     try { await api('/api/style', { method: 'POST', body: { action: 'set', id, status } }); toast(status === 'active' ? '收下了' : status === 'retired' ? '扔掉了' : '放回候选'); await reload(); }
     catch (e) { toast('没改成：' + e.message); }
   };
   const row = (s, kind) => h('tr', {},
-    h('td', {}, String(s.text || '').slice(0, 90)),
+    h('td', {}, (s.short ? '「' + String(s.short).slice(0, 30) + '」 ' : '') + String(s.text || '').slice(0, 70)),
     h('td', { class: 'muted', style: 'font-size:12px;width:70px' }, s.kind === 'framework' ? '框架' : s.kind === 'quote' ? '话术/梗' : '噪声'),
     h('td', { class: 'muted', style: 'font-size:12px;width:110px' }, s.why ? String(s.why).slice(0, 20) : '—'),
     h('td', { class: 'muted', style: 'font-size:12px;width:80px' }, String(Object.keys(s.hits || {}).length) + ' 人复用'),
     h('td', { style: 'width:150px;white-space:nowrap' },
       kind !== 'candidate' ? h('button', { class: 'btn ghost', style: 'padding:4px 9px;margin-right:4px', onclick: () => setStatus(s.id, 'candidate') }, '候选') : null,
       kind !== 'active' ? h('button', { class: 'btn ghost', style: 'padding:4px 9px;margin-right:4px', onclick: () => setStatus(s.id, 'active') }, '收下') : null,
-      kind !== 'retired' ? h('button', { class: 'btn ghost', style: 'padding:4px 9px', onclick: () => setStatus(s.id, 'retired') }, '扔掉') : null,
+      kind !== 'retired' ? h('button', { class: 'btn ghost', style: 'padding:4px 9px;margin-right:4px', onclick: () => setStatus(s.id, 'retired') }, '扔掉') : null,
+      h('button', { class: 'btn ghost', style: 'padding:4px 9px', onclick: () => styleShort(s.id) }, '拆短句'),
     ));
 
   wrap.append(h('div', { class: 'card' },
@@ -729,6 +942,10 @@ function pageStyle() { // STYLE_GATE_PATCH
         try { await api('/api/bridge/restart', { method: 'POST', body: {} }); toast('正在重启桥接，约 10 秒'); }
         catch (e) { toast('重启失败：' + e.message, 3800); }
       } }, '重启桥接'),
+      h('button', { class: 'btn', onclick: async () => {
+        try { const r = await api('/api/style-now', { method: 'POST', body: {} }); toast(r.hint || '已通知她去学'); }
+        catch (e) { toast('没发出去：' + e.message, 3800); }
+      } }, '立刻学一轮'),
     ),
     h('div', { class: 'muted', style: 'font-size:12px;margin-top:8px' },
       '当前：' + (scfg.targetQQ ? ('只学 QQ ' + scfg.targetQQ) : '未设置') + ' · 群 ' + ((scfg.groups || []).join('、') || '未设置')
@@ -743,6 +960,37 @@ function pageStyle() { // STYLE_GATE_PATCH
       : h('div', { class: 'muted' }, '空的'),
   );
 
+  wrap.append(h('div', { class: 'card', style: 'margin-top:12px' },
+    h('h3', {}, '我看上了，加一条'),
+    h('div', { class: 'muted', style: 'font-size:12px;margin-bottom:8px' }, '把一句话粘进来，直接进「正式」（会立刻进提示词）。只放你认可的说法。'),
+    h('div', { class: 'toolbar', style: 'gap:10px;align-items:center;flex-wrap:wrap' },
+      h('input', { type: 'text', id: 'stl-add', placeholder: '比如：这我得先看看，别急着下结论', style: 'width:420px' }),
+      h('button', { class: 'btn', onclick: async () => {
+        const text = ($('#stl-add')?.value || '').trim();
+        if (!text) return toast('先写一句');
+        try { const r = await api('/api/style-add', { method: 'POST', body: { text } }); toast(r.duplicated ? '这句已经有了' : '加进去了'); $('#stl-add').value = ''; await reload(); }
+        catch (e) { toast('没加成：' + e.message, 3800); }
+      } }, '加进样本'),
+    )));
+
+  wrap.append(h('div', { class: 'card', style: 'margin-top:12px' },
+    h('h3', {}, '批量导入（聊天记录粘进来）'),
+    h('div', { class: 'muted', style: 'font-size:12px;margin-bottom:8px' },
+      '把 QQ 里节选的聊天记录整段粘进来，每行一句；自动只挑 6~120 字的行，去重后进「候选」。最多一次 40 行。'),
+    h('textarea', { id: 'stl-bulk', rows: '6', placeholder: '一句一行，比如：\n这我得先看看，别急着下结论\n感觉这个版本能用，但心里没底', style: 'width:100%;resize:vertical' }),
+    h('div', { class: 'toolbar', style: 'gap:10px;margin-top:8px' },
+      h('button', { class: 'btn', onclick: async () => {
+        const text = ($('#stl-bulk')?.value || '').trim();
+        if (!text) return toast('先粘点东西');
+        try {
+          const r = await api('/api/style-bulk', { method: 'POST', body: { text } });
+          toast(`导入：新增 ${r.added}，重复 ${r.dup}，被拒 ${r.bad}`);
+          $('#stl-bulk').value = '';
+          await reload();
+        } catch (e) { toast('导入失败：' + e.message, 3800); }
+      } }, '导入到候选'),
+    )));
+
   wrap.append(section('候选（等验证）', data.candidates, 'candidate', '有人在群里第二次用同一个句式，它就会自己转正。'));
   wrap.append(section('正式（会进提示词）', data.active, 'active', '注入私聊/群提示词，最多 6 条、每条 80 字以内。'));
   if ((data.retired || []).length) wrap.append(section('已丢弃（最近 20 条）', data.retired, 'retired', '梗、口头禅、太长、过期没复用的都在这，留着方便你捞回来。'));
@@ -752,7 +1000,8 @@ function pageStyle() { // STYLE_GATE_PATCH
 function pageMemory() {
   const d = state.overview || {};
   const wrap = h('div', {});
-  const mood = Object.entries(d.mood || {}).sort((a, b) => b[1] - a[1]);
+  state.mood = state.mood || d.mood || null; // MOODBUBBLE_UI
+  const mood = Object.entries(d.mood || {}).filter(([k]) => MOOD_CN[k]).sort((a, b) => b[1] - a[1]);
   wrap.append(h('div', { class: 'grid g2' },
     h('div', { class: 'card' },
       h('h3', {}, '情绪（当前分数）'),
@@ -782,14 +1031,138 @@ function pageMemory() {
       })(),
     ),
   ));
-  wrap.append(h('div', { class: 'card', style: 'margin-top:14px' },
-    h('h3', {}, '欠着的事'),
-    ...(d.loops || []).length
-      ? d.loops.map((x) => h('div', { class: 'kv' },
-          h('span', {}, String(x.text || x.id || JSON.stringify(x)).slice(0, 80)),
-          h('span', { class: 'muted' }, loopWhen(x))))
-      : [h('div', { class: 'muted' }, '没有欠着的事')],
-  ));
+  // MOODSTAR_UI：照 surfcore 原版画法——所有情绪按角度均分、半径=16+分×1.02、颜色 hsl(270-分×2.2)
+  if (state.mood) {
+    const mv = (state.mood.values && Object.keys(state.mood.values).length ? state.mood.values : state.mood) || {};
+    const list = Object.entries(MOOD_CN).map(([id, zh]) => ({ id, zh, v: Number(mv[id] || 0) })).filter((m) => m.v >= 3);
+    const curId = state.mood.current || '';
+    const curZh = MOOD_CN[curId] || '平静';
+    const W = 260, C = W / 2;
+    const svg = [];
+    svg.push(`<circle cx="${C}" cy="${C}" r="${C - 1}" fill="none" stroke="rgba(255,255,255,0.10)"/>`);
+    svg.push(`<circle cx="${C}" cy="${C}" r="${((C - 1) * 0.66).toFixed(1)}" fill="none" stroke="rgba(255,255,255,0.06)" stroke-dasharray="4 4"/>`);
+    list.forEach((m, i) => {
+      const ang = (i / list.length) * Math.PI * 2 - Math.PI / 2;
+      const rad = 20 + m.v * 1.35;
+      const x = C + Math.cos(ang) * rad, y = C + Math.sin(ang) * rad;
+      const isCur = m.id === curId;
+      const col = isCur ? '#ffd166' : `hsl(${Math.round(270 - m.v * 2.2)},75%,62%)`;
+      svg.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="${col}" data-emo="${m.id}"><title>${m.zh} ${Math.round(m.v)}</title></circle>`);
+      if (m.v >= 55) svg.push(`<text x="${(x + 7).toFixed(1)}" y="${(y + 4).toFixed(1)}" font-size="10" fill="rgba(255,255,255,0.55)">${m.zh}</text>`);
+    });
+    svg.push(`<text x="${C}" y="${C + 4}" text-anchor="middle" font-size="12" fill="rgba(255,255,255,0.9)">${curZh}</text>`);
+
+    const sv = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    sv.setAttribute('viewBox', `0 0 ${W} ${W}`);
+    sv.setAttribute('width', String(W));
+    sv.setAttribute('height', String(W));
+    sv.style.cssText = 'display:block;margin:6px auto';
+    sv.innerHTML = svg.join('');
+    // MOODREAD_UI（B 批）：心情只读——不响应点击，也不提供 ± 按钮
+
+    const top6 = list.slice().sort((x, y) => y.v - x.v).slice(0, 6);
+    const rows = h('div', { style: 'display:flex;flex-wrap:wrap;gap:10px 18px;font-size:12px;justify-content:center' },
+      ...top6.map((m) => h('div', { style: 'display:flex;align-items:center;gap:6px' },
+        h('span', { style: 'width:52px;opacity:.85' }, m.zh),
+        h('span', { style: 'width:34px;text-align:center' }, String(Math.round(m.v))))));
+
+    const sinceH = state.mood.since ? Math.max(1, Math.round((Date.now() - Number(state.mood.since)) / 3600000)) : 1;
+    const card = h('div', { className: 'card', style: 'margin-top:10px' },
+      h('div', { className: 'card-h' }, '今天的感觉（心情）'),
+      h('div', { className: 'muted', style: 'font-size:12px;margin:2px 0 2px' }, '心情是她的，只能看不能调。'),
+      h('div', { className: 'muted', style: 'font-size:12px;margin:2px 0 6px' }, `现在：${curZh} · 已经 ${sinceH} 小时 · 越靠外分越高（只读）`),
+      sv, rows);
+    wrap.append(card);
+  }
+
+  return wrap;
+}
+
+// ---------- 插件清单（P3-1） ----------
+// 数据来自 /api/plugins（桥接读 docs/generated/manifests.json，再用运行实例补 routes）。
+// 下面是生成时的快照：接口挂了就用它，页面不会变空。
+const PLUGIN_FALLBACK = [
+  {"id": "blackbox", "title": "黑箱静默", "kind": "core", "hooks": [], "routes": [], "order": null, "migrated": false, "wave": 2},
+  {"id": "bot-detect", "title": "机器识别", "kind": "tool", "hooks": [], "routes": [], "order": null, "migrated": false, "wave": 2},
+  {"id": "channel", "title": "通道能力探测", "kind": "tool", "hooks": [], "routes": [], "order": null, "migrated": false, "wave": 2},
+  {"id": "github-learn", "title": "GitHub 学习", "kind": "tool", "hooks": [], "routes": [], "order": null, "migrated": false, "wave": 2},
+  {"id": "memory-card", "title": "记忆卡片上限", "kind": "core", "hooks": [], "routes": [], "order": null, "migrated": false, "wave": 2},
+  {"id": "memory-scope", "title": "记忆可见范围", "kind": "core", "hooks": [], "routes": [], "order": null, "migrated": false, "wave": 2},
+  {"id": "profile", "title": "档案与好友", "kind": "tool", "hooks": [], "routes": [], "order": null, "migrated": false, "wave": 2},
+  {"id": "qzone-watch", "title": "空间巡查", "kind": "tool", "hooks": [], "routes": [], "order": null, "migrated": false, "wave": 2},
+  {"id": "qzone", "title": "QQ 空间", "kind": "tool", "hooks": [], "routes": [], "order": null, "migrated": false, "wave": 2},
+  {"id": "related-memory", "title": "相关记忆", "kind": "core", "hooks": [], "routes": [], "order": null, "migrated": false, "wave": 2},
+  {"id": "reminders", "title": "提醒与汇报", "kind": "tool", "hooks": [], "routes": [], "order": null, "migrated": false, "wave": 2},
+  {"id": "sticker-frames", "title": "表情帧", "kind": "core", "hooks": [], "routes": [], "order": null, "migrated": false, "wave": 2},
+  {"id": "style-learn", "title": "学说话任务", "kind": "tool", "hooks": [], "routes": [], "order": null, "migrated": false, "wave": 2},
+  {"id": "owner-only", "title": "只听主人", "kind": "hook", "hooks": ["wakeGate", "onGroupMessage"], "routes": [], "order": 10, "migrated": true, "wave": 1},
+  {"id": "mute", "title": "静音名单", "kind": "hook", "hooks": ["wakeGate", "routes", "stateKey"], "routes": ["/api/socialV2/mute"], "order": 20, "migrated": true, "wave": 1},
+  {"id": "learnmode", "title": "学习模式", "kind": "hook", "hooks": ["wakeGate", "routes", "onGroupMessage", "stateKey"], "routes": ["/api/socialV2/learnmode"], "order": 30, "migrated": true, "wave": 1},
+  {"id": "economy", "title": "省钱模式", "kind": "hook", "hooks": ["wakeGate", "routes", "stateKey"], "routes": ["/api/socialV2/economy"], "order": 40, "migrated": true, "wave": 1},
+  {"id": "group-rate", "title": "群聊频率", "kind": "hook", "hooks": ["wakeGate", "routes", "stateKey"], "routes": ["/api/socialV2/grouprate"], "order": 50, "migrated": true, "wave": 1},
+  {"id": "attention", "title": "该不该接话", "kind": "hook", "hooks": ["promptBlock", "wakeGate", "routes", "onGroupMessage"], "routes": ["/api/socialV2/attention"], "order": 60, "migrated": true, "wave": 1},
+  {"id": "advice", "title": "建议收集", "kind": "hook", "hooks": ["routes", "onGroupMessage"], "routes": ["/api/socialV2/advice"], "order": 70, "migrated": true, "wave": 1},
+  {"id": "people", "title": "人群档案", "kind": "hook", "hooks": ["routes"], "routes": ["/api/socialV2/people", "/api/socialV2/people-mark"], "order": 80, "migrated": true, "wave": 1},
+  {"id": "utterances", "title": "她说的话", "kind": "hook", "hooks": ["routes"], "routes": ["/api/socialV2/utterances", "/api/socialV2/utterance-mark"], "order": 90, "migrated": true, "wave": 1},
+  {"id": "safe-talk", "title": "敏感话题", "kind": "hook", "hooks": ["wakeGate", "routes", "onGroupMessage", "onPrivateMessage", "stateKey"], "routes": ["/api/socialV2/safetalk"], "order": 100, "migrated": true, "wave": 1},
+  {"id": "promises", "title": "欠事捕获", "kind": "hook", "hooks": ["afterSend"], "routes": [], "order": 110, "migrated": true, "wave": 1},
+  {"id": "impressions", "title": "她的看法", "kind": "hook", "hooks": ["promptBlock", "routes", "stateKey"], "routes": ["/api/socialV2/impression"], "order": 120, "migrated": true, "wave": 1},
+  {"id": "owner-teach", "title": "主人教的说法", "kind": "hook", "hooks": ["promptBlock", "routes", "stateKey"], "routes": ["/api/socialV2/owner-teach"], "order": 130, "migrated": true, "wave": 1},
+  {"id": "tech-notes", "title": "技术笔记", "kind": "hook", "hooks": ["promptBlock", "routes", "stateKey"], "routes": ["/api/socialV2/tech-notes"], "order": 140, "migrated": true, "wave": 1},
+  {"id": "style", "title": "学说话", "kind": "hook", "hooks": ["promptBlock", "routes", "onGroupMessage", "onPrivateMessage"], "routes": ["/api/socialV2/style-list", "/api/socialV2/style-candidate", "/api/socialV2/style-note"], "order": 150, "migrated": true, "wave": 1},
+  {"id": "loops", "title": "欠事与人物", "kind": "hook", "hooks": ["routes"], "routes": ["/api/socialV2/person", "/api/socialV2/loop"], "order": 160, "migrated": true, "wave": 1},
+  {"id": "stickers", "title": "贴纸待办", "kind": "core", "hooks": [], "routes": [], "order": 170, "migrated": true, "wave": 1},
+];
+const PLUGIN_HOOK_LABEL = { promptBlock: '提示词', wakeGate: '唤醒闸门', onGroupMessage: '群消息', onPrivateMessage: '私聊', afterSend: '发送后', stateKey: '状态键', routes: '路由' };
+
+async function loadPlugins(force) {
+  if (state.plugins && !force) return state.plugins;
+  try {
+    const j = await api('/api/plugins');
+    if (!j || !Array.isArray(j.modules)) throw new Error((j && j.error) || '清单格式不对');
+    state.plugins = j.modules;
+    state.pluginsAt = j.at ? new Date(j.at).toLocaleString('zh-CN', { hour12: false }) : '';
+    state.pluginsErr = '';
+    state.pluginsFallback = false;
+  } catch (e) {
+    state.plugins = PLUGIN_FALLBACK;
+    state.pluginsAt = '';
+    state.pluginsErr = (e && e.message) || '读取失败';
+    state.pluginsFallback = true;
+  }
+  rerender();
+  return state.plugins;
+}
+
+function pluginTable(mods) {
+  return h('table', { class: 'tbl-fit nowrap-tbl plugins-tbl' },
+    h('thead', {}, h('tr', {},
+      h('th', {}, '标题'), h('th', { style: 'width:64px' }, 'wave'), h('th', { style: 'width:86px' }, 'migrated'),
+      h('th', { style: 'width:70px' }, '钩子'), h('th', { style: 'width:70px' }, '路由'), h('th', {}, '钩子明细'))),
+    h('tbody', {}, ...mods.map((m) => h('tr', {},
+      h('td', {}, m.title || m.id, h('div', { class: 'mono muted', style: 'font-size:11px' }, m.id)),
+      h('td', {}, 'W' + (m.wave || '?')),
+      h('td', {}, m.migrated ? h('span', { style: 'color:var(--ok)' }, '是') : h('span', { class: 'muted' }, '否')),
+      h('td', {}, String((m.hooks || []).length)),
+      h('td', {}, String((m.routes || []).length)),
+      h('td', { class: 'mono muted', style: 'font-size:11px' }, (m.hooks || []).map((x) => PLUGIN_HOOK_LABEL[x] || x).join(' · '))))));
+}
+
+function pagePlugins() {
+  const wrap = h('div', {});
+  if (!state.plugins) { loadPlugins(); wrap.append(h('div', { class: 'card muted' }, '正在读插件清单…')); return wrap; }
+  const mods = state.plugins.slice().sort((a, b) => (a.order || 0) - (b.order || 0));
+  const w1 = mods.filter((m) => m.wave === 1).length;
+  const w2 = mods.filter((m) => m.wave === 2).length;
+  wrap.append(h('div', { class: 'toolbar' },
+    h('span', { class: 'muted' }, `共 ${mods.length} 个模块 · wave1 ${w1} · wave2 ${w2}`),
+    h('span', { class: 'muted', style: 'margin-left:auto;font-size:12px' }, state.pluginsAt ? '清单时间 ' + state.pluginsAt : ''),
+    h('button', { class: 'btn ghost', onclick: () => loadPlugins(true) }, '刷新清单')));
+  if (state.pluginsFallback) {
+    wrap.append(h('div', { class: 'card', style: 'border-color:var(--warn)' },
+      h('div', { style: 'color:var(--warn);font-size:12.5px' }, `读 /api/plugins 失败（${state.pluginsErr}），下面是面板内置快照，可能过期；点「刷新清单」重试。`)));
+  }
+  wrap.append(h('div', { class: 'card' }, pluginTable(mods)));
   return wrap;
 }
 
@@ -1711,6 +2084,7 @@ async function loadMem() {
   memLoading = true;
   try {
     state.mem = await api('/api/mem?lite=1');
+    state.mood = (state.mem && state.mem.mood) || state.mood; // MOODBUBBLE_UI：气泡图要用
     memFails = 0;
     state.memError = '';
     state.memGaveUp = false;
@@ -1734,9 +2108,9 @@ function pageMemHealth() {
   const wrap = h('div', {});
   if (!state.mem) {
     if (state.memGaveUp) {
-      wrap.append(h('div', { class: 'card', style: 'text-align:center;padding:36px 20px' },
-        h('div', { style: 'font-size:34px;margin-bottom:8px' }, '🫧'),
-        h('h3', { style: 'margin:0 0 8px' }, '记忆没能读出来'),
+      wrap.append(h('div', { class: 'card mh-empty' },
+        h('div', { class: 'mh-empty-ico' }, '🫧'),
+        h('h3', {}, '记忆没能读出来'),
         h('div', { class: 'muted', style: 'margin-bottom:14px' }, state.memError || '网络或服务那边慢了一下，重试通常就好。'),
         h('button', {
           class: 'btn',
@@ -1748,51 +2122,112 @@ function pageMemHealth() {
     wrap.append(h('div', { class: 'card muted' }, '正在读记忆…'));
     return wrap;
   }
+
   const d = state.mem;
   const cap = d.cap || { records: 1500, pinned: 20 };
-  const pct = Math.min(100, (d.total / cap.records) * 100);
-
-  wrap.append(h('div', { class: 'grid g3', style: 'margin-bottom:12px' },
-    h('div', { class: 'card' },
-      h('div', { class: 'muted' }, `条数 ${d.total} / ${cap.records}`),
-      h('div', { class: 'bar', style: 'height:10px;margin-top:8px' }, h('i', { style: `width:${pct.toFixed(1)}%` })),
-      h('div', { class: 'muted', style: 'font-size:12px;margin-top:6px' }, `到 90% 会自动合并同主题、丢最不重要的`)),
-    h('div', { class: 'card' },
-      h('div', { class: 'muted' }, `钉住 ${d.pinned} / ${cap.pinned}`),
-      h('div', { class: 'bar', style: 'height:10px;margin-top:8px' }, h('i', { style: `width:${((d.pinned / cap.pinned) * 100).toFixed(1)}%` })),
-      h('div', { class: 'muted', style: 'font-size:12px;margin-top:6px' }, `已淡忘 ${d.forgotten} 条（可恢复）`)),
-    h('div', { class: 'card' },
-      h('div', { class: 'muted' }, '待处理'),
-      h('div', { class: 'big', style: 'font-size:24px' }, `${(d.pairs || []).length} 对相似记忆`),
-      h('div', { class: 'muted', style: 'font-size:12px' }, '可能是同一件事记了两遍')),
-  ));
-
-  // 暂存区：忘掉的记忆先放 30 天，可恢复或彻底删除
-  const trash = (state.mem.records || []).filter((r) => r.forgotten);
+  const records = d.records || [];
+  const trash = records.filter((r) => r.forgotten);
+  const pinnedRecs = records.filter((r) => r.pinned);
+  const pairs = d.pairs || [];
   const PURGE_DAYS = 30;
   const daysLeft = (t) => Math.max(0, PURGE_DAYS - Math.floor((Date.now() - new Date(t || 0).getTime()) / 86400000));
+
+  // 操作后只重拉数据、不丢滚动位置（老版整页重绘会跳回顶部）
+  const refresh = async (note) => {
+    const y = window.scrollY;
+    try { await loadMem(); } catch (e) { /* 保留旧数据 */ }
+    rerender();
+    requestAnimationFrame(() => window.scrollTo(0, y));
+    if (note) toast(note);
+  };
+
+  const pct = Math.min(100, (Number(d.total || 0) / Math.max(1, cap.records)) * 100);
+  const pinPct = Math.min(100, (Number(d.pinned || 0) / Math.max(1, cap.pinned)) * 100);
+
+  const kpi = (title, big, sub, bar, barCls) => h('div', { class: 'card mh-kpi' },
+    h('div', { class: 'mh-kpi-t' }, title),
+    h('div', { class: 'big' }, big, sub ? h('small', {}, sub) : null),
+    bar == null ? null : h('div', { class: 'bar', style: 'margin-top:10px' }, h('i', { class: barCls || '', style: 'width:' + bar.toFixed(1) + '%' })),
+  );
+
+  wrap.append(h('div', { class: 'mh-kpis' },
+    kpi('条数', String(d.total || 0), ' / ' + cap.records, pct),
+    kpi('钉住', String(d.pinned || 0), ' / ' + cap.pinned, pinPct, 'mh-bar-warn'),
+    kpi('相似记忆', String(pairs.length), ' 对', null),
+    kpi('已淡忘', String(d.forgotten || 0), ' 条（可恢复）', null),
+  ));
+
+  // 清晰度分布（接口早就返回 byClarity，旧页面没用上）
+  const CLARITY_MERGE = new Map();
+  for (const [k, n] of Object.entries(d.byClarity || {})) {
+    const label = (({ vivid: '清晰', clear: '清晰', '清晰': '清晰', fuzzy: '模糊', vague: '模糊', lost: '模糊', unknown: '未标' })[k]) || k;
+    CLARITY_MERGE.set(label, (CLARITY_MERGE.get(label) || 0) + n);
+  }
+  const clarity = [...CLARITY_MERGE.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const maxClarity = Math.max(1, ...clarity.map((x) => x[1]));
+  wrap.append(h('div', { class: 'grid g2', style: 'margin-bottom:12px' },
+    h('div', { class: 'card' },
+      h('h3', {}, '清晰度分布'),
+      clarity.length
+        ? h('div', {}, ...clarity.map(([k, n]) => h('div', { class: 'mh-line' },
+          h('span', { class: 'mh-line-t', title: k }, k),
+          h('div', { class: 'mh-line-bar' }, h('i', { style: 'width:' + ((n / maxClarity) * 100).toFixed(1) + '%' })),
+          h('span', { class: 'mh-line-n' }, String(n)))))
+        : h('div', { class: 'muted' }, '还没有清晰度数据。'),
+      h('div', { class: 'mh-note' }, '模糊条目突然变多，通常说明「忘记」在加速，可以去「记忆与情绪」调 memoryCard.clarify。')),
+    h('div', { class: 'card' },
+      h('h3', {}, '近 8 周新增'),
+      (d.older ? h('div', { class: 'mh-note', style: 'margin:-4px 0 6px' }, '另有 ' + d.older + ' 条更早的记忆（B 站旧动态），没算进这 8 周') : null),
+      h('div', { class: 'mh-weeks' }, ...(d.weeks || []).map((w) => {
+        const maxAdd = Math.max(1, ...(d.weeks || []).map((x) => x.added));
+        return h('div', { class: 'mh-wk', title: w.week + ' 新增 ' + w.added + (w.forgotten ? ' / 淡忘 ' + w.forgotten : '') },
+          h('div', { class: 'mh-wk-n' + (w.added ? '' : ' zero') }, String(w.added)),
+          h('div', { class: 'mh-wk-bar' }, h('i', { style: 'height:' + (w.added ? Math.max(8, (w.added / maxAdd) * 100) : 2) + '%' })),
+          h('div', { class: 'mh-wk-x' }, String(w.week || '').slice(5)));
+      })),
+    ),
+  ));
+
+  const tags = Object.entries(d.byTag || {}).sort((a, b) => b[1] - a[1]).slice(0, 12);
+  const maxTag = Math.max(1, ...tags.map((t) => t[1]));
+  const totalTag = tags.reduce((s, t) => s + t[1], 0) || 1;
   wrap.append(h('div', { class: 'card', style: 'margin-bottom:12px' },
-    h('h3', { style: 'margin-top:0' }, '暂存区（忘掉的记忆 · 30 天缓冲）'),
-    h('div', { class: 'muted', style: 'font-size:12px;margin-bottom:8px' },
+    h('h3', {}, '标签分布（前 12）'),
+    tags.length
+      ? h('div', {}, ...tags.map(([t, n]) => h('div', { class: 'mh-line' },
+        h('span', { class: 'mh-line-t', title: t }, t),
+        h('div', { class: 'mh-line-bar' }, h('i', { class: 'mh-tag-bar', style: 'width:' + ((n / maxTag) * 100).toFixed(1) + '%' })),
+        h('span', { class: 'mh-line-n' }, String(n)),
+        h('span', { class: 'mh-line-p' }, Math.round((n / totalTag) * 100) + '%'))))
+      : h('div', { class: 'muted' }, '还没有标签。'),
+  ));
+
+  // 暂存区
+  wrap.append(h('div', { class: 'card', style: 'margin-bottom:12px' },
+    h('div', { class: 'mh-head' },
+      h('h3', { style: 'margin:0' }, '暂存区 · ' + trash.length + ' 条'),
+      trash.length
+        ? h('button', {
+            class: 'btn ghost mh-btn',
+            onclick: async () => {
+              if (!confirm('清理 30 天以前的暂存记忆（不可恢复）？')) return;
+              const out = await api('/api/mem/purge', { method: 'POST', body: { olderThanDays: PURGE_DAYS } });
+              if (!out.ok) { toast(out.error || '清理失败'); return; }
+              await refresh('清理了 ' + out.removed + ' 条');
+            },
+          }, '清理 30 天前的')
+        : null),
+    h('div', { class: 'mh-note', style: 'margin:4px 0 8px' },
       trash.length ? '忘掉不等于删除：先在这里放 30 天，可以随时恢复或彻底删除。' : '暂存区是空的，忘掉的东西会先落到这里。'),
-    trash.length ? h('div', { style: 'margin-bottom:6px' },
+    ...trash.slice(0, 40).map((r) => h('div', { class: 'mh-row' },
+      h('div', { class: 'mh-row-main' },
+        h('div', { class: 'mh-row-t' }, String(r.title || r.text || '').slice(0, 56)),
+        state.peekId === r.id
+          ? h('div', { class: 'mh-pre' }, state.peekText || '读原文中…')
+          : null),
+      h('span', { class: 'mh-chip mh-chip-warn' }, '剩 ' + daysLeft(r.forgottenAt) + ' 天'),
       h('button', {
-        class: 'btn ghost', style: 'font-size:12px;padding:4px 10px',
-        onclick: async () => {
-          if (!confirm('清理 30 天以前的暂存记忆（不可恢复）？')) return;
-          const out = await api('/api/mem/purge', { method: 'POST', body: { olderThanDays: PURGE_DAYS } });
-          if (!out.ok) { alert(out.error || '失败'); return; }
-          state.mem = null; await loadMem(); rerender();
-          alert('清理了 ' + out.removed + ' 条');
-        },
-      }, '清理 30 天前的')) : null,
-    ...trash.slice(0, 40).map((r) => h('div', { style: 'display:flex;gap:10px;align-items:center;padding:6px 0;border-top:1px solid var(--line)' },
-      h('div', { style: 'flex:1;font-size:13px;line-height:1.6;overflow:hidden' },
-        String(r.title || r.text || '').slice(0, 56),
-        state.peekId === r.id ? h('div', { class: 'muted', style: 'font-size:12px;margin-top:4px;white-space:pre-wrap;line-height:1.7' }, state.peekText || '读原文中…') : null),
-      h('span', { class: 'muted', style: 'font-size:11.5px;white-space:nowrap' }, '剩 ' + daysLeft(r.forgottenAt) + ' 天'),
-      h('button', {
-        class: 'btn ghost', style: 'font-size:12px;padding:4px 10px',
+        class: 'btn ghost mh-btn',
         onclick: async () => {
           if (state.peekId === r.id) { state.peekId = null; rerender(); return; }
           state.peekId = r.id; state.peekText = ''; rerender();
@@ -1802,114 +2237,77 @@ function pageMemHealth() {
         },
       }, state.peekId === r.id ? '收起' : '看原文'),
       h('button', {
-        class: 'btn ghost', style: 'font-size:12px;padding:4px 10px',
+        class: 'btn ghost mh-btn',
         onclick: async () => {
           const out = await api('/api/mem/forget', { method: 'POST', body: { id: r.id, restore: true } });
-          if (!out.ok) { alert(out.error || '失败'); return; }
-          state.mem = null; await loadMem(); rerender();
+          if (!out.ok) { toast(out.error || '恢复失败'); return; }
+          await refresh('已恢复 1 条');
         },
       }, '恢复'),
       h('button', {
-        class: 'btn ghost', style: 'font-size:12px;padding:4px 10px;color:#ff8a8a',
+        class: 'btn ghost mh-btn mh-danger',
         onclick: async () => {
           if (!confirm('彻底删除，不可恢复。确定？')) return;
           const out = await api('/api/mem/purge', { method: 'POST', body: { id: r.id } });
-          if (!out.ok) { alert(out.error || '失败'); return; }
-          state.mem = null; await loadMem(); rerender();
+          if (!out.ok) { toast(out.error || '删除失败'); return; }
+          await refresh('已删除');
         },
       }, '彻底删除'),
     )),
   ));
 
-  // 已钉住清单（体检页也能直接取消，不用回星海找）
-  const pinnedRecs = (state.mem.records || []).filter((r) => r.pinned);
+  // 已钉住
   wrap.append(h('div', { class: 'card', style: 'margin-bottom:12px' },
-    h('h3', { style: 'margin-top:0' }, '已钉住 ' + pinnedRecs.length + ' / ' + cap.pinned),
-    h('div', { class: 'muted', style: 'font-size:12px;margin-bottom:8px' },
-      pinnedRecs.length ? '钉住 = 不会被淡忘、也不参与自动合并淘汰。点右边「取消钉住」就恢复成普通记忆。' : '现在没有钉住的记忆。'),
+    h('div', { class: 'mh-head' },
+      h('h3', { style: 'margin:0' }, '已钉住 ' + pinnedRecs.length + ' / ' + cap.pinned),
+      h('span', { class: 'mh-note', style: 'margin:0' }, '钉住 = 不会被淡忘、也不参与自动合并')),
     pinnedRecs.length
-      ? h('div', {}, ...pinnedRecs.map((r) => h('div', { style: 'display:flex;gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--line)' },
-        h('span', { style: 'color:#ffd479;font-size:13px' }, '★'),
-        h('div', { style: 'flex:1;font-size:13px;line-height:1.6;overflow:hidden' }, String(r.title || r.text || '').slice(0, 60)),
+      ? h('div', {}, ...pinnedRecs.map((r) => h('div', { class: 'mh-row' },
+        h('span', { class: 'mh-star' }, '★'),
+        h('div', { class: 'mh-row-main' }, h('div', { class: 'mh-row-t' }, String(r.title || r.text || '').slice(0, 60))),
         h('button', {
-          class: 'btn ghost', style: 'font-size:12px;padding:4px 10px', title: '恢复成普通记忆',
+          class: 'btn ghost mh-btn',
           onclick: async () => {
             const out = await api('/api/mem/pin', { method: 'POST', body: { id: r.id, pinned: false } });
-            if (!out.ok) { alert(out.error || '失败'); return; }
-            state.mem = null; await loadMem(); rerender();
+            if (!out.ok) { toast(out.error || '操作失败'); return; }
+            await refresh('已取消钉住');
           },
-        }, '取消钉住'),
-      )))
-      : h('div', { class: 'muted', style: 'font-size:12.5px' }, '去「记忆星海」页面，点下方列表里的「☆ 钉住」就能钉。'),
+        }, '取消钉住'))))
+      : h('div', { class: 'muted', style: 'margin-top:8px' }, '现在没有钉住的记忆。去「记忆星海」，点列表里的「☆ 钉住」就能钉。'),
   ));
 
-  // 周增长
-  const weeks = d.weeks || [];
-  const maxAdd = Math.max(1, ...weeks.map((w) => w.added));
-  const bars = weeks.map((w) => h('div', { style: 'flex:1;display:flex;flex-direction:column;align-items:center;gap:6px' },
-    h('div', { style: 'font-size:11px;color:#9fb4d6' }, String(w.added)),
-    h('div', {
-      style: 'width:70%;height:' + Math.max(4, (w.added / maxAdd) * 100) + 'px;background:linear-gradient(180deg,#5cb8ff,#2a6bd6);border-radius:6px 6px 3px 3px',
-      title: w.week + ' 新增 ' + w.added + (w.forgotten ? ' / 淡忘 ' + w.forgotten : ''),
-    }),
-    h('div', { style: 'font-size:10.5px;color:#7d8ba3' }, w.week.slice(5)),
-  ));
-  wrap.append(h('div', { class: 'card', style: 'margin-bottom:12px' },
-    h('h3', { style: 'margin-top:0' }, '近 8 周增长'),
-    (d.older ? h('div', { class: 'muted', style: 'font-size:11.5px;margin-top:-4px;margin-bottom:4px' },
-      '另有 ' + d.older + ' 条更早的记忆（从 B 站搬过来的旧动态），没算进这 8 周') : null),
-    h('div', { style: 'display:flex;gap:14px;align-items:flex-end;height:150px;padding:8px 4px' }, ...bars),
-  ));
-
-  // 标签分布
-  const tags = Object.entries(d.byTag || {}).sort((a, b) => b[1] - a[1]).slice(0, 12);
-  const maxTag = Math.max(1, ...tags.map((t) => t[1]));
-  wrap.append(h('div', { class: 'card', style: 'margin-bottom:12px' },
-    h('h3', { style: 'margin-top:0' }, '标签分布（前 12）'),
-    ...tags.map(([t, n]) => h('div', { style: 'display:flex;align-items:center;gap:10px;padding:3px 0' },
-      h('span', { style: 'width:120px;font-size:12.5px;color:#c3d4ee;overflow:hidden;text-overflow:ellipsis;white-space:nowrap' }, t),
-      h('div', { style: 'flex:1;height:8px;background:#1a2436;border-radius:4px;overflow:hidden' },
-        h('i', { style: `display:block;height:100%;width:${((n / maxTag) * 100).toFixed(1)}%;background:linear-gradient(90deg,#2a6bd6,#7fe0a0)` })),
-      h('span', { class: 'muted', style: 'font-size:11.5px;width:34px;text-align:right' }, String(n)))),
-  ));
-
-  // 相似对
-  const pairs = d.pairs || [];
+  // 相似记忆
   const doMerge = async (keep, drop) => {
     const out = await api('/api/mem/merge', { method: 'POST', body: { keep, drop } });
-    if (!out.ok) { alert(out.error || '失败'); return; }
-    state.mem = null; await loadMem(); rerender();
+    if (!out.ok) { toast(out.error || '合并失败'); return; }
+    await refresh('已合并 1 对');
   };
+  const hotPairs = pairs.filter((p) => p.sim >= 0.85).length;
   wrap.append(h('div', { class: 'card' },
-    h('h3', { style: 'margin-top:0' }, `相似记忆（${pairs.length} 对，可能记重了）`),
-    pairs.length ? h('div', {},
-      h('div', { style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px' },
-        h('button', {
-          class: 'btn', style: 'font-size:12.5px;padding:6px 14px',
-          onclick: async () => {
-            const n = pairs.filter((p) => p.sim >= 0.85).length;
-            if (!n) { alert('没有相似度 ≥0.85 的对，先手动挑几对'); return; }
-            if (!confirm(`会把 ${n} 对相似度 ≥0.85 的记忆自动合并（保留重要的那条，另一条淡忘，可恢复）。继续？`)) return;
-            const out = await api('/api/mem/merge-auto', { method: 'POST', body: { minSim: 0.85, max: 20 } });
-            if (!out.ok) { alert(out.error || '失败'); return; }
-            state.mem = null; await loadMem(); rerender();
-            alert(`已合并 ${out.merged} 对`);
-          },
-        }, `一键合并 ≥0.85（${pairs.filter((p) => p.sim >= 0.85).length} 对）`)),
-      h('div', { class: 'muted', style: 'font-size:12px' }, '「合并」= 保留左边那条，把右边那条作为补充记进去；右边会被淡忘（可恢复）。'),
-    ) : h('div', { class: 'muted' }, '没有发现高度相似的记忆 👍'),
-    ...pairs.slice(0, 30).map((p) => h('div', { style: 'border-top:1px solid var(--line);padding:10px 0' },
-      h('div', { style: 'display:flex;gap:8px;align-items:center;margin-bottom:6px' },
-        h('span', { style: 'font-size:11.5px;color:#7fe0a0' }, '相似度 ' + p.sim.toFixed(2)),
-        h('span', { class: 'muted', style: 'font-size:11.5px' }, (p.a.clarity || '') + ' / ' + (p.b.clarity || ''))),
-      h('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:10px' },
-        h('div', { style: 'font-size:13px;line-height:1.6' }, h('b', {}, 'A '), p.a.title || p.a.text.slice(0, 80)),
-        h('div', { style: 'font-size:13px;line-height:1.6' }, h('b', {}, 'B '), p.b.title || p.b.text.slice(0, 80))),
-      h('div', { style: 'margin-top:8px' },
-        h('button', { class: 'btn', style: 'font-size:12px;padding:4px 10px;margin-right:8px', onclick: () => doMerge(p.a.id, p.b.id) }, '合并（保留 A）'),
-        h('button', { class: 'btn ghost', style: 'font-size:12px;padding:4px 10px', onclick: () => doMerge(p.b.id, p.a.id) }, '合并（保留 B）'),
-      ),
-    )),
+    h('div', { class: 'mh-head' },
+      h('h3', { style: 'margin:0' }, '相似记忆 · ' + pairs.length + ' 对'),
+      hotPairs ? h('button', {
+        class: 'btn mh-btn',
+        onclick: async () => {
+          if (!confirm('会把 ' + hotPairs + ' 对相似度 ≥0.85 的记忆自动合并（保留重要的那条，另一条淡忘，可恢复）。继续？')) return;
+          const out = await api('/api/mem/merge-auto', { method: 'POST', body: { minSim: 0.85, max: 20 } });
+          if (!out.ok) { toast(out.error || '合并失败'); return; }
+          await refresh('已合并 ' + out.merged + ' 对');
+        },
+      }, '一键合并 ≥0.85（' + hotPairs + ' 对）') : null),
+    h('div', { class: 'mh-note', style: 'margin:4px 0 8px' }, '「合并」= 保留一条，把另一条作为补充记进去；被并的那条会进暂存区，可恢复。'),
+    pairs.length
+      ? h('div', {}, ...pairs.slice(0, 30).map((p) => h('div', { class: 'mh-pair' },
+        h('div', { class: 'mh-pair-h' },
+          h('span', { class: 'mh-chip mh-chip-ok' }, '相似度 ' + p.sim.toFixed(2)),
+          h('span', { class: 'mh-note', style: 'margin:0' }, (p.a.clarity || '未标') + ' / ' + (p.b.clarity || '未标'))),
+        h('div', { class: 'mh-pair-g' },
+          h('div', {}, h('b', {}, 'A  '), p.a.title || String(p.a.text || '').slice(0, 80)),
+          h('div', {}, h('b', {}, 'B  '), p.b.title || String(p.b.text || '').slice(0, 80))),
+        h('div', { style: 'margin-top:8px' },
+          h('button', { class: 'btn mh-btn', style: 'margin-right:8px', onclick: () => doMerge(p.a.id, p.b.id) }, '合并（保留 A）'),
+          h('button', { class: 'btn ghost mh-btn', onclick: () => doMerge(p.b.id, p.a.id) }, '合并（保留 B）')))))
+      : h('div', { class: 'muted', style: 'margin-top:8px' }, '没有发现高度相似的记忆 👍'),
   ));
 
   return wrap;
@@ -1923,7 +2321,7 @@ function pageEntry() {
     return wrap;
   }
   for (const it of state.entry.items || []) {
-    const label = it.local ? '本机服务（启动器自动开）' : (it.up ? '● 服务器在听 ' + it.port : '○ 没在听 ' + it.port);
+    const label = it.self ? '本面板内页（同一个页面）' : it.local ? '本机服务（启动器自动开）' : (it.up ? '● 服务器在听 ' + it.port : '○ 没在听 ' + it.port);
     const color = it.local ? 'color:var(--muted)' : (it.up ? 'color:var(--ok)' : 'color:var(--bad)');
     wrap.append(h('div', { class: 'card' },
       h('div', { style: 'display:flex;justify-content:space-between;align-items:baseline' },
@@ -1934,29 +2332,120 @@ function pageEntry() {
     ));
   }
   wrap.append(h('div', { class: 'card muted', style: 'font-size:12.5px' },
-    '这四个都在服务器 127.0.0.1 上，浏览器要能打开得先有对应隧道。桌面「三叶面板」启动器会把 ', h('b', {}, '7800 / 3080 / 3100 / 6099'), ' 一起转出来；7788 是本地服务，要另开「看花费」。'));
+    '这四个都在服务器 127.0.0.1 上，浏览器要能打开得先有对应隧道。桌面「三叶面板」启动器会把 ', h('b', {}, '7800 / 3080 / 3100 / 6099'), ' 一起转出来；7788 是「看每次对话花了多少」的本机面板，启动器会顺带开；面板内「花费」记的是她（QQ）的账。'));
   return wrap;
 }
 
+function activeWindowText() {
+  const items = (state.aw && state.aw.items) || [];
+  if (!items.length) return '活跃期：当前没有会话处于活跃期';
+  const names = (state.names && state.names.groups) || {};
+  return '活跃期：' + items.map((x) => {
+    const gid = String(x.key || '').replace('group:', '');
+    const nm = (names[gid] && names[gid].name) || gid;
+    return nm + ' 剩 ' + x.minutesLeft + ' 分钟';
+  }).join(' · ');
+}
+
 function pageSafe() {
+  if (!state.names) loadNames().catch(() => {}).finally(rerender); // 群号旁边显示名字
   const wrap = h('div', {});
+  // SAFE_JUMP（B 批）：本页四块内容很长，顶部给一个「跳到本页」下拉
+  const _jump = h('select', { class: 'input', style: 'max-width:260px;margin-bottom:10px', onchange: (e) => {
+    const label = e.target.value;
+    if (!label) return;
+    const nodes = [...document.querySelectorAll('#view h3, #view .card-h')];
+    const hit = nodes.find((n) => String(n.textContent || '').includes(label));
+    if (hit) hit.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    e.target.value = '';
+  } },
+    h('option', { value: '' }, '跳到本页：省钱模式 / 群频率 / 敏感词 / 按群规则'),
+    h('option', { value: '省钱' }, '省钱模式'),
+    h('option', { value: '频率' }, '群频率'),
+    h('option', { value: '敏感' }, '敏感词'),
+    h('option', { value: '按群规则' }, '按群规则'),
+  );
+  wrap.append(_jump);
+  // PRESET_CARD（E-3）：三档总览 = 把常用调整翻译成现有配置；底层 7 道闸门不动
+  try {
+    if (!state.preset) api('/api/preset').then((r) => { if (r && r.ok) { state.preset = r; rerender(); } }).catch(() => {});
+    const MODE_LABEL = { normal: '正常聊', called: '只听叫我', watch: '只看不说' };
+    const ACT_LABEL = { quiet: '安静', normal: '正常', active: '热闹' };
+    const pst = state.preset;
+    const rows = ((pst && pst.groups) || []).map((g) => {
+      const mk = h('select', { class: 'input', style: 'max-width:120px', onchange: async (e) => {
+        await api('/api/preset', { method: 'POST', body: { group: g.gid, mode: e.target.value } });
+        state.preset = null; state.gr = null; state.attnCfg = null; state.attnLoaded = false; rerender();
+      } }, Object.keys(MODE_LABEL).map((k) => h('option', { value: k, selected: g.mode === k ? 'selected' : null }, MODE_LABEL[k])));
+      const ak = h('select', { class: 'input', style: 'max-width:110px', onchange: async (e) => {
+        await api('/api/preset', { method: 'POST', body: { group: g.gid, activity: e.target.value } });
+        state.preset = null; state.gr = null; state.attnCfg = null; state.attnLoaded = false; rerender();
+      } }, Object.keys(ACT_LABEL).map((k) => h('option', { value: k, selected: g.activity === k ? 'selected' : null }, ACT_LABEL[k])));
+      const name = state.names && state.names.groups && state.names.groups[g.gid] ? state.names.groups[g.gid].name : g.gid;
+      return h('div', { class: 'rg-row', style: 'grid-template-columns:220px 130px 120px 1fr' }, [
+        h('div', {}, [h('div', { class: 'mono' }, name), h('div', { class: 'muted', style: 'font-size:12px' }, g.gid)]),
+        mk, ak,
+        h('div', { class: 'muted' }, `今天自动发言 ${g.count || 0}/${g.maxPerDay || 0} 次 · 间隔 ${Math.round((g.minGapMs || 0) / 60000)} 分钟`),
+      ]);
+    });
+    wrap.append(h('div', { class: 'card' }, [
+      h('div', { class: 'card-h' }, '三档总览（快捷预设）'),
+      h('div', { class: 'muted', style: 'margin:6px 0 10px' }, '两个下拉批量改现有设置，保存即生效。群模式：正常聊 = 解除静音 + 关学习；只听叫我 = 开静音（你 @ 她或叫名字才回，别人找她不回）；只看不说 = 开学习。活跃度：安静 / 正常 / 热闹 = 频率档位 + 抽样比例。'),
+      ...rows,
+      h('div', { class: 'muted', style: 'margin-top:8px' }, `全局日花费上限：${pst && pst.dailyLimit != null ? '¥' + pst.dailyLimit : '未单独设置（默认 ¥8）'}`),
+      h('div', { class: 'muted', style: 'margin-top:6px;font-size:12px' }, '说明：「只听叫我」下，只有你（主人）亲自 @ 她或叫名字会回；群友 @ 她、普通聊天、问句都不回。'),
+      h('div', { class: 'muted', style: 'margin-top:6px;font-size:12px' }, '底层设置仍可在下方单独调整，快捷预设只是批量修改。'),
+    ]));
+  } catch (e) {}
+
   if (!state.access) loadAccess().catch(() => {}).finally(rerender); // 频率卡要按白名单群列出来
   if (!state.style) { /* 复用已有加载器无所谓 */ }
   const load = async () => {
-    const [gr, safe, econ] = await Promise.all([
+    const [gr, safe, econ, aw] = await Promise.all([
       api('/api/gr').catch(() => null),
       api('/api/safe').catch(() => null),
       api('/api/econ').catch(() => null),
+      api('/api/active-window').catch(() => null),
     ]);
     state.gr = gr || { levels: {}, rates: [] };
     state.safe = safe || { cfg: {}, modes: {}, alerts: [], sessions: [] };
     state.econ = econ || { mode: 'auto', modes: {}, groups: [], autoOn: false };
+    state.aw = aw || { items: [] };
     rerender();
   };
   if (!state.gr || !state.safe) {
     wrap.append(h('div', { class: 'card muted' }, '正在读频率与安全设置…'));
     if (!state.safeLoading) { state.safeLoading = true; load().catch(() => {}).finally(() => { state.safeLoading = false; }); }
-    return wrap;
+      // ATTN-CARD：按群规则（只回谁 / 抽样%）
+  try {
+    const gs = (state.access && state.access.groups) || [];
+    if (!state.attnGid && gs.length) state.attnGid = gs[gs.length - 1];
+    const sel = h('select', { class: 'input', style: 'max-width:240px', onchange: (e) => { state.attnGid = e.target.value; state.attnLoaded = false; rerender(); } },
+      gs.map((g) => h('option', { value: g, selected: state.attnGid === g ? 'selected' : null }, g + (state.names && state.names.groups && state.names.groups[g] ? ' · ' + state.names.groups[g].name : ''))));
+    if (!state.attnLoaded) {
+      state.attnLoaded = true;
+      api('/api/attn-get').then((r) => { if (r && r.ok) { state.attnCfg = r; } }).catch(() => {});
+    }
+    const cur = (state.attnCfg && state.attnCfg.replyOnly && state.attnCfg.replyOnly[state.attnGid]) || [];
+    const smp = (state.attnCfg && state.attnCfg.sample && state.attnCfg.sample[state.attnGid]) || 0;
+    const replyIn = h('input', { class: 'input', style: 'max-width:320px', value: cur.join(','), placeholder: '只回这些 QQ，逗号分隔；留空 = 都能回' });
+    const smpIn = h('input', { class: 'input', style: 'max-width:100px', value: String(smp), placeholder: '%' });
+    wrap.append(h('div', { class: 'card' }, [
+      h('div', { class: 'card-h' }, '按群规则（只回谁 / 抽样唤醒）'),
+      h('div', { class: 'muted', style: 'margin:6px 0 10px' }, '只回谁：名单里的人说话才接（其他人 @ 也不回）；抽样：平时被判定"不值得回"的消息里，按这个百分比随机接一句（0 = 不抽）。改完需要重启桥接生效。'),
+      h('div', { style: 'display:flex;gap:10px;flex-wrap:wrap;align-items:center' }, [
+        sel,
+        h('span', { class: 'muted' }, '只回：'), replyIn,
+        h('span', { class: 'muted' }, '抽样：'), smpIn,
+        h('button', { class: 'btn primary', onclick: async () => {
+          const r = await api('/api/attn-set', { method: 'POST', body: { group: state.attnGid, replyOnly: replyIn.value, sample: smpIn.value } });
+          if (r && r.ok) { state.attnCfg = null; state.attnLoaded = false; rerender(); }
+        } }, '保存'),
+      ]),
+    ]));
+  } catch (e) {}
+
+  return wrap;
   }
   const gr = state.gr, safe = state.safe, cfg = safe.cfg || {}, modes = safe.modes || {};
   const groups = (state.access?.groups || []);
@@ -2027,15 +2516,53 @@ function pageSafe() {
       const lv = r?.level || 'normal';
       const lvDef = (gr.levels || {})[lv] || {};
       return h('div', { class: 'rg-row' },
-        h('div', { class: 'rg-gid' }, gid),
+        h('div', { class: 'rg-gid', title: gid }, gid,
+          h('div', { class: 'muted', style: 'font-size:11.5px;margin-top:2px' }, (typeof nameOf === 'function' ? nameOf('group', gid) : '') || '')),
         h('div', { class: 'rg-seg' }, ...Object.entries(gr.levels || {}).map(([k, v]) =>
           h('button', {
             class: 'btn' + (lv === k ? '' : ' ghost'),
             title: v.hint,
             onclick: () => setLevel(gid, k),
           }, v.label))),
-        h('div', { class: 'rg-hint' }, lvDef.hint || ''),
-        h('div', { class: 'rg-count' }, r ? ('今天 ' + r.count + '/' + r.maxPerDay + ' 次') : '今天 0 次'),
+        h('div', { class: 'rg-hint rg-slide' },
+          h('input', { id: 'rg-min-' + gid, type: 'range', min: 0, max: 120, step: 1,
+            value: String(r?.custom?.minGapMin ?? Math.round((lvDef.minGapMs || 360000) / 60000)),
+            style: 'width:104px;vertical-align:middle',
+            oninput: (e) => { const l = $('#rg-minv-' + gid); if (l) l.textContent = e.target.value; } }),
+          h('span', { id: 'rg-minv-' + gid, class: 'mono', style: 'font-size:12px;min-width:20px;display:inline-block;text-align:right' },
+            String(r?.custom?.minGapMin ?? Math.round((lvDef.minGapMs || 360000) / 60000))),
+          h('span', { class: 'muted', style: 'font-size:12px;margin:0 6px' }, '分钟 / 每天'),
+          h('input', { id: 'rg-day-' + gid, type: 'range', min: 1, max: 200, step: 1,
+            value: String(r?.custom?.perDay ?? lvDef.maxPerDay ?? 40),
+            style: 'width:96px;vertical-align:middle',
+            oninput: (e) => { const l = $('#rg-dayv-' + gid); if (l) l.textContent = e.target.value; } }),
+          h('span', { id: 'rg-dayv-' + gid, class: 'mono', style: 'font-size:12px;min-width:24px;display:inline-block;text-align:right' },
+            String(r?.custom?.perDay ?? lvDef.maxPerDay ?? 40)),
+          h('span', { class: 'muted', style: 'font-size:12px;margin:0 6px' }, '次'),
+          h('button', {
+            class: 'btn ghost', style: 'margin-left:4px',
+            onclick: async () => { // CUSTOM_RATE：滑块存
+              const minGapMin = Number(($('#rg-min-' + gid) || {}).value || 0);
+              const perDay = Number(($('#rg-day-' + gid) || {}).value || 0);
+              try {
+                const j = await api('/api/gr', { method: 'POST', body: { action: 'custom', group: gid, minGapMin, perDay } });
+                const back = ((j && j.rates) || []).find((x) => String(x.gid) === String(gid));
+                const shown = back && back.custom ? back.custom : { minGapMin, perDay };
+                const mi = $('#rg-min-' + gid); const di = $('#rg-day-' + gid);
+                if (mi) mi.value = String(shown.minGapMin);
+                if (di) di.value = String(shown.perDay);
+                const ml = $('#rg-minv-' + gid); const dl = $('#rg-dayv-' + gid);
+                if (ml) ml.textContent = String(shown.minGapMin);
+                if (dl) dl.textContent = String(shown.perDay);
+                toast('已生效：每 ' + shown.minGapMin + ' 分钟最多一次，每天 ' + shown.perDay + ' 次');
+                await load();
+              } catch (e) { toast('没存上：' + e.message, 3800); }
+            },
+          }, '存')),
+        h('div', { class: 'rg-count' }, r
+          ? ('今天 ' + r.count + '/' + r.maxPerDay + ' 次'
+             + (r.lastAt ? ' · 最近 ' + new Date(r.lastAt).toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit', hour12: false }) : ' · 无') + ' · 间隔 ' + Math.round((r.minGapMs || 0) / 60000) + ' 分钟')
+          : '今天自动发言 0 次'),
         h('button', {
           class: 'btn' + (ecoMap[gid] ? '' : ' ghost'),
           style: 'margin-left:8px',
@@ -2044,6 +2571,7 @@ function pageSafe() {
         }, ecoMap[gid] ? '省钱中' : '省钱'),
       );
     })),
+    h('div', { class: 'rg-count', style: 'margin-top:10px' }, activeWindowText()),
   ));
 
   // 敏感话题
@@ -2063,7 +2591,7 @@ function pageSafe() {
   wrap.append(h('div', { class: 'card', style: 'margin-top:12px' },
     h('h3', {}, '敏感话题守门（有人反复试探时怎么处理）'),
     h('div', { class: 'muted', style: 'font-size:12.5px;margin-bottom:10px' },
-      '命中词表：AI/机器人/模型/谁做的/多少钱/住址/账号/借钱…（可在 config.json 的 socialV2.safeTalk.words 里改）。'
+      '命中词表：AI/机器人/模型/谁做的/多少钱/住址/账号/借钱…（下面的框里直接改）。'
       + '默认「只记录」，什么都不挡。改完要点「重启桥接」。'),
     h('div', { style: 'display:flex;flex-direction:column;gap:2px;margin-bottom:10px' },
       ...Object.entries(modes).map(([k, v]) => h('label', { class: 'opt-row', style: 'font-size:13px;cursor:pointer' },
@@ -2084,6 +2612,26 @@ function pageSafe() {
         try { await api('/api/bridge/restart', { method: 'POST', body: {} }); toast('正在重启桥接，约 10 秒'); }
         catch (e) { toast('重启失败：' + e.message, 3800); }
       } }, '重启桥接'),
+    ),
+    h('div', { style: 'margin-top:12px' }, // SAFEWORDS_UI
+      h('div', { class: 'muted', style: 'font-size:12.5px;margin-bottom:6px' }, '命中词表（一行一个，也可用逗号分隔；只有「真会问出身份/隐私」的词才需要留）'),
+      h('textarea', { id: 'sf-words', rows: 6, style: 'width:100%;font-size:12.5px;line-height:1.6;font-family:inherit' }, (cfg.words || []).join('\n')),
+      h('div', { class: 'toolbar', style: 'margin-top:6px' },
+        h('button', { class: 'btn ghost', onclick: async () => {
+          const raw = ($('#sf-words').value || '');
+          const words = raw.split(/[\n,，、;；]/).map((x) => x.trim()).filter(Boolean);
+          if (!words.length) { toast('至少要留一个词'); return; }
+          try {
+            await api('/api/safe', { method: 'POST', body: { action: 'setcfg', words } });
+            toast('词表已保存（' + words.length + ' 条），重启桥接后生效');
+            await load();
+          } catch (e) { toast('没存上：' + e.message, 3800); }
+        } }, '保存词表'),
+        h('button', { class: 'btn ghost', onclick: async () => {
+          try { await api('/api/safe', { method: 'POST', body: { action: 'clear' } }); await load(); toast('已清空命中记录'); }
+          catch (e) { toast('没清掉：' + e.message, 3800); }
+        } }, '清空命中记录'),
+      ),
     ),
   ));
 
@@ -2108,11 +2656,35 @@ function pageSafe() {
     ),
   ));
   return wrap;
+
+
+}
+
+// NAMES_UI：把号码翻成名字（群名 / 昵称），失败就只显示号码
+async function loadNames() {
+  let acc = state.access || {};
+  if (!(acc.groups || []).length && !((acc.private || acc.users) || []).length) {
+    try { acc = state.access = await api('/api/access'); } catch {}
+  }
+  const groups = (acc.groups || []).map(String);
+  const users = (acc.users || acc.private || []).map(String); // 白名单里私聊叫 private
+  if (!groups.length && !users.length) return; // 名单还没加载，等下次再试
+  try {
+    const r = await api('/api/names', { method: 'POST', body: { groups, users } });
+    state.names = { group: r.groups || {}, private: r.users || {} };
+  } catch (e) { /* 拿不到就只显示号码 */ }
+  state.namesLoaded = true;
+}
+
+function nameOf(kind, id) {
+  const m = state.names && state.names[kind === 'group' ? 'group' : 'private'];
+  return (m && m[String(id)]) || '';
 }
 
 function pageAccess() {
   const wrap = h('div', {});
   if (!state.access) { loadAccess().catch(() => {}).finally(rerender); return h('div', { class: 'card muted' }, '正在读配置…'); }
+  if (!state.namesLoaded) { loadNames().catch(() => {}).finally(rerender); }
   const a = state.access;
   const mk = (title, kind, list, hint) => h('div', { class: 'card', style: 'margin-bottom:14px' },
     h('h3', {}, title),
@@ -2121,7 +2693,8 @@ function pageAccess() {
       ? list.map((id) => {
           const key = (kind === 'group' ? 'group:' : 'private:') + id;
           const muted = isMutedKey(key);
-          return h('span', { class: 'chip', style: 'display:inline-flex;gap:8px;align-items:center' + (muted ? ';opacity:.55' : '') }, id,
+          const nm = nameOf(kind, id);
+          return h('span', { class: 'chip', style: 'display:inline-flex;gap:8px;align-items:center' + (muted ? ';opacity:.55' : '') }, nm ? (id + ' · ' + nm) : id,
             h('a', {
               href: '#',
               style: 'color:' + (muted ? 'var(--ok)' : 'var(--warn)') + ';text-decoration:none;font-size:11.5px',
@@ -2195,6 +2768,103 @@ async function loadWhy() {
   const key = state.whyKey;
   if (!key) { state.why = null; return; }
   state.why = await api('/api/why?key=' + encodeURIComponent(key));
+}
+
+
+// ---------- P1 决策记录 ----------
+const DECISION_MARKS = ['正常', '该回没回', '不该回却回', '答非所问'];
+async function loadDecisions() {
+  const f = state.decFilter || (state.decFilter = {});
+  const q = new URLSearchParams();
+  q.set('day', f.day || new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10));
+  for (const k of ['key', 'allow', 'source', 'minScore', 'maxScore']) if (f[k]) q.set(k, f[k]);
+  if (f.unmarked) q.set('unmarked', '1');
+  state.decisions = await api('/api/decisions?' + q.toString());
+  // 名称：把本页出现的群号一次翻好
+  const groups = [...new Set((state.decisions.items || []).filter((x) => String(x.key).startsWith('group:')).map((x) => String(x.key).slice(6)))];
+  const users = [...new Set((state.decisions.items || []).filter((x) => String(x.key).startsWith('private:')).map((x) => String(x.key).slice(8)))];
+  // 只补齐本页缺的名字（别的页可能已经加载过一部分）
+  const missG = groups.filter((g) => !(state.names && state.names.group && state.names.group[g]));
+  const missU = users.filter((u) => !(state.names && state.names.private && state.names.private[u]));
+  if (missG.length || missU.length) {
+    try {
+      const r = await api('/api/names', { method: 'POST', body: { groups: missG, users: missU } });
+      state.names = state.names || { group: {}, private: {} };
+      state.names.group = { ...(state.names.group || {}), ...(r.groups || {}) };
+      state.names.private = { ...(state.names.private || {}), ...(r.users || {}) };
+      state.namesLoaded = true;
+    } catch {}
+  }
+}
+async function decisionMark(id, mark) {
+  try { await api('/api/decisions/mark', { method: 'POST', body: { id, mark } }); const it = (state.decisions.items || []).find((x) => x.id === id); if (it) { state.decisions.marks[id] = mark; } rerender(); }
+  catch (e) { toast('标注失败：' + e.message, 3600); }
+}
+async function decisionExport() {
+  const day = (state.decFilter && state.decFilter.day) || new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);
+  try {
+    const r = await fetch('/api/decisions/export?day=' + day, { headers: { 'x-her-token': TOKEN } });
+    const b = await r.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(b); a.download = 'decisions-' + day + '.csv'; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  } catch (e) { toast('导出失败：' + e.message, 3600); }
+}
+function decisionConvName(x) {
+  const m = /^(group|private):(\d+)$/.exec(String(x.key || ''));
+  if (!m) return x.key || '';
+  const kind = m[1] === 'group' ? 'group' : 'private';
+  const hit = state.names && state.names[kind] && state.names[kind][m[2]];
+  const nm = hit && hit.name ? hit.name + ' · ' : '';
+  return nm + (m[1] === 'group' ? '群 ' : '私聊 ') + m[2];
+}
+
+function pageDecisions() {
+  const wrap = h('div', {});
+  if (!state.decFilter) state.decFilter = { day: new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10) };
+  const f = state.decFilter;
+  if (!state.decisions) { loadDecisions().catch(() => {}).finally(rerender); wrap.append(h('div', { class: 'card muted' }, '正在读判决书…')); }
+  const upd = (k, v) => { f[k] = v; loadDecisions().catch(() => {}).finally(rerender); };
+  const sel = (k, opts) => h('select', { class: 'input', style: 'max-width:150px', onchange: (e) => upd(k, e.target.value) },
+    opts.map(([v, t]) => h('option', { value: v, selected: (f[k] || '') === v ? 'selected' : null }, t)));
+  const input = (k, ph, style) => h('input', { class: 'input', placeholder: ph, value: f[k] || '', style: style || 'max-width:150px',
+    onchange: (e) => upd(k, String(e.target.value || '').trim()) });
+  wrap.append(h('div', { class: 'card' }, [
+    h('div', { class: 'toolbar', style: 'flex-wrap:wrap;gap:8px' }, [
+      h('input', { class: 'input', type: 'date', value: f.day, onchange: (e) => upd('day', e.target.value) }),
+      sel('allow', [['', '全部'], ['true', '只看放行'], ['false', '只看拦截']]),
+      sel('source', [['', '全部来源'], ['owner-only', 'owner-only'], ['mute', 'mute'], ['learnmode', 'learnmode'], ['economy', 'economy'], ['group-rate', 'group-rate'], ['attention', 'attention'], ['safe-talk', 'safe-talk'], ['ext', '其它放行']]),
+      input('key', '会话 key（可部分匹配）'),
+      input('minScore', '最低分', 'max-width:90px'), input('maxScore', '最高分', 'max-width:90px'),
+      h('label', { class: 'muted', style: 'display:flex;align-items:center;gap:6px' }, [h('input', { type: 'checkbox', checked: f.unmarked ? 'checked' : null, onchange: (e) => upd('unmarked', e.target.checked) }), '只看未标注']),
+      h('button', { class: 'btn', onclick: () => loadDecisions().catch(() => {}).finally(rerender) }, '刷新'),
+      h('button', { class: 'btn', onclick: decisionExport }, '导出 CSV'),
+    ]),
+  ]));
+  const d = state.decisions || { items: [], stats: {} };
+  const st = d.stats || {};
+  wrap.append(h('div', { class: 'card' }, [
+    h('div', { class: 'big', style: 'font-size:15px' }, `今日判断 ${st.total || 0} · 放行 ${st.allow || 0} · 拦截 ${st.block || 0} · 回了 ${st.replied || 0} · 已标 ${st.marked || 0}`),
+    h('div', { class: 'muted', style: 'font-size:12.5px;margin-top:6px' }, (st.topSources || []).length ? ('拦截来源 top：' + st.topSources.map(([k, v]) => k + ' ' + v).join(' · ')) : '今天还没有拦截记录。'),
+  ]));
+  const rows = (d.items || []).map((x) => {
+    const mark = (d.marks || {})[x.id] || '';
+    return h('tr', {}, [
+      h('td', { class: 'mono', style: 'font-size:11.5px' }, new Date(x.ts).toLocaleTimeString('zh-CN')),
+      h('td', { style: 'font-size:12px' }, decisionConvName(x)),
+      h('td', { style: 'font-size:12.5px;max-width:340px' }, x.text || ''),
+      h('td', { class: 'mono' }, x.score == null ? '—' : String(x.score)),
+      h('td', {}, h('span', { class: 'tag ' + (x.allow ? 'ok' : 'warn') }, x.allow ? '放行' : '拦截')),
+      h('td', { class: 'mono', style: 'font-size:11.5px' }, x.source || ''),
+      h('td', { class: 'muted', style: 'font-size:12px' }, x.replied === true ? '回了' : (x.replied === false ? '没回' : '—')),
+      h('td', {}, h('div', { class: 'toolbar', style: 'gap:4px;flex-wrap:wrap' }, DECISION_MARKS.map((m) =>
+        h('button', { class: 'btn ' + (mark === m ? 'primary' : ''), style: 'padding:2px 6px;font-size:11.5px', onclick: () => decisionMark(x.id, mark === m ? '' : m) }, m)))),
+    ]);
+  });
+  wrap.append(h('div', { class: 'card', style: 'overflow:auto' }, rows.length
+    ? h('table', { class: 'tbl' }, h('thead', {}, h('tr', {}, ['时间', '会话', '消息摘要', '分数', '最终', '来源', '结果', '标注'].map((t) => h('th', {}, t)))), h('tbody', {}, ...rows))
+    : h('div', { class: 'muted' }, '这一天没有记录。判决书要等 bridge 重启后才会开始写。')));
+  return wrap;
 }
 
 function pageDiag() {
@@ -2290,6 +2960,7 @@ async function toggleFeature(f, next) {
     toast(`${f.name} → ${next ? '开' : '关'}（${r.effectText}）`);
     if (r.effect !== 'hot') toast(`${f.name} 已写入，需要${r.effectText.replace('需', '')}才生效`, 3600);
     await loadFeatures();
+    await loadPending(); // PENDING_FIX：拨完立刻刷新顶栏「待生效」，别等整页刷新
     rerender();
   } catch (e) { toast('失败：' + e.message, 3600); rerender(); }
 }
@@ -2298,6 +2969,7 @@ async function saveSetting(f, raw) {
     const r = await api('/api/setting', { method: 'POST', body: { id: f.id, value: raw } });
     f.value = r.value;
     toast(`${f.name} = ${r.value}（${r.effectText}）`);
+    await loadPending(); // PENDING_FIX
     rerender();
   } catch (e) { toast('失败：' + e.message, 3600); }
 }
@@ -2324,6 +2996,10 @@ async function loadFeatures() { const r = await api('/api/features'); state.feat
 
 // MUTE_UI：静音名单 + 待生效改动
 async function loadMuted() { const r = await api('/api/mute'); state.muted = r.keys || []; }
+async function loadMoodHist() { // MOODCHART_UI
+  try { state.moodHist = await api('/api/mood/history'); } catch { state.moodHist = null; }
+}
+
 async function loadPending() { try { state.pending = await api('/api/pending'); } catch { state.pending = null; } }
 const isMutedKey = (key) => (state.muted || []).includes(key);
 async function muteDo(key, mute) {
@@ -2387,17 +3063,29 @@ function renderPills() {
 }
 
 function renderNav() {
-  $('#nav').replaceChildren(...PAGES.map((p) => h('a', {
-    href: '#' + p.id, class: state.page === p.id ? 'active' : '',
-    onclick: (e) => { e.preventDefault(); location.hash = '#' + p.id; },
-  }, p.title)));
+  const nodes = [];
+  for (const g of NAV_GROUPS) {
+    nodes.push(h('div', { class: 'nav-group-title' }, g.title));
+    for (const id of g.ids) {
+      const p = PAGES.find((x) => x.id === id);
+      if (!p) continue;
+      nodes.push(h('a', {
+        href: '#' + p.id, class: state.page === p.id ? 'active' : '',
+        onclick: (e) => { e.preventDefault(); location.hash = '#' + p.id; },
+      }, p.title));
+    }
+  }
+  $('#nav').replaceChildren(...nodes);
 }
 
 function rerender() {
   renderNav();
   renderPills();
   const page = PAGES.find((p) => p.id === state.page) || PAGES[0];
-  $('#view').replaceChildren(page.render());
+  const _view = page.render();
+  const _adj = PAGE_ADJUST[page.id];
+  if (_adj) $('#view').replaceChildren(h('div', { class: 'page-adjust' }, '本页能调：' + _adj), _view);
+  else $('#view').replaceChildren(_view);
   $('#conn').className = 'conn ok';
   $('#conn').textContent = '已连接 · ' + (state.overview?.cfgMeta?.mode || '');
 }
@@ -2405,7 +3093,7 @@ function rerender() {
 async function boot() {
   if (!TOKEN) { showGate(); return; }
   try {
-    await loadOverview(); await loadFeatures();
+    await loadOverview(); await loadFeatures(); loadNames().catch(() => {});
     await Promise.all([loadMuted().catch(() => {}), loadPending().catch(() => {}), loadLearn().catch(() => {})]);
     if (state.page === 'cost' && !state.cost) await loadCost();
     if (state.page === 'entry' && !state.entry) await loadEntry();
@@ -2428,7 +3116,16 @@ function route() {
 }
 window.addEventListener('hashchange', route);
 
-$('#btnRefresh').addEventListener('click', async () => { try { await loadOverview(); await loadFeatures(); rerender(); toast('已刷新'); } catch (e) { toast('失败：' + e.message); } });
+$('#btnRefresh').addEventListener('click', async () => {
+  try {
+    await loadOverview(); await loadFeatures(); await loadPending();
+    // REFRESH_PAGE：当前页的数据也要重新拉，否则“刷新”看着没变化
+    const fn = { cost: 'loadCost', memory: 'loadMem', access: 'loadAccess', style: 'loadStyle',
+      impr: 'loadImpr', cmds: 'loadCmds', logs: 'loadLogs', commands: 'loadCmds' }[state.page];
+    if (fn && typeof window[fn] === 'function') await window[fn]();
+    rerender(); toast('已刷新');
+  } catch (e) { toast('失败：' + e.message); }
+});
 $('#tokenSave').addEventListener('click', async () => {
   const v = $('#tokenInput').value.trim();
   if (!v) return;
@@ -2438,8 +3135,170 @@ $('#tokenSave').addEventListener('click', async () => {
 });
 setInterval(() => { $('#clock').textContent = new Date().toLocaleTimeString('zh-CN', { hour12: false }); }, 1000);
 setInterval(async () => {
+  if (state.view === 'overview') loadMediaStats();
   if (!$('#autoRefresh').checked || !TOKEN) return;
-  try { await loadOverview(); if (state.page === 'features' || state.page === 'settings') await loadFeatures(); rerender(); } catch {}
+  try { await loadOverview(); if (state.page === 'features' || state.page === 'settings') await loadFeatures(); await loadPending(); rerender(); } catch {}
 }, 20000);
 
 route();
+
+// PEOPLE_PAGE：人群档案（按群看今天最活跃的人 + 我的标记）
+async function loadPeople() {
+  if (!state.peopleGroup) { try { const q = new URLSearchParams(location.search).get('group'); if (q) state.peopleGroup = q; } catch {} }
+  const gid = state.peopleGroup || ''; // 空 = 后端自动挑今天最热闹的群
+  const r = await api('/api/people', { method: 'POST', body: { group: gid, limit: 50 } });
+  state.peopleRows = r.rows || [];
+}
+
+function pageUtter() {
+  const wrap = h('div', {});
+  if (!state.utterStarted) {
+    state.utterStarted = true;
+    state.utterHours = state.utterHours || 72;
+    loadUtter().then(() => rerender()).catch((e) => { state.utterErr = String(e && e.message || e); rerender(); });
+  }
+  const TAGS = [['', '全部'], ['ok', '正常'], ['odd', '怪'], ['ai', '人机味'], ['offtopic', '答非所问'], ['fake', '像编的']];
+  const head = h('div', { class: 'card' }, [
+    h('div', { class: 'card-h' }, '她说的话（调试用）'),
+    h('div', { class: 'muted', style: 'margin:6px 0 10px' },
+      '把她说过的话按时间倒序列出来，看到有问题的点一下标签；标签只是记录，不影响她。目前显示最近 ' + state.utterHours + ' 小时。'),
+    h('div', { class: 'chips', style: 'display:flex;gap:6px;flex-wrap:wrap;align-items:center' }, [
+      ...[24, 72, 168].map((hh) => h('button', {
+        class: 'btn' + (state.utterHours === hh ? ' primary' : ''),
+        onclick: () => { state.utterHours = hh; loadUtter().then(() => rerender()); },
+      }, hh + ' 小时')),
+      h('span', { class: 'muted', style: 'margin-left:8px' },
+        '共 ' + (state.utterTotal || 0) + ' 条' + (state.utterErr ? ' · 错误：' + state.utterErr : '')),
+    ]),
+    h('div', { class: 'chips', style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:8px' },
+      TAGS.map(([k, label]) => h('button', {
+        class: 'btn' + ((state.utterTag || '') === k ? ' primary' : ''),
+        onclick: () => { state.utterTag = k; loadUtter().then(() => rerender()); },
+      }, label + (k && state.utterTags && state.utterTags[k] ? ' ' + state.utterTags[k] : '')))),
+  ]);
+  wrap.append(head);
+
+  const rows = state.utterRows || [];
+  if (!rows.length) {
+    wrap.append(h('div', { class: 'card muted' }, '这段时间没有她的发言（或还没加载完）。'));
+    return wrap;
+  }
+  const MARK = [['ok', '正常'], ['odd', '怪'], ['ai', '人机味'], ['offtopic', '答非所问'], ['fake', '像编的']];
+  const table = h('div', { class: 'card' }, [
+    h('div', { class: 'tbl-fit nowrap-tbl' }, h('table', { class: 'tbl' }, [
+      h('thead', {}, h('tr', {}, [h('th', { style: 'width:118px' }, '时间'), h('th', { style: 'width:150px' }, '会话'), h('th', {}, '她说的'), ])),
+      h('tbody', {}, rows.map((r) => h('tr', {}, [
+        h('td', { class: 'muted' }, fmtHm(r.at)),
+        h('td', { class: 'muted' }, r.key),
+        h('td', {}, [
+          r.text,
+          r.note ? h('div', { class: 'muted', style: 'margin-top:4px' }, '备注：' + r.note) : null,
+          h('div', { style: 'margin-top:6px' }, MARK.map(([k, label]) => h('button', {
+            class: 'btn' + (r.tag === k ? ' primary' : ''),
+            style: 'font-size:12px;padding:2px 8px;margin:0 6px 4px 0',
+            onclick: () => markUtter(r.id, r.tag === k ? '' : k),
+          }, label))),
+        ]),
+
+      ]))),
+    ])),
+  ]);
+  wrap.append(table);
+  return wrap;
+}
+
+async function loadUtter() {
+  const body = { sinceHours: state.utterHours || 72, limit: 300, tag: state.utterTag || '' };
+  const r = await api('/api/utts', { method: 'POST', body });
+  state.utterRows = r.items || [];
+  state.utterTotal = r.total || 0;
+  state.utterTags = r.tags || {};
+}
+
+async function markUtter(id, tag) {
+  await api('/api/utts-mark', { method: 'POST', body: { id, tag } });
+  const row = (state.utterRows || []).find((x) => x.id === id);
+  if (row) row.tag = tag;
+  rerender();
+}
+
+function fmtHm(ms) {
+  if (!ms) return '—';
+  const d = new Date(Number(ms));
+  const p2 = (n) => String(n).padStart(2, '0');
+  return p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes());
+}
+
+
+// PEOPLE_AVA：QQ 头像（浏览器直连 qlogo，加载失败就露首字母，不占额外请求）
+function avatarOf(uin, name) {
+  const initial = String(name || uin || '?').trim().slice(0, 1).toUpperCase();
+  return h('span', { class: 'ppl-ava' },
+    h('i', {}, initial),
+    h('img', {
+      src: 'https://q1.qlogo.cn/g?b=qq&nk=' + encodeURIComponent(String(uin)) + '&s=100',
+      loading: 'lazy', alt: '', referrerpolicy: 'no-referrer',
+      onerror: (e) => { e.target.style.display = 'none'; },
+    }));
+}
+
+function pagePeople() {
+  const wrap = h('div', {});
+  if (!state.peopleStarted) {
+    state.peopleStarted = true;
+    loadPeople().then(() => rerender()).catch((e) => { state.peopleErr = String(e && e.message || e); rerender(); });
+  }
+  const groups = (state.access && state.access.groups) || [];
+  const gid = state.peopleGroup || '';
+  const sel = h('select', { class: 'input', style: 'max-width:280px', onchange: (e) => {
+    state.peopleGroup = e.target.value; state.peopleRows = null;
+    loadPeople().catch(() => {}).finally(() => rerender());
+  } }, h('option', { value: '', selected: !gid }, '（自动：今天最热闹的群）'), ...groups.map((g) => h('option', { value: g, selected: String(g) === String(gid) }, g + (nameOf('group', g) ? ' · ' + nameOf('group', g) : ''))));
+  wrap.append(h('div', { class: 'card' },
+    h('h3', {}, '人群档案'),
+    h('div', { class: 'muted', style: 'font-size:12px;margin-bottom:8px' }, '按「今天在这个群说了多少」排前 50。我的标记只是加减分，不是强制开关。'),
+    h('div', { style: 'display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap' }, sel,
+      h('button', { class: 'btn ghost', onclick: async (e) => {
+        e.target.disabled = true;
+        try { await loadPeople(); toast('已刷新'); } catch (err) { toast('刷新失败：' + err.message); }
+        e.target.disabled = false; rerender();
+      } }, '刷新'),
+      h('span', { class: 'muted', style: 'font-size:12px' },
+        state.peopleRows ? ('共 ' + state.peopleRows.length + ' 人' + (state.peopleGroup ? '' : '（自动选群）')) : '')),
+  ));
+  const rows = state.peopleRows || [];
+  if (!rows.length) {
+    wrap.append(h('div', { class: 'card muted' }, '这个群今天还没有统计到消息（或刚重启过）。' + (state.peopleErr ? ' 错误：' + state.peopleErr : '')));
+    return wrap;
+  }
+  const tr = (r) => h('tr', {},
+    h('td', {}, avatarOf(r.uin, r.name), h('span', {}, r.name || '-')),
+    h('td', { class: 'mono', style: 'font-size:12px' }, r.uin),
+    h('td', { class: 'num' }, String(r.n)),
+    h('td', { class: 'num' }, r.avgLen + ' 字'),
+    h('td', { class: 'num' }, r.dup + '%'),
+    h('td', { class: 'num' }, String(r.skips || 0)),
+    h('td', {}, r.verdict + (r.score ? `（${r.score} 分）` : '')),
+    h('td', {}, ...['human', 'bot', ''].map((m) => h('label', { style: 'margin-right:8px;font-size:12px;cursor:pointer' },
+      h('input', { type: 'radio', name: 'mk-' + r.uin, checked: (r.mark || '') === m,
+        onchange: () => { // PEOPLE_MARK_REFRESH：标完立刻重拉，分数/系统判断当场更新
+          if (r._saving) return;
+          r._saving = true;
+          api('/api/people-mark', { method: 'POST', body: { uin: r.uin, mark: m } })
+            .then(async () => {
+              r.mark = m;
+              toast('已标记：' + (m === 'human' ? '人' : m === 'bot' ? '机器' : '未标'));
+              await loadPeople();
+              rerender();
+            })
+            .catch((e) => toast('没存上：' + e.message))
+            .finally(() => { r._saving = false; });
+        } }),
+      m === 'human' ? '人' : m === 'bot' ? '机器' : '未标'))),
+  );
+  wrap.append(h('div', { class: 'card', style: 'margin-top:12px;overflow-x:auto' },
+    h('table', { class: 'tbl-fit nowrap-tbl', style: 'width:100%;font-size:13px' },
+      h('thead', {}, h('tr', {}, ...['昵称', 'QQ', '今天', '句长', '复读', '被拦', '系统判断', '我的标记'].map((x) => h('th', {}, x)))),
+      h('tbody', {}, ...rows.map(tr)))));
+  return wrap;
+}
