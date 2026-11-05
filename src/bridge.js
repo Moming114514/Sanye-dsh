@@ -7960,6 +7960,20 @@ async function main() {
                 try { cache = JSON.parse(fs.readFileSync(f, 'utf8')); } catch {}
                 cache.groups = cache.groups || {};
                 cache.users = cache.users || {};
+                // NAMES_CACHE_FULL：不传号码时直接返回本地缓存里的全部名字（决策页等只读场景）
+                if (!wantGroups.length && !wantUsers.length) {
+                  const groups = {};
+                  for (const [k, v] of Object.entries(cache.groups)) {
+                    const nm = typeof v === 'string' ? v : (v && v.name);
+                    if (nm) groups[k] = nm;
+                  }
+                  const users = {};
+                  for (const [k, v] of Object.entries(cache.users)) {
+                    const nm = typeof v === 'string' ? v : (v && v.name);
+                    if (nm) users[k] = nm;
+                  }
+                  return sendJson({ ok: true, groups, users, cached: true });
+                }
                 let changed = false;
                 for (const gid of wantGroups) {
                   if (cache.groups[gid]?.name) continue;
