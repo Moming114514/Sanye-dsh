@@ -36,7 +36,7 @@ function navGroups() {
 
 // PAGE_ADJUST（B 批）：每页第一张卡之前的一行说明——这页到底能调什么
 const PAGE_ADJUST = {
-  talk: '说话：学到的说法、她的看法、她说的话。',
+  talk: '说话：人味指标、学到的说法、她的看法、她说的话。',
   health: '只读：自检、诊断、媒体与通道健康。',
   personality: '只读：当前角色与人格文件大小。',
   maintenance: '旧页面入口都在这里，只是没放进主导航。',
@@ -1019,6 +1019,7 @@ function pageStyle() { // STYLE_GATE_PATCH
 
 function pageTalk() {
   return tabbed('talk', [
+    { title: '人味指标', render: () => { const w = h('div', {}); w.append(humanStatsCard()); return w; } },
     { title: '学到的说法', render: pageStyle },
     { title: '她的看法', render: pageImpr },
     { title: '她说的话', render: pageUtter },
@@ -3073,9 +3074,73 @@ function pageGroupRules() {
   ].filter(Boolean));
 }
 
+
+// P2-D：误判分析卡（决策记录页）
+function decisionStatsCard() {
+  const wrap = h('div', { class: 'card', style: 'margin-bottom:12px' }, h('h3', {}, '误判分析'));
+  const box = h('div', { class: 'muted' }, '正在读统计…');
+  wrap.append(box);
+  (async () => {
+    try {
+      const r = await api('/api/decision-stats');
+      const rows = (r && r.sources) || [];
+      box.textContent = '';
+      if (!rows.length) { box.append(h('div', { class: 'muted' }, '还没有判决记录；等桥接写出 decision/*.jsonl 后再看。')); return; }
+      if (r.marked < 10) { box.append(h('div', { class: 'muted', style: 'margin-bottom:6px' }, '先标 10 条再回来看，样本太少统计没意义（现在 ' + r.marked + ' 条）')); }
+      const top = rows.find((x) => x.bad > 0);
+      if (top) box.append(h('div', { style: 'margin-bottom:8px' }, '当前误判最多的是 ' + top.source + '（' + top.bad + ' 条，' + top.rate + '%）'));
+      const tbl = h('table', { class: 'tbl-fit nowrap-tbl' },
+        h('thead', {}, h('tr', {}, ...['来源', '判断数', '已标数', '该回没回', '不该回却回', '答非所问', '误判率'].map((x) => h('th', {}, x)))),
+        h('tbody', {}, ...rows.map((x) => h('tr', { style: 'cursor:pointer', onclick: () => { state._decSource = x.source; rerender(); } },
+          h('td', {}, x.source), h('td', {}, String(x.total)), h('td', {}, String(x.marked)),
+          h('td', {}, String(x.missed)), h('td', {}, String(x.wrong)), h('td', {}, String(x.off)),
+          h('td', { class: x.rate > 50 ? 'warn' : '' }, x.rate + '%')))));
+      box.append(tbl);
+      if (state._decSource) box.append(h('div', { class: 'muted', style: 'margin-top:6px' }, '已选来源：' + state._decSource + '（再点一次清除）'), h('div', {}, h('button', { class: 'btn', onclick: () => { state._decSource = ''; rerender(); } }, '清除筛选')));
+    } catch (e) { box.textContent = '误判统计没读到：' + (e && e.message ? e.message : e); }
+  })();
+  return wrap;
+}
+
+// P2-D：人味指标卡（说话页）
+function humanStatsCard() {
+  const wrap = h('div', { class: 'card', style: 'margin-bottom:12px' }, h('h3', {}, '人味指标（近两周）'));
+  const box = h('div', { class: 'muted' }, '正在计算…'); wrap.append(box);
+  const arrow = (cur, prev, higherBad) => {
+    if (!prev) return '—';
+    const d = cur - prev;
+    if (Math.abs(d) < 1e-9) return '→ 持平';
+    const up = d > 0;
+    const good = higherBad ? !up : up;
+    return (up ? '↑ ' : '↓ ') + (good ? '变好' : '变差');
+  };
+  const fmt = (v) => (Math.round(v * 100) / 100).toLocaleString();
+  (async () => {
+    try {
+      const r = await api('/api/human-stats'); const c = r.cur || {}, p = r.prev || {};
+      const pctText = (o) => '。' + (o['。'] || 0) + '% ！' + (o['！'] || 0) + '% ？' + (o['？'] || 0) + '% …' + (o['…'] || 0) + '%';
+      const rows = [
+        ['句长中位数（群 / 私聊）', (c.lenG || 0) + ' / ' + (c.lenP || 0), (p.lenG || 0) + ' / ' + (p.lenP || 0), arrow(c.lenG + c.lenP, p.lenG + p.lenP, false)],
+        ['实词重合度', fmt(c.ov || 0), fmt(p.ov || 0), arrow(c.ov || 0, p.ov || 0, false)],
+        ['标点分布', pctText(c.punc || {}), pctText(p.punc || {}), arrow(c.punc && c.punc['！'] || 0, p.punc && p.punc['！'] || 0, true)],
+        ['总结句比例', Math.round((c.sumRatio || 0) * 100) + '%', Math.round((p.sumRatio || 0) * 100) + '%', arrow(c.sumRatio || 0, p.sumRatio || 0, true)],
+        ['样本数', String(c.n || 0), String(p.n || 0), ''],
+      ];
+      box.textContent = '';
+      const tbl = h('table', { class: 'tbl-fit nowrap-tbl' },
+        h('thead', {}, h('tr', {}, ...['指标', '本周', '上周', '变化'].map((x) => h('th', {}, x)))),
+        h('tbody', {}, ...rows.map((x) => h('tr', {}, h('td', {}, x[0]), h('td', {}, x[1]), h('td', {}, x[2]), h('td', {}, x[3])))));
+      box.append(tbl);
+      if (!c.n) box.append(h('div', { class: 'muted', style: 'margin-top:6px' }, '近两周还没有她的消息样本。'));
+    } catch (e) { box.textContent = '人味指标没算出来：' + (e && e.message ? e.message : e); }
+  })();
+  return wrap;
+}
+
 function pageDecisions() {
   if (!state.names) loadNames().catch(() => {});
   const wrap = h('div', {});
+  wrap.append(decisionStatsCard()); // P2-D 误判分析
   if (!state.decFilter) state.decFilter = { day: new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10) };
   const f = state.decFilter;
   if (!state.decisions) { loadDecisions().catch(() => {}).finally(rerender); wrap.append(h('div', { class: 'card muted' }, '正在读判决书…')); }

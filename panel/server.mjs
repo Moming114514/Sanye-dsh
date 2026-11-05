@@ -717,6 +717,85 @@ const server = http.createServer(async (req, res) => {
       const r = await api('/api/socialV2/learnmode', 'POST', { action: 'list' });
       return send(res, 200, r || { ok: false });
     }
+
+    if (p === '/api/decision-stats') { // P2-D：误判分析
+      if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
+      const DIR = path.join(QQ_STATE, 'decision');
+      let marks = {}; try { marks = JSON.parse(fs.readFileSync(path.join(QQ_STATE, 'decision-marks.json'), 'utf8')) || {}; } catch {}
+      let rows = [];
+      try { rows = fs.readdirSync(DIR).filter((f) => /^\d{4}-\d{2}-\d{2}\.jsonl$/.test(f)); } catch {}
+      const by = {};
+      const day = String(new URL(req.url, 'http://x').searchParams.get('day') || '').trim();
+      for (const f of rows) {
+        if (day && f !== day + '.jsonl') continue;
+        let raw = ''; try { raw = fs.readFileSync(path.join(DIR, f), 'utf8'); } catch { continue; }
+        for (const line of raw.split('\n')) {
+          if (!line.trim()) continue;
+          let r; try { r = JSON.parse(line); } catch { continue; }
+          if (r.type !== 'decision') continue;
+          const src = String(r.source || (r.allow ? 'ext' : 'unknown'));
+          const b = (by[src] = by[src] || { source: src, total: 0, marked: 0, missed: 0, wrong: 0, off: 0 });
+          b.total++;
+          const m = marks[r.id];
+          if (!m) continue;
+          b.marked++;
+          if (m === '该回没回') b.missed++;
+          else if (m === '不该回却回') b.wrong++;
+          else if (m === '答非所问') b.off++;
+        }
+      }
+      const list = Object.values(by).map((b) => {
+        const bad = b.missed + b.wrong + b.off;
+        return { ...b, bad, rate: b.marked ? Math.round((bad / b.marked) * 100) : 0 };
+      }).sort((a, b) => b.bad - a.bad || b.total - a.total);
+      return send(res, 200, { ok: true, total: list.reduce((s, x) => s + x.total, 0), marked: list.reduce((s, x) => s + x.marked, 0), sources: list });
+    }
+
+    if (p === '/api/human-stats') { // P2-D：人味指标
+      if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
+      let social = { conversations: {} };
+      try { social = JSON.parse(fs.readFileSync(path.join(QQ_STATE, 'social-v2.json'), 'utf8')) || social; } catch {}
+      const NOW = Date.now(), W = 7 * 86400000;
+      const STOP = new Set('的 了 是 在 我 你 他 她 它 们 这 那 有 和 就 都 也 不 吗 呢 啊 吧 呀 嘛 个 一 会 要 说 去 来 好 很 还 但 而 被 把 给 让 对 从 到 与 或 及 着 过 地 得 么 什么 怎么 因为 所以 如果 就是 可以 我们 你们'.split(' '));
+      const bigrams = (s) => { const t = String(s || '').replace(/[^\u4e00-\u9fa5A-Za-z0-9]/g, ''); const out = new Set(); for (let i = 0; i + 2 <= t.length; i++) { const g = t.slice(i, i + 2); if (!STOP.has(g[0]) && !STOP.has(g[1])) out.add(g); } return out; };
+      const pct = (n, d) => (d ? n / d : 0);
+      const MARK = ['总的来说', '说到底', '其实', '需要注意的是', '可以理解', '换句话说', '简单说', '总之'];
+      const bucket = () => ({ lens: { group: [], private: [] }, ov: [], punc: { '。': 0, '！': 0, '？': 0, '…': 0, other: 0 }, sum: 0, sentences: 0, n: 0 });
+      const wk = { cur: bucket(), prev: bucket() };
+      for (const [key, conv] of Object.entries(social.conversations || {})) {
+        const isGroup = key.startsWith('group:');
+        const msgs = Array.isArray(conv.recentMessages) ? conv.recentMessages : [];
+        for (let i = 0; i < msgs.length; i++) {
+          const m = msgs[i];
+          if (!m || !m.isSelf) continue;
+          const t = Number(m.time || 0);
+          if (!t || NOW - t > 2 * W) continue;
+          const b = t >= NOW - W ? wk.cur : (t >= NOW - 2 * W ? wk.prev : null);
+          if (!b) continue;
+          const text = String(m.plain || m.text || '').trim();
+          if (!text) continue;
+          b.n++;
+          b.lens[isGroup ? 'group' : 'private'].push(text.length);
+          for (const ch of '。！？…') b.punc[ch] += (text.split(ch).length - 1);
+          b.punc.other += 0;
+          for (const part of text.split(/[。！？\n]+/).filter((x) => x.trim())) {
+            b.sentences++;
+            if (MARK.some((w) => part.includes(w))) b.sum++;
+          }
+          let trig = null;
+          for (let j = i - 1; j >= 0; j--) if (msgs[j] && !msgs[j].isSelf && String(msgs[j].plain || msgs[j].text || '').trim()) { trig = String(msgs[j].plain || msgs[j].text).trim(); break; }
+          if (trig) {
+            const A = bigrams(text), B2 = bigrams(trig);
+            if (B2.size) b.ov.push(pct([...A].filter((g) => B2.has(g)).length, B2.size));
+          }
+        }
+      }
+      const med = (a) => { if (!a.length) return 0; const s = [...a].sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
+      const avg = (a) => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
+      const sum = (b) => { const tot = Object.values(b.punc).reduce((x, y) => x + y, 0) || 1; return { n: b.n, lenG: med(b.lens.group), lenP: med(b.lens.private), ov: avg(b.ov), punc: Object.fromEntries(Object.entries(b.punc).map(([k, v]) => [k, Math.round((v / tot) * 100)])), sumRatio: b.sentences ? b.sum / b.sentences : 0 }; };
+      return send(res, 200, { ok: true, cur: sum(wk.cur), prev: sum(wk.prev) });
+    }
+
     if (p === '/api/attn-get') { // ATTNGET_PATCH
       if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
       const CFG = process.env.SURFCORE_CONFIG || '/home/dsh/apps/surfcore/config.json';
@@ -726,30 +805,44 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true, replyOnly: at.replyOnly || {}, sample: at.sample || {}, maxPerDay: at.maxPerDay || 0 });
     }
 
-    if (p === '/api/attn-set') { // ATTNSET_PATCH：按群规则（只回谁 / 抽样%）
+    if (p === '/api/attn-set') { // ATTNSET_PATCH：转发到桥接；桥接还是旧版（404）时回退为本地写 config
       if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
       const body = req.method === 'POST' ? await readBody(req) : {};
       const gid = String(body.group || '').replace('group:', '');
       if (!gid) return send(res, 400, { ok: false, error: 'group 不能为空' });
-      const CFG = process.env.SURFCORE_CONFIG || '/home/dsh/apps/surfcore/config.json';
-      let cfg = {};
-      try { cfg = JSON.parse(fs.readFileSync(CFG, 'utf8')); } catch (e) { return send(res, 500, { ok: false, error: 'config 读取失败' }); }
-      cfg.socialV2 = cfg.socialV2 || {};
-      const at = (cfg.socialV2.attention = cfg.socialV2.attention || {});
-      at.replyOnly = at.replyOnly || {};
-      at.sample = at.sample || {};
-      if (body.replyOnly !== undefined) {
-        const list = String(body.replyOnly || '').split(/[,，\s]+/).filter(Boolean);
-        if (list.length) at.replyOnly[gid] = list; else delete at.replyOnly[gid];
-      }
-      if (body.sample !== undefined) {
-        const n = Math.max(0, Math.min(50, Number(body.sample) || 0));
-        if (n > 0) at.sample[gid] = n; else delete at.sample[gid];
-      }
+      const fallback = () => {
+        const CFG = process.env.SURFCORE_CONFIG || '/home/dsh/apps/surfcore/config.json';
+        let cfg = {};
+        try { cfg = JSON.parse(fs.readFileSync(CFG, 'utf8')); } catch (e) { return send(res, 500, { ok: false, error: 'config 读取失败' }); }
+        cfg.socialV2 = cfg.socialV2 || {};
+        const at = (cfg.socialV2.attention = cfg.socialV2.attention || {});
+        at.replyOnly = at.replyOnly || {};
+        at.sample = at.sample || {};
+        if (body.replyOnly !== undefined) {
+          const list = String(body.replyOnly || '').split(/[,，\s]+/).filter(Boolean);
+          if (list.length) at.replyOnly[gid] = list; else delete at.replyOnly[gid];
+        }
+        if (body.sample !== undefined) {
+          const n = Math.max(0, Math.min(50, Number(body.sample) || 0));
+          if (n > 0) at.sample[gid] = n; else delete at.sample[gid];
+        }
+        try {
+          const tmp = CFG + '.tmp-attnset';
+          fs.writeFileSync(tmp, JSON.stringify(cfg, null, 2));
+          fs.renameSync(tmp, CFG);
+        } catch (e) { return send(res, 500, { ok: false, error: String(e.message || e) }); }
+        return send(res, 200, { ok: true, group: gid, replyOnly: at.replyOnly[gid] || [], sample: at.sample[gid] || 0, via: 'local' });
+      };
       try {
-        fs.writeFileSync(CFG, JSON.stringify(cfg, null, 2));
-      } catch (e) { return send(res, 500, { ok: false, error: String(e.message || e) }); }
-      return send(res, 200, { ok: true, group: gid, replyOnly: at.replyOnly[gid] || [], sample: at.sample[gid] || 0 });
+        const r = await fetch('http://127.0.0.1:3100/api/socialV2/attn-set', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-console-token': cfgToken() },
+          body: JSON.stringify({ group: gid, ...(body.replyOnly !== undefined ? { replyOnly: body.replyOnly } : {}), ...(body.sample !== undefined ? { sample: body.sample } : {}) }),
+        });
+        if (r.status === 404) return fallback();
+        const j = await r.json().catch(() => ({ ok: false, error: '桥接返回非 JSON' }));
+        return send(res, r.ok && j.ok !== false ? 200 : 502, j);
+      } catch (e) { return fallback(); }
     }
 
     if (p === '/api/utts' || p === '/api/utts-mark') { // UTTS_PATCH：她说的话
@@ -1016,7 +1109,7 @@ const server = http.createServer(async (req, res) => {
       if (minS !== '') items = items.filter((x) => Number(x.score) >= Number(minS));
       if (maxS !== '') items = items.filter((x) => Number(x.score) <= Number(maxS));
       items.sort((a, b) => b.ts - a.ts);
-      const marksPath = path.join(STATE, 'decision-marks.json');
+      const marksPath = path.join(QQ_STATE, 'decision-marks.json');
       let marks = {}; try { marks = JSON.parse(fs.readFileSync(marksPath, 'utf8')) || {}; } catch {}
       const markOf = (id) => marks[id] || '';
       if (q('unmarked') === '1') items = items.filter((x) => !markOf(x.id));
@@ -1036,7 +1129,7 @@ const server = http.createServer(async (req, res) => {
       const mark = String(body.mark || '').trim();
       const ALLOWED = ['正常', '该回没回', '不该回却回', '答非所问', ''];
       if (!id || !ALLOWED.includes(mark)) return send(res, 400, { ok: false, error: 'id/mark 不合法' });
-      const marksPath = path.join(STATE, 'decision-marks.json');
+      const marksPath = path.join(QQ_STATE, 'decision-marks.json');
       let marks = {}; try { marks = JSON.parse(fs.readFileSync(marksPath, 'utf8')) || {}; } catch {}
       if (mark) marks[id] = mark; else delete marks[id];
       writeJsonAtomic(marksPath, marks);
@@ -1054,7 +1147,7 @@ const server = http.createServer(async (req, res) => {
           byId.set(r.id, r);
         }
       } catch {}
-      const marksPath = path.join(STATE, 'decision-marks.json');
+      const marksPath = path.join(QQ_STATE, 'decision-marks.json');
       let marks = {}; try { marks = JSON.parse(fs.readFileSync(marksPath, 'utf8')) || {}; } catch {}
       const esc = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
       const rows = ['时间,会话,消息摘要,分数,最终,拦截来源,是否回了,延迟ms,标注,经过层'];
