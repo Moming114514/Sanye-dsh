@@ -290,3 +290,8 @@ tr.gr-flash > td { animation: grflash 1.3s ease-out; }
 .gr-state.wait::before { background: var(--warn); }
 .gr-state.ok { color: var(--ok); }
 .gr-state.wait { color: var(--warn); }
+
+/* P2-B：页内 Tab */
+.tabs { display: flex; gap: 8px; margin: 0 0 14px; flex-wrap: wrap; }
+.tabs-btn { background: transparent; color: var(--muted); border: 1px solid var(--line); border-radius: 8px; padding: 6px 14px; font-size: 13px; cursor: pointer; }
+.tabs-btn.on { color: var(--text); border-color: var(--accent); background: rgba(120,170,255,.10); }

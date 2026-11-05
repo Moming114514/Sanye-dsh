@@ -15,7 +15,8 @@ const PAGES = [
   { id: 'group-rules', title: '群规则', render: pageGroupRules }, // P2-A
   { id: 'safe', title: '安全', render: pageSafe }, // 频率 + 敏感话题
   { id: 'cost', title: '花费', render: pageCost },
-  { id: 'memory', title: '记忆与情绪', render: pageMemory },
+  { id: 'memory', title: '记忆', render: pageMemoryHub },
+  { id: 'memory-old', title: '记忆与情绪（旧）', render: pageMemory },
   { id: 'impr', title: '她的看法', render: pageImpr },
   { id: 'style', title: '学说话', render: pageStyle }, // STYLE_GATE_PATCH
   { id: 'decisions', title: '决策记录', render: pageDecisions }, // P1
@@ -269,6 +270,39 @@ function selfcheckCard() {
         h('span', {}, i.name),
         h('span', { class: 'muted', style: 'margin-left:auto;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap' }, i.detail || '')))),
   );
+}
+
+
+// ---------- P2-B：Tab 容器 + 卡片级隐藏 ----------
+function tabbed(key, defs) {
+  const wrap = h('div', {});
+  state._tab = state._tab || {};
+  const cur = Math.min(state._tab[key] || 0, defs.length - 1);
+  const bar = h('div', { class: 'tabs' });
+  defs.forEach((d, i) => {
+    bar.append(h('button', { class: 'tabs-btn' + (i === cur ? ' on' : ''), onclick: () => { state._tab[key] = i; rerender(); } }, d.title));
+  });
+  wrap.append(bar);
+  try {
+    wrap.append(defs[cur].render());
+  } catch (e) {
+    wrap.append(h('div', { class: 'card warn' }, '这块没加载出来：' + (e && e.message ? e.message : e)));
+  }
+  return wrap;
+}
+function findCardByTitle(root, needle) {
+  const cards = [...root.querySelectorAll('.card')];
+  return cards.find((c) => {
+    const t = c.querySelector('h3, .card-h');
+    return t && String(t.textContent || '').includes(needle);
+  }) || null;
+}
+function hideCardsIn(root, needles) {
+  for (const n of needles) {
+    const c = findCardByTitle(root, n);
+    if (c) c.style.display = 'none';
+  }
+  return root;
 }
 
 function pageOverview() {
@@ -528,6 +562,12 @@ function pageSettings() {
 function pageCost() {
   const c = state.cost;
   const wrap = h('div', {});
+  // P2-B 1.2：省钱模式从安全页挪到这里（克隆安全页的卡，去掉隐藏标记）
+  try {
+    const _safe = pageSafe();
+    const _eco = findCardByTitle(_safe, '省钱模式（少说话）');
+    if (_eco) { _eco.style.display = ''; _eco.style.marginBottom = '14px'; wrap.append(_eco); }
+  } catch (e) {}
   if (!c) {
     wrap.append(h('div', { class: 'card muted' }, '正在算账…'));
     if (!state.costLoading) { state.costLoading = true; loadCost().finally(() => { state.costLoading = false; rerender(); }); }
@@ -999,6 +1039,13 @@ function pageStyle() { // STYLE_GATE_PATCH
   return wrap;
 }
 
+function pageMemoryHub() {
+  return tabbed('memory', [
+    { title: '心情', render: () => hideCardsIn(pageMemory(), ['学到的说法（最近）', '学到的说法']) },
+    { title: '体检', render: pageMemHealth },
+    { title: '星海', render: pageStarmap },
+  ]);
+}
 function pageMemory() {
   const d = state.overview || {};
   const wrap = h('div', {});
@@ -2657,6 +2704,8 @@ function pageSafe() {
       } }, '清空记录'),
     ),
   ));
+  // P2-B 1.2：省钱模式→花费页；频率/按群规则→群规则页
+  hideCardsIn(wrap, ['省钱模式（少说话）', '群发言频率', '按群规则（只回谁', '按群规则']);
   return wrap;
 
 
@@ -2751,6 +2800,8 @@ function pageAccess() {
       }, g))),
     ));
   }
+  // P2-B 1.1：静音/学习模式已挪到「群规则」页
+  hideCardsIn(wrap, ['暂时不理（静音）', '学习模式（只看不说）', '学习模式（只看不聊）']);
   return wrap;
 }
 
