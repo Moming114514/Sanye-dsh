@@ -427,6 +427,7 @@ const LEAN_TOOL_NAMES = new Set([
 // 与 core 的区别：去掉 6 天内 0 次的 impression/get_group_members/memory_query/
 // slang_query/slang_submit/get_self_image；补回 unread/style_note/collect_sticker。
 const CORE_MIN_TOOL_NAMES = new Set([
+  'qq_send_sticker',
   'qq_recall_memory',
   'qq_memory_query',
   'qq_impression',
@@ -1467,8 +1468,6 @@ if (cfg.socialV2?.sticker?.enabled !== false && cfg.socialV2?.tools?.sendSticker
   server.tool(
     // VIEW_STICKER_PATCH：看动图/表情的几帧
     'qq_view_sticker',
-  'qq_style_note',
-  'qq_read_group_recent',
     '看这个会话里最近一张图/表情/动图到底画了什么：自动从动图里抽 3 帧拼成一张图给你，动图也能看清动作和变化。收到看不懂的表情、贴纸、GIF 时用；静态图也能用（只出 1 帧）。一次调用约 1 张图的 token，很便宜。',
     {
       key: z.string().describe('会话 key，格式 group:群号 或 private:QQ号'),
@@ -1495,8 +1494,10 @@ if (cfg.socialV2?.sticker?.enabled !== false && cfg.socialV2?.tools?.sendSticker
       } catch (error) {
         return { content: [{ type: 'text', text: `看看这张图失败：${error?.message || error}` }], isError: true };
       }
-    },
+    }
+  );
 
+  server.tool(
     'qq_send_sticker',
     '在指定会话发送一个 QQ 收藏表情包（自定义表情）。stickerId 直接写编号最省事（"#03" 或 "3"），也可以用 qq_list_stickers 返回的 id / md5 / url。注意：一条消息只能是一张表情，不能在同一气泡里附带文字；想说的话请先用 qq_send_message / qq_reply 作为单独气泡发送，再单独发这张表情。需要引用/点名时可用 replyToMessageId / atUserId（群聊）。真人偶尔用表情包很自然，但别刷屏。',
     {
