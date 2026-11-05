@@ -18,6 +18,18 @@ let cache = { sig: '', data: null };
 const today = () => new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
 const hhmm = (ts) => { try { return new Date(Number(ts) || 0).toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit', hour12: false }); } catch { return '--:--'; } };
 
+// 绕过缓存直接读盘：跨天重置必须拿磁盘上的最新版本，否则会覆盖面板刚写的 custom
+function readDisk() {
+  let data = { day: today(), groups: {} };
+  try {
+    const raw = JSON.parse(fs.readFileSync(FILE, 'utf8'));
+    data = { day: String(raw?.day || today()), groups: raw?.groups && typeof raw.groups === 'object' ? raw.groups : {} };
+  } catch {
+    // 文件坏了当默认
+  }
+  return data;
+}
+
 function readAll() {
   let sig = '';
   try {
@@ -28,22 +40,19 @@ function readAll() {
     return cache.data;
   }
   if (sig === cache.sig && cache.data) return cache.data;
-  let data = { day: today(), groups: {} };
-  try {
-    const raw = JSON.parse(fs.readFileSync(FILE, 'utf8'));
-    data = { day: String(raw?.day || today()), groups: raw?.groups && typeof raw.groups === 'object' ? raw.groups : {} };
-  } catch {
-    // 文件坏了当默认
-  }
+  let data = readDisk();
   if (data.day !== today()) {
-    // D-1：新的一天清计数，档位与自定义（custom）都保留
+    // E-1：重置前强制重读磁盘，保留 level/custom，只清 count/lastAt
+    const fresh = readDisk();
     const groups = {};
-    for (const [gid, v] of Object.entries(data.groups)) {
+    for (const [gid, v] of Object.entries(fresh.groups)) {
       groups[gid] = { ...v, level: v.level || 'normal', count: 0, lastAt: 0, custom: v.custom || null };
     }
     data = { day: today(), groups };
     try { writeAll(data); } catch {}
     try { const st2 = fs.statSync(FILE); sig = `${st2.mtimeMs}:${st2.size}`; } catch { sig = ''; }
+    cache = { sig, data };
+    return data;
   }
   cache = { sig, data };
   return data;
