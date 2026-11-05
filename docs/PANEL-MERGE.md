@@ -129,3 +129,15 @@
 1. **3 页 + 11 视图** 这个结构行吗？（不行你指哪页要独立）
 2. **「群规则」一张表** 收掉 5 个入口，行吗？
 3. 先做 **桥接侧（第 1 步，要重启）** 还是 **面板侧（第 2 步，不重启）**？
+
+## 实施记录（2026-11-05）
+
+三段提交：`5fee208`（职责拆分：白名单/安全/花费归位、记忆三合一）、`28acb9f`（说话页三合一 + 概览精简）、`410f794`（导航 12 项定稿 + 性格/健康/维护/设置枢纽页）。
+
+P2-C 收尾（`d5d9ef4`，面板无 git，代码同步在本仓 `panel/`）：
+- A2 概览「她刚说的」改为「群名/昵称 · 内容」，超 60 字省略，时间保留 HH:mm（名称取 `/api/names`，取不到显示号码）。
+- A3 删除不可达的旧页壳：`pageEntry` / `pageAccess` / `pageSettings`（设置枢纽改用内联待生效卡）及对应 PAGES 条目；删除 `LEGACY_NAV` 与 `her.legacyNav` / `state._legacyNav` 回滚开关。共享函数（`pageFeatures`/`pageCommands`/`pageStyle`/`pageImpr`/`pageUtter`/`pageMemory`/`pageMemHealth`/`pageStarmap`/`pageSafe`）保留，因为它们被新页的 Tab 复用。
+- 遍历 12 页（overview/decisions/cost/health/personality/talk/memory/group-rules/people/settings/commands/maintenance）无 pageerror。
+- 回滚：`git revert d5d9ef4` 恢复旧页壳；导航回滚已随 A3 删除，只能 revert。
+
+A1（`[策略] 计算失败：ownerOnlyGroupAllowed is not defined`）：由 2026-11-05 的 `75aadd5` 修复（`owner-only.js` 导出 + bridge 导入）。本次重启（21:43:16，pid 1081630）后日志无新增，`[策略·预测]` 正常输出。

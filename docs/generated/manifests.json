@@ -1,7 +1,24 @@
 {
  "schema": "ext-manifests/v1",
- "at": "2026-11-04T05:46:24.307Z",
+ "at": "2026-11-05T13:49:32.979Z",
  "modules": [
+  {
+   "file": "active-window.js",
+   "id": "active-window",
+   "title": "活跃期（叫醒后 10 分钟）",
+   "hooks": [],
+   "order": 190,
+   "config": [
+    "socialV2.activeWindow"
+   ],
+   "stateFiles": [
+    "active-window.json"
+   ],
+   "kind": "tool",
+   "layer": "判断",
+   "registered": false,
+   "wave": 2
+  },
   {
    "file": "advice-capture.js",
    "id": "advice",
@@ -87,6 +104,19 @@
    "wave": 2
   },
   {
+   "file": "decision-log.js",
+   "id": "decision-log",
+   "title": "决策记录",
+   "hooks": [],
+   "order": 200,
+   "config": [],
+   "stateFiles": [],
+   "kind": "tool",
+   "layer": "判断",
+   "registered": false,
+   "wave": 2
+  },
+  {
    "file": "economy.js",
    "id": "economy",
    "title": "省钱模式",
@@ -119,6 +149,21 @@
    ],
    "kind": "tool",
    "layer": "运维",
+   "registered": false,
+   "wave": 2
+  },
+  {
+   "file": "group-policy.js",
+   "id": "group-policy",
+   "title": "群规则唯一事实源",
+   "hooks": [],
+   "order": 210,
+   "config": [],
+   "stateFiles": [
+    "group-policy.json"
+   ],
+   "kind": "tool",
+   "layer": "判断",
    "registered": false,
    "wave": 2
   },
@@ -423,6 +468,19 @@
    "layer": "判断",
    "registered": true,
    "wave": 1
+  },
+  {
+   "file": "speak-policy.js",
+   "id": "speak-policy",
+   "title": "发言策略（只读对照）",
+   "hooks": [],
+   "order": 180,
+   "config": [],
+   "stateFiles": [],
+   "kind": "tool",
+   "layer": "判断",
+   "registered": false,
+   "wave": 2
   },
   {
    "file": "sticker-frames.js",
