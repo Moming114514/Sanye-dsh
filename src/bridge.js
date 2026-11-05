@@ -10187,7 +10187,22 @@ const fishGroupNames = new Map(); // groupId -> group_name（'' = 查不到）
           log(`[autolook] 取图异常 ${key}: ${e?.message ?? e}`);
         }
       }
+      // P2E_E4：mface / 动图统一抽帧成静帧，模型才看得到画面
       if (buffer?.length) {
+        const anim = media.kind === 'sticker' || String(media.subType ?? '') === '1' || /gif|apng|webp/i.test(String(mimeType || ''));
+        if (anim && cfg?.socialV2?.media?.flattenAnim !== false) {
+          try {
+            const flat = await flattenAnimated(buffer, mimeType);
+            if (flat?.buffer?.length) {
+              buffer = flat.buffer; mimeType = flat.mimeType || 'image/png';
+              log(`[media] 动图抽帧 ok ${buffer.length}`);
+            } else {
+              log(`[media] 动图抽帧 skip ${buffer.length}`);
+            }
+          } catch (e) {
+            log(`[media] 动图抽帧 fail ${buffer.length} ${e?.message ?? e}`);
+          }
+        }
         parts.push({ type: 'image', mediaType: mimeType, data: buffer.toString('base64'), name: `auto-${media.kind}-${idx + 1}.${(mimeType.split('/')[1] || 'jpg')}` });
         log(`[autolook] 已附图 ${key}（${label}，${buffer.length} 字节）`);
       }

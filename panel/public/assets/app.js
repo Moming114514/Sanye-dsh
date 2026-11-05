@@ -3634,7 +3634,7 @@ function pagePeople() {
     wrap.append(h('div', { class: 'card muted' }, '这个群今天还没有统计到消息（或刚重启过）。' + (state.peopleErr ? ' 错误：' + state.peopleErr : '')));
     return wrap;
   }
-  const tr = (r) => h('tr', { id: 'pr-' + r.uin },
+  const tr = (r) => h('tr', { id: 'pr-' + r.uin, style: r.mark === 'bot' ? 'background:rgba(239,68,68,.12)' : r.mark === 'human' ? 'background:rgba(34,197,94,.12)' : '' },
     h('td', {}, avatarOf(r.uin, r.name), h('span', {}, r.name || '-')),
     h('td', { class: 'mono', style: 'font-size:12px' }, r.uin),
     h('td', { class: 'num' }, String(r.n)),
