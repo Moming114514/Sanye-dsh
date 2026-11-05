@@ -3016,8 +3016,10 @@ function pageGroupRules() {
     return h('div', { class: 'card muted' }, '正在读群规则…');
   }
   const d = state.groupRules;
+  const addCard = h('div', { class: 'card', style: 'margin-bottom:10px' }, h('div', { class: 'kv', style: 'align-items:center;gap:10px' }, [h('b', {}, '添加'), addWhitelistRow(['group', 'private'])]));
   if (!d.rows.length) {
     return h('div', {}, [
+      addCard,
       d.errors.length ? h('div', { class: 'card', style: 'border-color:var(--warn)' }, [
         h('div', { class: 'card-h' }, '读取失败，先用兜底显示'),
         ...d.errors.map((x) => h('div', { class: 'muted', style: 'font-size:12.5px' }, '· ' + x)),
@@ -3068,6 +3070,7 @@ function pageGroupRules() {
     ...d.errors.map((x) => h('div', { class: 'muted', style: 'font-size:12.5px' }, '· ' + x)),
   ]) : null;
   return h('div', {}, [
+    addCard,
     h('div', { class: 'muted', style: 'margin:0 2px 10px;font-size:12.5px' }, '这里改的是「她在每个群怎么说话」，改完 60 秒内生效；删增群需要重启桥接。'),
     err,
     h('div', { class: 'tbl-fit' }, h('table', { class: 'tbl-fit rules-tbl' }, [head, body])),
@@ -3563,6 +3566,28 @@ function rerenderKeepFocus() {
   const el = document.getElementById(id);
   if (!el) return;
   try { el.focus(); if (ss != null) el.setSelectionRange(ss, se); } catch (e) {}
+}
+
+
+// P2E_E2：白名单添加入口（群规则页 / 人页共用）
+async function addWhitelist(kind, raw) {
+  const id = String(raw || '').trim().replace(/[^0-9]/g, '');
+  if (!id) { toast('请输入' + (kind === 'group' ? '群号' : 'QQ 号')); return false; }
+  try {
+    await api('/api/access', { method: 'POST', body: { kind, id, action: 'add' } });
+    toast('已添加，30 秒内生效');
+    if (kind === 'group') { state.groupRules = null; await loadGroupRules(true); } else { await loadPeople(); }
+    rerender();
+    return true;
+  } catch (e) { toast('没加上：' + (e && e.message || e)); return false; }
+}
+function addWhitelistRow(kinds) {
+  const box = h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;align-items:center' });
+  for (const k of kinds) {
+    const input = h('input', { type: 'text', placeholder: k === 'group' ? '群号，可粘贴' : 'QQ 号', style: 'width:150px' });
+    box.append(input, h('button', { class: 'btn', onclick: () => addWhitelist(k, input.value) }, k === 'group' ? '添加群' : '添加私聊'));
+  }
+  return box;
 }
 
 // PEOPLE_AVA：QQ 头像（浏览器直连 qlogo，加载失败就露首字母，不占额外请求）
