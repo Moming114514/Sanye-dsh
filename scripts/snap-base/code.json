@@ -1,8 +1,8 @@
 {
  "schema": "snap-code/v1",
- "at": "2026-11-05T00:13:37.014Z",
+ "at": "2026-11-05T00:19:06.281Z",
  "tools": {
-  "count": 50,
+  "count": 51,
   "names": [
    "note_tech",
    "qq_close_conversation",
@@ -43,6 +43,7 @@
    "qq_send_poke",
    "qq_send_private_message",
    "qq_send_qzone_msg",
+   "qq_send_sticker",
    "qq_set_avatar",
    "qq_set_profile",
    "qq_set_sticker_remark",
