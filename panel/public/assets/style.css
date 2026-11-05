@@ -275,3 +275,18 @@ input:focus,select:focus{border-color:var(--accent)}
   .mh-line-t{width:88px}
   .mh-weeks{height:150px;gap:6px}
 }
+
+/* P2-A：群规则单表 + 绿闪 */
+.rules-tbl td { vertical-align: middle; }
+.rules-tbl th:first-child, .rules-tbl td:first-child { min-width: 150px; }
+.rules-tbl input.input, .rules-tbl select.input { height: 28px; }
+@keyframes grflash { 0% { background: rgba(46,160,67,.30); } 100% { background: transparent; } }
+tr.gr-flash > td { animation: grflash 1.3s ease-out; }
+
+/* P2-A：群规则状态点（避免 emoji 字体缺失显示成方块） */
+.gr-state { display: inline-flex; align-items: center; gap: 5px; }
+.gr-state::before { content: ''; width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.gr-state.ok::before { background: var(--ok); }
+.gr-state.wait::before { background: var(--warn); }
+.gr-state.ok { color: var(--ok); }
+.gr-state.wait { color: var(--warn); }

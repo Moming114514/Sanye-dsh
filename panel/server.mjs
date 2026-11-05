@@ -794,8 +794,21 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/names') { // NAMES_PROXY：把号码翻成名字
       if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
       const body = req.method === 'POST' ? await readBody(req) : {};
-      const r = await api('/api/socialV2/names', 'POST', body);
-      return send(res, r?.ok ? 200 : 400, r || { ok: false });
+      // 先读本地 names.json（桥接查名偶尔返回空，本地缓存更可靠），再叠桥接结果
+      const local = readJSON(path.join(QQ_STATE, 'names.json'), {}) || {};
+      let r = null;
+      try { r = await api('/api/socialV2/names', 'POST', body); } catch {}
+      const normalize = (m) => {
+        const out = {};
+        for (const [k, v] of Object.entries(m || {})) {
+          if (typeof v === 'string') out[k] = { name: v };
+          else if (v && typeof v === 'object') out[k] = v;
+        }
+        return out;
+      };
+      const groups = { ...normalize(local.groups), ...normalize(r && r.groups) };
+      const users = { ...normalize(local.users), ...normalize(r && r.users) };
+      return send(res, 200, { ok: true, groups, users });
     }
     if (p === '/api/style-bulk') { // STYLE_BULK_UI
       if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });

@@ -12,6 +12,7 @@ const PAGES = [
   { id: 'utter', title: '她说的话', render: pageUtter },
   { id: 'settings', title: '设置', render: pageSettings },
   { id: 'access', title: '白名单', render: pageAccess },
+  { id: 'group-rules', title: '群规则', render: pageGroupRules }, // P2-A
   { id: 'safe', title: '安全', render: pageSafe }, // 频率 + 敏感话题
   { id: 'cost', title: '花费', render: pageCost },
   { id: 'memory', title: '记忆与情绪', render: pageMemory },
@@ -28,7 +29,7 @@ const PAGES = [
 // 组名是灰字不可点；手机端由 CSS 隐藏组名，仍是原来的横向导航
 const NAV_GROUPS = [
   { title: '感知', ids: ['people'] },
-  { title: '判断', ids: ['features', 'access', 'decisions', 'safe'] },
+  { title: '判断', ids: ['features', 'access', 'group-rules', 'decisions', 'safe'] },
   { title: '表达', ids: ['commands', 'utter', 'style'] },
   { title: '记忆', ids: ['memory', 'impr', 'starmap', 'memhealth'] },
   { title: '运维', ids: ['overview', 'entry', 'settings', 'cost', 'plugins'] },
@@ -37,6 +38,7 @@ const NAV_GROUPS = [
 
 // PAGE_ADJUST（B 批）：每页第一张卡之前的一行说明——这页到底能调什么
 const PAGE_ADJUST = {
+  'group-rules': '一屏看完每个群：在不在白名单、怎么回、发言量、只回谁、抽样多少；改完 60 秒内生效，白名单增删建议重启一次。',
   decisions: '每一条「要不要回」的判决都在这里：哪层拦的、分数多少、最后回没回。只读，不改任何判断。',
   overview: '什么也调不了，只看今天的量：消息、唤醒、花费、心情。',
   entry: '入口通道的状态；改通道要去「设置」。',
@@ -46,7 +48,7 @@ const PAGE_ADJUST = {
   utter: '她最近说过的话；可以删掉不想留的句子。',
   settings: '运行参数（群限制、回复长度等）；改完多半要重启桥接。页面底部有「重启桥接」按钮。',
   access: '白名单与准入；决定哪些群、哪些人能跟她说话。',
-  safe: '省钱模式、群频率、敏感词、按群规则，四块都在这一页。',
+  safe: '省钱模式、群频率、敏感词，三块都在这一页；按群规则已挪到「群规则」页。',
   cost: '花费曲线与额度；省钱模式在「安全」页。',
   memory: '记忆条目可以删；心情只能看，不能调。',
   impr: '她对人的看法；可以删掉一条看法。',
@@ -2814,12 +2816,240 @@ function decisionConvName(x) {
   const m = /^(group|private):(\d+)$/.exec(String(x.key || ''));
   if (!m) return x.key || '';
   const kind = m[1] === 'group' ? 'group' : 'private';
-  const hit = state.names && state.names[kind] && state.names[kind][m[2]];
+  const bucket = kind === 'group' ? 'groups' : 'users';
+  const hit = state.names && state.names[bucket] && state.names[bucket][m[2]];
   const nm = hit && hit.name ? hit.name + ' · ' : '';
   return nm + (m[1] === 'group' ? '群 ' : '私聊 ') + m[2];
 }
 
+
+// ==================== P2-A 群规则（单表） ====================
+// 只读五个现有接口，写走 applyGroupRule 适配层；不改桥接、不新增后端。
+const GR_MODES = { normal: '正常聊', called: '只回@', watch: '只看不说' };
+const GR_LEVELS = { quiet: '保守', normal: '正常', active: '活跃', custom: '自定义' };
+const GR_HIDE_TITLES = ['三档总览（快捷预设）', '群发言频率（每群单独一档', '群发言频率', '学习模式（只看不聊）', '按群规则（只回谁'];
+
+function hideLegacyGroupCards() {
+  // 复用同一批旧卡：全部隐藏，代码还在；把 state._hideLegacyGroupCards 设为 false 即可回滚
+  if (state._hideLegacyGroupCards === false) return;
+  for (const card of document.querySelectorAll('#view .card')) {
+    const head = card.querySelector('.card-h, h3');
+    const text = String(head && head.textContent || '').trim();
+    if (!text) continue;
+    if (GR_HIDE_TITLES.some((t) => text.startsWith(t.slice(0, 8)) || text.startsWith(t))) card.style.display = 'none';
+  }
+}
+
+function grEffective(row) {
+  const lv = row.level || 'normal';
+  const base = (row.levels || {})[lv] || {};
+  const cu = row.custom || null;
+  const presetMin = Math.round(Number(base.minGapMs || 0) / 60000);
+  const presetMax = Number(base.maxPerDay || 0);
+  const isCustom = !!(cu && (Number(cu.perDay || 0) !== presetMax || Number(cu.minGapMin || 0) !== presetMin));
+  return {
+    level: isCustom ? 'custom' : lv,
+    minGapMin: isCustom ? Number(cu.minGapMin || 0) : presetMin,
+    perDay: isCustom ? Number(cu.perDay || 0) : presetMax,
+    presetMin,
+    presetMax,
+  };
+}
+
+async function loadGroupRules(force) {
+  if (state.groupRules && !force) return state.groupRules;
+  const data = { rows: [], errors: [], levels: {}, at: 0 };
+  const get = async (p, label) => {
+    try { return await api(p); } catch (e) { data.errors.push(label + '（' + p + '）：' + (e.message || '读取失败')); return null; }
+  };
+  const [acc, mute, learn, gr, attn] = await Promise.all([
+    get('/api/access', '白名单'), get('/api/mute', '静音'), get('/api/learn', '学习模式'),
+    get('/api/gr', '发言频率'), get('/api/attn-get', '抽样/只回谁'),
+  ]);
+  data.levels = (gr && gr.levels) || {};
+  const allow = new Set(((acc && acc.groups) || []).map(String));
+  const muted = new Set((((mute && mute.keys) || [])).filter((k) => String(k).startsWith('group:')).map((k) => String(k).slice(6)));
+  const learned = new Set(((learn && learn.groups) || []).map(String));
+  const rates = new Map((((gr && gr.rates) || [])).map((r) => [String(r.gid), r]));
+  const sample = (attn && attn.sample) || {};
+  const replyOnly = (attn && attn.replyOnly) || {};
+  const onlyGid = (k) => /^\d{5,}$/.test(String(k));
+  const gids = new Set([
+    ...allow, ...rates.keys(), ...muted, ...learned,
+    ...Object.keys(sample || {}).filter(onlyGid), ...Object.keys(replyOnly || {}).filter(onlyGid),
+  ]);
+  // 名字：只补缺的
+  const need = [...gids].filter((g) => {
+    const hit = state.names && state.names.group && state.names.group[g];
+    return !(hit && hit.name);
+  });
+  if (need.length) {
+    try {
+      const r = await api('/api/names', { method: 'POST', body: { groups: need, users: [] } });
+      state.names = state.names || { group: {}, private: {} };
+      state.names.group = { ...(state.names.group || {}), ...(r.groups || {}) };
+    } catch {}
+  }
+  const now = Date.now();
+  data.rows = [...gids].filter(Boolean).map((gid) => {
+    const r = rates.get(gid) || {};
+    const cu = r.custom || null;
+    const hit = state.names && state.names.group && state.names.group[gid];
+    const name = (hit && hit.name) || (typeof hit === 'string' ? hit : '') || '';
+    return {
+      gid,
+      name,
+      allow: allow.has(gid),
+      mode: learned.has(gid) ? 'watch' : (muted.has(gid) ? 'called' : 'normal'),
+      level: r.level || 'normal',
+      levels: data.levels,
+      custom: cu,
+      count: Number(r.count || 0),
+      lastAt: Number(r.lastAt || 0),
+      maxPerDay: Number(r.maxPerDay || 0),
+      minGapMs: Number(r.minGapMs || 0),
+      sample: Number(sample[gid] || 0),
+      replyOnly: (replyOnly[gid] || []).join(', '),
+      minsAgo: Number(r.lastAt || 0) ? Math.max(0, Math.round((now - Number(r.lastAt)) / 60000)) : null,
+    };
+  }).sort((a, b) => Number(b.count || 0) - Number(a.count || 0) || String(a.name || a.gid).localeCompare(String(b.name || b.gid), 'zh'));
+
+  const pending = state.pending && state.pending.count > 0;
+  if (!(state._grRestart instanceof Set)) state._grRestart = new Set();
+  for (const row of data.rows) row.pendingRestart = state._grRestart.has(String(row.gid));
+  data.at = now;
+  state.groupRules = data;
+  return data;
+}
+
+async function applyGroupRule(gid, field, next) {
+  const row = ((state.groupRules && state.groupRules.rows) || []).find((r) => r.gid === gid) || {};
+  const prev = String(
+    field === 'allow' ? (row.allow ? '在' : '不在')
+      : field === 'mode' ? GR_MODES[row.mode] || row.mode
+        : field === 'level' ? GR_LEVELS[row.level] || row.level
+          : field === 'replyOnly' ? (row.replyOnly || '不限')
+            : field === 'sample' ? (row.sample || 0)
+              : String((grEffective(row).minGapMin) + ' 分钟/' + grEffective(row).perDay + ' 次'),
+  );
+  const muteKey = 'group:' + gid;
+  try {
+    if (field === 'allow') {
+      await api('/api/access', { method: 'POST', body: { kind: 'group', id: gid, action: next ? 'add' : 'remove' } });
+      state.access = null;
+    } else if (field === 'mode') {
+      if (next === 'called') {
+        await api('/api/mute', { method: 'POST', body: { action: 'mute', key: muteKey } });
+        await api('/api/learn', { method: 'POST', body: { action: 'off', group: gid } }).catch(() => {});
+      } else if (next === 'watch') {
+        await api('/api/learn', { method: 'POST', body: { action: 'on', group: gid } });
+        await api('/api/mute', { method: 'POST', body: { action: 'unmute', key: muteKey } });
+      } else {
+        await api('/api/mute', { method: 'POST', body: { action: 'unmute', key: muteKey } });
+        await api('/api/learn', { method: 'POST', body: { action: 'off', group: gid } }).catch(() => {});
+      }
+      state.muted = null; state.learn = null;
+    } else if (field === 'level') {
+      const base = (row.levels || {})[next] || {};
+      await api('/api/gr', { method: 'POST', body: { action: 'set', group: gid, level: next } });
+      // 预设档位要同时覆盖自定义值，否则 custom 会一直盖住
+      await api('/api/gr', { method: 'POST', body: { action: 'custom', group: gid, minGapMin: Math.round(Number(base.minGapMs || 0) / 60000), perDay: Number(base.maxPerDay || 40) } });
+      state.gr = null;
+    } else if (field === 'rate') {
+      await api('/api/gr', { method: 'POST', body: { action: 'custom', group: gid, minGapMin: Number(next.minGapMin), perDay: Number(next.perDay) } });
+      state.gr = null;
+    } else if (field === 'replyOnly') {
+      await api('/api/attn-set', { method: 'POST', body: { group: gid, replyOnly: String(next || '') } });
+      state.attnCfg = null;
+    } else if (field === 'sample') {
+      await api('/api/attn-set', { method: 'POST', body: { group: gid, sample: Number(next) || 0 } });
+      state.attnCfg = null;
+    }
+    if (field === 'allow') state._grRestart.add(String(gid));
+    state.groupRules = null;
+    await loadGroupRules(true);
+    state.flash = { gid, at: Date.now() };
+    rerender();
+    setTimeout(() => { if (state.flash && state.flash.gid === gid) { state.flash = null; rerender(); } }, 1300);
+    if (field === 'allow') toast(next ? '已加入白名单（下一条消息生效；没生效就重启桥接）' : '已移出白名单（下一条消息生效）');
+    else if (field === 'mode') toast('已改：' + (GR_MODES[next] || next) + '（立刻生效）');
+    else toast('已保存（60 秒内生效）');
+    loadPending().catch(() => {});
+  } catch (e) {
+    toast(({ allow: '在群里', mode: '怎么回', level: '档位', rate: '发言量', replyOnly: '只回谁', sample: '抽样' }[field] || field)
+      + '没改成：' + (e.message || '未知错误') + '；原值：' + prev, 4200);
+    state.groupRules = null;
+    await loadGroupRules(true).catch(() => {});
+    rerender();
+  }
+}
+
+function pageGroupRules() {
+  if (!state.groupRules) {
+    loadGroupRules(true).catch(() => {}).finally(() => rerender());
+    return h('div', { class: 'card muted' }, '正在读群规则…');
+  }
+  const d = state.groupRules;
+  if (!d.rows.length) {
+    return h('div', {}, [
+      d.errors.length ? h('div', { class: 'card', style: 'border-color:var(--warn)' }, [
+        h('div', { class: 'card-h' }, '读取失败，先用兜底显示'),
+        ...d.errors.map((x) => h('div', { class: 'muted', style: 'font-size:12.5px' }, '· ' + x)),
+        h('div', { style: 'margin-top:10px' }, h('button', { class: 'btn', onclick: () => { state.groupRules = null; rerender(); } }, '重试')),
+      ]) : h('div', { class: 'card' }, [
+        h('h3', {}, '群规则'),
+        h('div', { class: 'muted' }, '还没有配置任何群。'),
+        h('div', { style: 'margin-top:10px' }, h('a', { href: '#access', class: 'btn ghost' }, '去白名单添加')),
+      ]),
+    ]);
+  }
+  const head = h('thead', {}, h('tr', {}, ['群', '在群里？', '怎么回', '发言量（间隔 / 每天）', '只回谁（QQ，逗号分隔）', '抽样%', '今天', '状态']
+    .map((t) => h('th', {}, t))));
+  const body = h('tbody', {}, ...d.rows.map((row) => {
+    const eff = grEffective(row);
+    const flash = state.flash && state.flash.gid === row.gid;
+    const td = (children, opts = {}) => h('td', opts, children);
+    const allowBox = h('input', {
+      type: 'checkbox', checked: row.allow ? 'checked' : null,
+      onchange: (e) => { const v = e.target.checked; e.target.disabled = true; applyGroupRule(row.gid, 'allow', v); },
+    });
+    const modeSel = h('select', { class: 'input', onchange: (e) => applyGroupRule(row.gid, 'mode', e.target.value) },
+      Object.entries(GR_MODES).map(([k, v]) => h('option', { value: k, selected: row.mode === k ? 'selected' : null }, v)));
+    const lvSel = h('select', { class: 'input', style: 'max-width:96px', onchange: (e) => applyGroupRule(row.gid, 'level', e.target.value) },
+      [...Object.entries(GR_LEVELS).filter(([k]) => k !== 'custom'), ['custom', '自定义']].map(([k, v]) =>
+        h('option', { value: k, selected: eff.level === k ? 'selected' : null, disabled: k === 'custom' ? 'disabled' : null }, v)));
+    const gapIn = h('input', { class: 'input', type: 'number', min: 0, max: 240, value: String(eff.minGapMin), style: 'width:66px',
+      onchange: (e) => applyGroupRule(row.gid, 'rate', { minGapMin: Number(e.target.value) || 0, perDay: eff.perDay }) });
+    const dayIn = h('input', { class: 'input', type: 'number', min: 1, max: 500, value: String(eff.perDay), style: 'width:74px',
+      onchange: (e) => applyGroupRule(row.gid, 'rate', { minGapMin: eff.minGapMin, perDay: Number(e.target.value) || 1 }) });
+    const replyIn = h('input', { class: 'input', value: row.replyOnly, placeholder: '空=不限', style: 'width:170px',
+      onchange: (e) => applyGroupRule(row.gid, 'replyOnly', e.target.value) });
+    const sampleIn = h('input', { class: 'input', type: 'number', min: 0, max: 5, step: 0.1, value: String(row.sample || 0), style: 'width:64px',
+      onchange: (e) => applyGroupRule(row.gid, 'sample', e.target.value) });
+    return h('tr', { class: flash ? 'gr-flash' : null }, [
+      td([h('div', { class: 'mono' }, row.name || row.gid), h('div', { class: 'muted', style: 'font-size:11.5px' }, row.gid)]),
+      td(allowBox),
+      td(modeSel),
+      td(h('div', { style: 'display:flex;gap:6px;align-items:center;flex-wrap:wrap' }, [lvSel, gapIn, h('span', { class: 'muted' }, '/'), dayIn, h('span', { class: 'muted' }, '次')])),
+      td(replyIn),
+      td(sampleIn),
+      td(h('span', { class: 'muted', style: 'font-size:12px' }, `今天 ${row.count}/${row.maxPerDay} 次` + (row.minsAgo == null ? ' · 距上次 —' : ` · 距上次 ${row.minsAgo} 分钟`))),
+      td(row.pendingRestart ? h('span', { class: 'gr-state wait' }, '需重启') : h('span', { class: 'gr-state ok' }, '立即')),
+    ]);
+  }));
+  const err = d.errors.length ? h('div', { class: 'card', style: 'border-color:var(--warn)' }, [
+    h('div', { class: 'card-h' }, '部分读取失败（该列显示兜底值）'),
+    ...d.errors.map((x) => h('div', { class: 'muted', style: 'font-size:12.5px' }, '· ' + x)),
+  ]) : null;
+  return h('div', {}, [
+    h('div', { class: 'muted', style: 'margin:0 2px 10px;font-size:12.5px' }, '这里改的是「她在每个群怎么说话」，改完 60 秒内生效；删增群需要重启桥接。'),
+    err,
+    h('div', { class: 'tbl-fit' }, h('table', { class: 'tbl-fit rules-tbl' }, [head, body])),
+  ].filter(Boolean));
+}
+
 function pageDecisions() {
+  if (!state.names) loadNames().catch(() => {});
   const wrap = h('div', {});
   if (!state.decFilter) state.decFilter = { day: new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10) };
   const f = state.decFilter;
@@ -3088,6 +3318,7 @@ function rerender() {
   else $('#view').replaceChildren(_view);
   $('#conn').className = 'conn ok';
   $('#conn').textContent = '已连接 · ' + (state.overview?.cfgMeta?.mode || '');
+  hideLegacyGroupCards();
 }
 
 async function boot() {
