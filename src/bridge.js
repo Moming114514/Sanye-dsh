@@ -13157,6 +13157,17 @@ const fishGroupNames = new Map(); // groupId -> group_name（'' = 查不到）
       }
       throw error;
     }
+    // SIDECAR_ENTRY_PATCH：非 wake 的后台任务（学习/学样/GitHub）也走副手提示词
+    if (opts?.reason && isSidecarTask(opts.reason) && !opts.wakeReason) {
+      try {
+        const st0 = getSocialV2State(key);
+        const sc0 = buildSidecarPrompt(opts.reason, key, st0?.agentToken || '');
+        promptText = sc0 + '\n\n' + promptText;
+        log(`[task] 副手模式（入口）reason=${opts.reason} promptChars=${promptText.length}`);
+      } catch (e) {
+        log(`[task] 副手提示词组装失败：${e?.message || e}`);
+      }
+    }
     let wakeState;
     let wakeToken;
     let wakeSnapshot;
