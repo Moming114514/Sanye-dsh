@@ -14,7 +14,9 @@ export const LEVELS = {
 
 let cache = { sig: '', data: null };
 
-const today = () => new Date().toISOString().slice(0, 10);
+// D-1：按东八区日期跨天（UTC 会在北京时间 08:00 才翻篇，导致上午还算昨天）
+const today = () => new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
+const hhmm = (ts) => { try { return new Date(Number(ts) || 0).toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit', hour12: false }); } catch { return '--:--'; } };
 
 function readAll() {
   let sig = '';
@@ -34,11 +36,14 @@ function readAll() {
     // 文件坏了当默认
   }
   if (data.day !== today()) {
-    // 新的一天：清计数，留档位
+    // D-1：新的一天清计数，档位与自定义（custom）都保留
     const groups = {};
-    for (const [gid, v] of Object.entries(data.groups)) groups[gid] = { level: v.level || 'normal', count: 0, lastAt: 0 };
+    for (const [gid, v] of Object.entries(data.groups)) {
+      groups[gid] = { ...v, level: v.level || 'normal', count: 0, lastAt: 0, custom: v.custom || null };
+    }
     data = { day: today(), groups };
     try { writeAll(data); } catch {}
+    try { const st2 = fs.statSync(FILE); sig = `${st2.mtimeMs}:${st2.size}`; } catch { sig = ''; }
   }
   cache = { sig, data };
   return data;
@@ -60,14 +65,22 @@ export function groupLevel(gid) {
 
 export function groupRates() {
   const d = readAll();
-  return Object.entries(d.groups).map(([gid, v]) => ({
-    gid,
-    level: LEVELS[v?.level] ? v.level : 'normal',
-    count: Number(v?.count || 0),
-    lastAt: Number(v?.lastAt || 0),
-    ...LEVELS[LEVELS[v?.level] ? v.level : 'normal'],
-    custom: v?.custom || null,
-  }));
+  return Object.entries(d.groups).map(([gid, v]) => {
+    const lv = LEVELS[v?.level] ? v.level : 'normal';
+    const base = LEVELS[lv];
+    const cu = v?.custom || null;
+    // D-1：面板展示的是「真正生效」的上限，自定义优先
+    return {
+      gid,
+      level: lv,
+      count: Number(v?.count || 0),
+      lastAt: Number(v?.lastAt || 0),
+      ...base,
+      maxPerDay: cu?.perDay ? Number(cu.perDay) : base.maxPerDay,
+      minGapMs: cu?.minGapMin ? Number(cu.minGapMin) * 60000 : base.minGapMs,
+      custom: cu,
+    };
+  });
 }
 
 export function setGroupCustom(gid, patch) { // CUSTOM_RATE：每群可单独设最小间隔/每日上限
@@ -132,11 +145,13 @@ export default {
     const maxPerDay = cu?.perDay ? Number(cu.perDay) : cfg.maxPerDay;
     const minGapMs = cu?.minGapMin ? Number(cu.minGapMin) * 60000 : cfg.minGapMs;
     if (count >= maxPerDay) {
-      return { allow: false, reason: `[频繁度] 跳过唤醒 ${k}（${why}）：今天已 ${count}/${maxPerDay} 次` };
+      // D-1：被拦时把「当前 count / 上限 / 最近一次」都写出来，面板和日志能对上
+      return { allow: false, reason: `[频繁度] 跳过唤醒 ${k}（${why}）：今天已 ${count}/${maxPerDay} 次，最近一次 ${lastAt ? hhmm(lastAt) : '无'}，明天 0 点重置` };
     }
     if (lastAt && now - lastAt < minGapMs) {
       const waitMin = Math.ceil((minGapMs - (now - lastAt)) / 60000);
-      return { allow: false, reason: `[频繁度] 跳过唤醒 ${k}（${why}）：还要等 ${waitMin} 分钟` };
+      const gapMin = Math.max(1, Math.round(minGapMs / 60000));
+      return { allow: false, reason: `[频繁度] 跳过唤醒 ${k}（${why}）：当前 ${count}/${maxPerDay} 次，最近一次 ${hhmm(lastAt)}，最小间隔 ${gapMin} 分钟，还要等 ${waitMin} 分钟` };
     }
     bump(gid);
     return true;
