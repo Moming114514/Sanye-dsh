@@ -89,8 +89,9 @@ export default function createAttention({ log }) {
           const cap = Number(sp.maxPerDay ?? 20);
           if (used < cap && Math.random() * 100 < pct) {
             sampleCount.set(ck, used + 1);
-            active = { key: k, score: min, min, at: Date.now() };
-            log(`[抽样] 放行 ${k}（分数 ${st.score} < ${min}，今天第 ${used + 1} 次）`);
+            // D-2：抽样只放行，不动分数；sampled=true 用于三档判定（默认走正常档）
+            active = { key: k, score: st.score, min, at: Date.now(), sampled: true };
+            log(`[抽样] 放行 ${k}（分数 ${st.score} < ${min}，今天第 ${used + 1} 次，sampled=true）`);
             return true;
           }
         }
@@ -112,6 +113,13 @@ export default function createAttention({ log }) {
         if (c.enabled === false || !active) return null;
         if (Date.now() - active.at > 3 * 60 * 1000) return null;
         const min = active.min || 2;
+        // D-2：抽样放行的消息默认按正常档处理（sampleTier=oneLine 可退回一句档）
+        if (active.sampled) {
+          if (c.sampleTier === 'oneLine') {
+            return '【这条只值一句】只回一句话（15 字以内），别提问、别举例、别展开；想不出说什么就不说。';
+          }
+          return null;
+        }
         if (active.score < min + 2) {
           return '【这条只值一句】只回一句话（15 字以内），别提问、别举例、别展开；想不出说什么就不说。';
         }
