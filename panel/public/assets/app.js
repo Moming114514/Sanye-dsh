@@ -449,7 +449,7 @@ function loadCmds() {
 function pageFeatures() {
   const wrap = h('div', {});
   const bar = h('div', { class: 'toolbar' },
-    h('input', { type: 'text', placeholder: '搜索功能名…', value: state.q, oninput: (e) => { state.q = e.target.value; rerender(); } }),
+    h('input', { type: 'text', id: 'feat-q', placeholder: '搜索功能名…', value: state.q, oninput: (e) => { state.q = e.target.value; rerenderKeepFocus(); } }),
     h('label', { class: 'muted', style: 'display:flex;gap:6px;align-items:center' },
       h('input', { type: 'checkbox', checked: state.filterOnlyOff ? 'checked' : null, onchange: (e) => { state.filterOnlyOff = e.target.checked; rerender(); } }), '只看关着的'),
     h('span', { class: 'muted', style: 'margin-left:auto' }, '改动会写配置并自动备份'),
@@ -3550,6 +3550,20 @@ function fmtHm(ms) {
   return p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes());
 }
 
+
+
+// P2E_E1：重绘后保留焦点与光标（搜索框输入不再失焦）
+function rerenderKeepFocus() {
+  const a = document.activeElement;
+  const id = a && a.id;
+  const ss = a && a.selectionStart;
+  const se = a && a.selectionEnd;
+  rerender();
+  if (!id) return;
+  const el = document.getElementById(id);
+  if (!el) return;
+  try { el.focus(); if (ss != null) el.setSelectionRange(ss, se); } catch (e) {}
+}
 
 // PEOPLE_AVA：QQ 头像（浏览器直连 qlogo，加载失败就露首字母，不占额外请求）
 function avatarOf(uin, name) {
