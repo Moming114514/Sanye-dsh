@@ -19,6 +19,7 @@ const PAGES = [
   { id: 'memory-old', title: '记忆与情绪（旧）', render: pageMemory },
   { id: 'impr', title: '她的看法', render: pageImpr },
   { id: 'style', title: '学说话', render: pageStyle }, // STYLE_GATE_PATCH
+  { id: 'talk', title: '说话', render: pageTalk }, // P2-B
   { id: 'decisions', title: '决策记录', render: pageDecisions }, // P1
   { id: 'starmap', title: '记忆星海', render: pageStarmap },
   { id: 'memhealth', title: '记忆体检', render: pageMemHealth },
@@ -371,6 +372,27 @@ function pageOverview() {
       ...svc.map(([n, v]) => h('div', { class: 'kv' }, h('span', {}, n), h('span', { style: v === 'active' ? 'color:var(--ok)' : 'color:var(--bad)' }, v))),
     ),
   ));
+  // P2-B 2.2：概览只留四块（花费 / 她刚说的 / 待办与提醒 / 健康红绿灯）
+  hideCardsIn(wrap, ['QQ 状态', '媒体', '运行', '她现在的心情', '端口', '记着的东西', '最近她说的']);
+  const _sends = (d.sends || []).slice(0, 3);
+  const _sendRows = _sends.length
+    ? _sends.map((l) => h('div', { class: 'kv', style: 'align-items:flex-start' },
+        h('span', { class: 'mono', style: 'font-size:11.5px;flex:0 0 92px;color:#7f8b99' }, (l.match(/^\S+\s+\S+\s+\S+/) || [''])[0]),
+        h('span', { style: 'flex:1' }, l.replace(/^\S+\s+\S+\s+\S+\s*/, '').slice(0, 160))))
+    : [h('div', { class: 'muted' }, '日志里还没抓到发送记录')];
+  wrap.append(h('div', { class: 'card', style: 'margin-top:14px' },
+    h('h3', {}, '她刚说的'),
+    ..._sendRows));
+  wrap.append(h('div', { class: 'card', style: 'margin-top:14px' },
+    h('h3', {}, '待办与提醒'),
+    h('div', { class: 'kv' }, h('span', {}, '她记着要做的事'), h('span', {}, ((d.loops || []).length) + ' 条')),
+    h('div', { class: 'kv' }, h('span', {}, '定时提醒'), h('span', {}, ((d.reminders || []).length) + ' 条'))));
+  wrap.append(h('div', { class: 'card', style: 'margin-top:14px;display:flex;gap:16px;flex-wrap:wrap;font-size:13px' },
+    h('a', { href: '#health' }, '健康红绿灯 →'),
+    h('a', { href: '#cost' }, '花费明细 →'),
+    h('a', { href: '#group-rules' }, '群规则 →'),
+    h('a', { href: '#talk' }, '说话 →'),
+    h('a', { href: '#settings' }, '设置 →')));
   return wrap;
 }
 
@@ -1037,6 +1059,14 @@ function pageStyle() { // STYLE_GATE_PATCH
   wrap.append(section('正式（会进提示词）', data.active, 'active', '注入私聊/群提示词，最多 6 条、每条 80 字以内。'));
   if ((data.retired || []).length) wrap.append(section('已丢弃（最近 20 条）', data.retired, 'retired', '梗、口头禅、太长、过期没复用的都在这，留着方便你捞回来。'));
   return wrap;
+}
+
+function pageTalk() {
+  return tabbed('talk', [
+    { title: '学到的说法', render: pageStyle },
+    { title: '她的看法', render: pageImpr },
+    { title: '她说的话', render: pageUtter },
+  ]);
 }
 
 function pageMemoryHub() {
