@@ -13,6 +13,16 @@ import { URL } from 'node:url';
 
 export const METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
 
+// 与 bridge 内层的 SECURITY_HEADERS 保持一致；放在这里是为了让 ctx.json 写出的
+// 响应头与搬走前逐字相同（不依赖任何按请求创建的闭包）。
+export const SECURITY_HEADERS = {
+  'X-Frame-Options': 'DENY',
+  'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'",
+  'Cache-Control': 'no-store',
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'no-referrer',
+};
+
 function norm(p) {
   if (typeof p !== 'string' || !p.startsWith('/')) throw new Error('path 必须以 / 开头：' + p);
   return p.length > 1 && p.endsWith('/') ? p.slice(0, -1) : p;
@@ -61,14 +71,15 @@ export function createRouter({ log = () => {} } = {}) {
       url,
       query: url.searchParams,
       log,
+      // 与 bridge 的 sendJson 逐字等价：同样的 content-type + SECURITY_HEADERS + 2 空格缩进。
+      // 必须走这里的 res（按请求创建），不能把 bridge 里按请求创建的 sendJson 塞进 deps ——
+      // router 是缓存复用的，那样会把第一个请求的 res 闭包一直用下去（R9-3 回归根因）。
       json(code, obj) {
-        res.statusCode = code;
-        res.setHeader('content-type', 'application/json; charset=utf-8');
-        res.end(JSON.stringify(obj));
+        res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', ...SECURITY_HEADERS });
+        res.end(JSON.stringify(obj, null, 2));
       },
       text(code, body, type = 'text/plain; charset=utf-8') {
-        res.statusCode = code;
-        res.setHeader('content-type', type);
+        res.writeHead(code, { 'content-type': type, ...SECURITY_HEADERS });
         res.end(body);
       },
     };

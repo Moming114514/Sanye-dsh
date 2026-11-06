@@ -4154,7 +4154,6 @@ async function main() {
             },
           });
           registerSocialRead(consoleRouter, {
-            sendJson,
             getCfg: () => cfg,
             readToolLog,
             ownerAudit,

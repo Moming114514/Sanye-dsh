@@ -4,19 +4,14 @@ import { createRouter } from '../../src/console/http.js';
 import { registerSocialRead } from '../../src/console/routes/social-read.js';
 
 function mockRes() {
-  const r = { code: 0, body: '' };
-  r.writeHead = (code) => { r.code = code; };
-  r.setHeader = () => {};
-  r.end = (b) => { r.body = String(b ?? ''); };
+  const r = { code: 0, body: '', writes: 0, headersSent: false, headers: {} };
+  r.writeHead = (code, headers) => { r.code = code; r.headers = headers || {}; r.headersSent = true; };
+  r.setHeader = (k, v) => { r.headers[k] = v; };
+  r.end = (b) => { r.writes += 1; r.body = String(b ?? ''); r.headersSent = true; };
   return r;
 }
 
-const sendJson = (obj, code = 200) => {
-  globalThis.__out = { code, obj };
-};
-
 const deps = {
-  sendJson,
   getCfg: () => ({ ownerQQ: 3160624852, consoleToken: 'CT', biliBridge: { enabled: true, dynamics: { groups: ['g1'] }, share: { groups: [] } }, allow: { groups: ['g0'] } }),
   readToolLog: (limit) => [{ at: 1, tool: 'qq_status', limit }],
   ownerAudit: { readTail: (limit) => [{ at: 2, limit }], health: { ok: true }, path: '/tmp/audit.jsonl' },
@@ -39,9 +34,10 @@ registerSocialRead(router, deps);
 async function call(path, headers = {}, method = 'GET') {
   const res = mockRes();
   const req = { method, url: path, headers, socket: { remoteAddress: '10.0.0.9' } };
-  globalThis.__out = null;
   const matched = await router.handle(req, res);
-  return { matched, res, out: globalThis.__out };
+  let body = null;
+  try { body = res.body ? JSON.parse(res.body) : null; } catch {}
+  return { matched, res, body };
 }
 
 const fails = [];
@@ -49,40 +45,38 @@ const check = (name, cond, extra) => { if (!cond) fails.push(name + (extra ? ' :
 
 let r = await call('/api/socialV2/tool-log?limit=5');
 check('tool-log 命中', r.matched === true);
-check('tool-log 形状', r.out?.obj?.ok === true && r.out.obj.entries[0].limit === 5, r.out);
+check('tool-log 形状', r.body?.ok === true && r.body.entries[0].limit === 5, r.body);
 
 r = await call('/api/owner-audit?limit=3');
-check('owner-audit 形状', r.out?.obj?.entries?.[0]?.limit === 3 && r.out.obj.path === '/tmp/audit.jsonl', r.out);
+check('owner-audit 形状', r.body?.entries?.[0]?.limit === 3 && r.body.path === '/tmp/audit.jsonl', r.body);
 
 r = await call('/api/bili/status');
-check('bili enabled', r.out?.obj?.enabled === true);
-check('bili dynamics 缺省', JSON.stringify(r.out.obj.dynamics) === '{"enabled":false}', r.out.obj.dynamics);
-check('bili share 正常', r.out.obj.share.enabled === true);
-check('bili groups', JSON.stringify(r.out.obj.groups) === '{"allow":["g0"],"dynamics":["g1"],"share":[]}', r.out.obj.groups);
+check('bili enabled', r.body?.enabled === true);
+check('bili dynamics 缺省', JSON.stringify(r.body.dynamics) === '{"enabled":false}', r.body.dynamics);
+check('bili share 正常', r.body.share.enabled === true);
+check('bili groups', JSON.stringify(r.body.groups) === '{"allow":["g0"],"dynamics":["g1"],"share":[]}', r.body.groups);
 
 r = await call('/api/sessions');
-check('sessions 两条', r.out?.obj?.sessions?.length === 2);
-check('sessions owner 标记', r.out.obj.sessions.find((x) => x.key === 'private:3160624852')?.owner === true);
+check('sessions 两条', r.body?.sessions?.length === 2);
+check('sessions owner 标记', r.body.sessions.find((x) => x.key === 'private:3160624852')?.owner === true);
 
 r = await call('/api/pending');
-check('pending 两条', r.out?.obj?.pending?.length === 2);
-check('pending approval 字段', r.out.obj.pending[0].toolName === 'bash' && r.out.obj.pending[0].approvalId === 'a1', r.out.obj.pending[0]);
-check('pending question 字段', Array.isArray(r.out.obj.pending[1].questions) && r.out.obj.pending[1].toolName === undefined, r.out.obj.pending[1]);
+check('pending 两条', r.body?.pending?.length === 2);
+check('pending approval 字段', r.body.pending[0].toolName === 'bash' && r.body.pending[0].approvalId === 'a1', r.body.pending[0]);
+check('pending question 字段', Array.isArray(r.body.pending[1].questions) && r.body.pending[1].toolName === undefined, r.body.pending[1]);
 
 r = await call('/api/socialV2/states');
-check('states 一条', r.out?.obj?.conversations?.length === 1);
-check('states 字段', JSON.stringify(r.out.obj.conversations[0]) === JSON.stringify({ key: 'group:1', wakeConfig: { noActionCount: 2 }, unreadCount: 2, recentCount: 1, lastWakeReason: 'message', lastAiReplyAt: 99, noActionCount: 2 }), r.out.obj.conversations[0]);
+check('states 一条', r.body?.conversations?.length === 1);
+check('states 字段', JSON.stringify(r.body.conversations[0]) === JSON.stringify({ key: 'group:1', wakeConfig: { noActionCount: 2 }, unreadCount: 2, recentCount: 1, lastWakeReason: 'message', lastAiReplyAt: 99, noActionCount: 2 }), r.body.conversations[0]);
 
 r = await call('/api/plugins', {});
-check('plugins 未授权 403', r.out?.code === 403 && r.out.obj.error === 'agent token 无效', r.out);
+check('plugins 未授权 403', r.res.code === 403 && r.body.error === 'agent token 无效', r.body);
 
-const deps2 = { ...deps, isLiveAgentToken: () => true };
 const router2 = createRouter({ log: () => {} });
-registerSocialRead(router2, deps2);
+registerSocialRead(router2, { ...deps, isLiveAgentToken: () => true });
 const res2 = mockRes();
-globalThis.__out = null;
 await router2.handle({ method: 'GET', url: '/api/plugins', headers: {}, socket: { remoteAddress: '10.0.0.9' } }, res2);
-check('plugins 授权 200', globalThis.__out?.obj?.count === 37, globalThis.__out);
+check('plugins 授权 200', JSON.parse(res2.body).count === 37, res2.body);
 
 // 未命中不写响应
 const missRes = mockRes();
@@ -95,6 +89,15 @@ const moodRes = mockRes();
 const moodMatched = await router.handle({ method: 'GET', url: '/api/socialV2/mood', headers: {}, socket: {} }, moodRes);
 check('mood 走原链', moodMatched === false);
 check('mood 响应未被写', moodRes.code === 0 && moodRes.body === '', { code: moodRes.code, body: moodRes.body });
+
+// 依赖缺失必须注册期就抛
+let depThrew = false;
+try {
+  registerSocialRead(createRouter({ log: () => {} }), { ...deps, ownerAudit: undefined });
+} catch (e) {
+  depThrew = /ownerAudit/.test(String(e?.message));
+}
+check('依赖缺失注册期抛错', depThrew === true);
 
 // 静态：bridge 里 mood / style-list 分支仍在，plugins 分支已搬走
 const br = fs.readFileSync('/home/dsh/apps/surfcore/src/bridge.js', 'utf8');
