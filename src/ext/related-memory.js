@@ -6,6 +6,8 @@ const RELMEM_STOP = new Set(['一个', '什么', '我们', '你们', '他们', '
 
 const cache = { key: '', records: [], df: new Map(), postings: new Map(), total: 0 }; // INVERTED_INDEX_PATCH
 
+import { expandGrams } from '../lib/mem-alias.js'; // MEMALIAS
+
 export function relmemGrams(s) {
   const text = String(s || '').toLowerCase().replace(/[\s\p{P}\p{S}]+/gu, ' ').trim();
   const out = [];
@@ -36,7 +38,7 @@ function index(paths) {
     const df = new Map();
     const postings = new Map();
     records.forEach((r, i) => {
-      const set = new Set(relmemGrams(`${r.title || ''} ${r.text || ''}`));
+      const set = new Set(expandGrams(relmemGrams(`${r.title || ''} ${r.text || ''}`))); // MEMALIAS
       for (const g of set) {
         df.set(g, (df.get(g) || 0) + 1);
         let arr = postings.get(g);
@@ -69,9 +71,10 @@ export function relatedMemoryBlock(text, { cfg, paths } = {}) {
   const minHits = Math.max(1, Math.min(4, Number(rc.minHits) || 2));
   const idx = index(paths);
   if (!idx.records.length) return '';
-  const qg = [...new Set(relmemGrams(q))];
+  const _qgRaw = [...new Set(relmemGrams(q))]; // MEMALIAS_NEEDHITS：阈值按原词算，别被别名撑大
+  const qg = [...new Set(expandGrams(_qgRaw))];
   if (!qg.length) return '';
-  const needHits = Math.min(minHits, qg.length);
+  const needHits = Math.min(minHits, _qgRaw.length);
   const n = Math.max(1, idx.total);
   // INVERTED_INDEX_PATCH：先用倒排拿到候选（只有命中 >= needHits 的记忆才可能进结果），
   // 再对候选算完整分。原来每条记忆都要重新切一遍 gram，2000 条以上会明显拖慢每轮注入。
@@ -87,7 +90,7 @@ export function relatedMemoryBlock(text, { cfg, paths } = {}) {
     const r = idx.records[i];
     if (!r) continue;
     let score = 0;
-    const hay = new Set(relmemGrams(`${r.title || ''} ${r.text || ''}`));
+    const hay = new Set(expandGrams(relmemGrams(`${r.title || ''} ${r.text || ''}`))); // MEMALIAS
     for (const g of qg) {
       if (!hay.has(g)) continue;
       score += Math.log(1 + n / (idx.df.get(g) || 1));
