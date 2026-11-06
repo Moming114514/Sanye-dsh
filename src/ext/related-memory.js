@@ -146,6 +146,50 @@ export function relatedMemoryBlock(text, { cfg, paths } = {}) {
   return `【和这句话有关的记忆（你自己想起来的旧事，只当背景：和当前话题无关就当没想起来，不要硬提）】\n${lines.join('\n')}`;
 }
 
+// MEMTOPIC_IMPL：按话题挑记忆 + 固定骨架（开关 socialV2.memoryTopic）
+function topicSkeleton(card) {
+  const recs = (card && card.records) || [];
+  const live = recs.filter((r) => r && !r.forgottenAt && !r.displayOnly);
+  const picks = [];
+  const init = live.filter((r) => r.isInitial).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))[0];
+  if (init) picks.push(init);
+  const top = live.filter((r) => r !== init).sort((a, b) => (b.importance || 0) - (a.importance || 0))[0];
+  if (top) picks.push(top);
+  const weekAgo = Date.now() - 7 * 864e5;
+  const recentPool = live.filter((r) => r !== init && r !== top && (r.lastSeenAt || 0) >= weekAgo);
+  const recent = (recentPool.length ? recentPool : live.filter((r) => r !== init && r !== top))
+    .sort((a, b) => (b.importance || 0) - (a.importance || 0) || (b.lastSeenAt || 0) - (a.lastSeenAt || 0))[0];
+  if (recent) picks.push(recent);
+  return picks;
+}
+
+function topicMemoryBlock(text, { cfg, paths } = {}) {
+  const mt = (cfg && cfg.socialV2 && cfg.socialV2.memoryTopic) || {};
+  const maxChars = Number(mt.maxChars || 800);
+  const maxItems = Number(mt.maxItems || 8);
+  let card = null;
+  try { card = JSON.parse(fs.readFileSync(paths.json, 'utf8')); } catch {}
+  const skel = card ? topicSkeleton(card) : [];
+  const skelLines = skel.map((r) => '- ' + clean(r.text || r.title || '').slice(0, 90));
+  const baseCfg = JSON.parse(JSON.stringify(cfg || {}));
+  baseCfg.socialV2 = baseCfg.socialV2 || {};
+  baseCfg.socialV2.relatedMemories = Object.assign({}, (cfg && cfg.socialV2 && cfg.socialV2.relatedMemories) || {}, {
+    maxItems: Math.max(2, maxItems - skelLines.length),
+    injectMaxChars: Math.max(200, maxChars - skelLines.join('').length - 80),
+  });
+  const rel = relatedMemoryBlock(text, { cfg: baseCfg, paths });
+  const skelIds = new Set(skel.map((r) => r && r.id).filter(Boolean));
+  const relLines = (rel ? rel.split('\n').slice(1) : []).filter((ln) => {
+    const t = clean(ln.replace(/^- /, '')).slice(0, 40);
+    return t && !skelLines.some((x) => x.includes(t));
+  });
+  const lines = skelLines.concat(relLines);
+  if (!lines.length) return '';
+  let out = '【你现在想起的事（一部分按这句话挑的，只当背景：和当前话题无关就当没想起来，别硬提）】\n' + lines.join('\n');
+  if (out.length > maxChars) out = out.slice(0, maxChars) + '…';
+  return out;
+}
+
 // 只在私聊注入：群聊里不能把「和主人」的旧事塞给所有人看
 export function relatedMemorySuffix({ key, text, cfg, paths, log } = {}) {
   try {
@@ -153,7 +197,8 @@ export function relatedMemorySuffix({ key, text, cfg, paths, log } = {}) {
     const _k0 = String(key || '');
     // MEMTOPIC：群聊也注入（受 groups 开关控制）
     if (!_k0.startsWith('private:') && !(_rc0.groups && _k0.startsWith('group:'))) return '';
-    const block = relatedMemoryBlock(text, { cfg, paths });
+    const _mt0 = (cfg && cfg.socialV2 && cfg.socialV2.memoryTopic) || {};
+    const block = _mt0.enabled ? topicMemoryBlock(text, { cfg, paths }) : relatedMemoryBlock(text, { cfg, paths });
     if (!block) return '';
     if (cfg?.socialV2?.relatedMemories?.log !== false && typeof log === 'function') {
       log(`[相关记忆] ${key} 注入 ${block.split('\n').length - 1} 条 for「${String(text).slice(0, 30)}」`);
