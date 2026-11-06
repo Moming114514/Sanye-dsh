@@ -73,7 +73,6 @@ import { createBiliMemory } from './bili-memory.js';
 import { createRouter } from './console/http.js';
 import { registerTokens } from './console/routes/tokens.js'; // R9-1
 import { registerRolesDebug } from './console/routes/roles-debug.js';
-import { registerSocialRead } from './console/routes/social-read.js'; // R9-3
 import {
   appendMemoryInboxEvent, looksNoteworthyMessage, resolveMemoryCardPaths, loadMemoryCard, saveMemoryCardOutputs, touchMemories } from './memory-card.js';
 import { scopedMemoryText } from './ext/memory-scope.js'; // MEMSCOPE_PATCH
@@ -4153,20 +4152,6 @@ async function main() {
               notifyDowngradeOnce,
             },
           });
-          registerSocialRead(consoleRouter, {
-            sendJson,
-            getCfg: () => cfg,
-            readToolLog,
-            ownerAudit,
-            biliMemory,
-            getBiliDynamics: () => biliDynamics,
-            getBiliShare: () => biliShare,
-            getSessionsMap: () => state.sessions,
-            getPending: () => pending,
-            getSocialV2: () => socialV2,
-            buildPlugins,
-            isLiveAgentToken,
-          });
         }
         if (await consoleRouter.handle(req, res)) return;
         if (req.method === 'GET' && url.pathname === '/') {
@@ -4178,7 +4163,11 @@ async function main() {
           }
           return;
         }
-        // moved to src/console/routes/social-read.js (R9-3)
+        if (req.method === 'GET' && url.pathname === '/api/owner-audit') {
+          const limit = Math.max(1, Math.min(200, Number(url.searchParams.get('limit')) || 50));
+          sendJson({ ok: true, entries: ownerAudit.readTail(limit), health: ownerAudit.health, path: ownerAudit.path });
+          return;
+        }
         // 调试：查看/触发花费降级（?notify=1 立即发一次通知，用于验证）
         // DBGPROMPT_PATCH：仅控制台令牌可用，手动给某个 QQ 会话投递提示词
         if (req.method === 'POST' && url.pathname === '/api/debug/prompt') {
@@ -4213,7 +4202,20 @@ async function main() {
         }
         // moved to src/console/routes/tokens.js (R9-1)
         // ── B站记忆 / 动态 / 分享（管理端只读状态 + 手动触发，供排查）─────────
-        // moved to src/console/routes/social-read.js (R9-3)
+        if (req.method === 'GET' && url.pathname === '/api/bili/status') {
+          sendJson({
+            enabled: cfg.biliBridge?.enabled !== false,
+            memory: biliMemory.status(),
+            dynamics: biliDynamics?.status() ?? { enabled: false },
+            share: biliShare?.status() ?? { enabled: false },
+            groups: {
+              allow: cfg.allow?.groups ?? [],
+              dynamics: cfg.biliBridge?.dynamics?.groups ?? [],
+              share: cfg.biliBridge?.share?.groups ?? [],
+            },
+          });
+          return;
+        }
         if (req.method === 'GET' && url.pathname === '/api/bili/prompt-preview') {
           // 只读排查：看看群友提到「B站那个号」时，实际会注入什么。
           const text = String(url.searchParams.get('text') ?? '').slice(0, 500);
@@ -4782,9 +4784,29 @@ async function main() {
           return;
         }
         // ── 会话查看 ──────────────────────────────────────────────────────────
-        // moved to src/console/routes/social-read.js (R9-3)
+        if (req.method === 'GET' && url.pathname === '/api/sessions') {
+          const list = [];
+          for (const [key, sessionId] of Object.entries(state.sessions)) {
+            list.push({ key, sessionId, owner: key === `private:${String(cfg.ownerQQ ?? '')}` });
+          }
+          sendJson({ sessions: list });
+          return;
+        }
         // ── 挂起审批 / 提问 ───────────────────────────────────────────────────
-        // moved to src/console/routes/social-read.js (R9-3)
+        if (req.method === 'GET' && url.pathname === '/api/pending') {
+          const list = [];
+          for (const [key, p] of pending.entries()) {
+            list.push({
+              key,
+              kind: p.kind,
+              sessionId: p.sessionId,
+              ...(p.kind === 'approval' ? { toolName: p.toolName, reason: p.reason, approvalId: p.approvalId } : {}),
+              ...(p.kind === 'question' ? { questions: p.questions } : {})
+            });
+          }
+          sendJson({ pending: list });
+          return;
+        }
         // ── 白名单可视化编辑（写 config.json + 热更新内存） ───────────────────
         if (req.method === 'GET' && url.pathname === '/api/whitelist') {
           sendJson({ allow: cfg.allow ?? { private: [], groups: [] }, deny: cfg.deny ?? { users: [], private: [], groups: [] }, ownerQQ: cfg.ownerQQ ?? null });
@@ -5970,7 +5992,22 @@ async function main() {
           sendJson({ ok: true, code, muted: true });
           return;
         }
-        // moved to src/console/routes/social-read.js (R9-3)
+        if (req.method === 'GET' && url.pathname === '/api/socialV2/states') {
+          const list = [];
+          for (const [key, st] of socialV2.conversations) {
+            list.push({
+              key,
+              wakeConfig: st.wakeConfig,
+              unreadCount: st.unread.length,
+              recentCount: st.recentMessages.length,
+              lastWakeReason: st.lastWakeReason,
+              lastAiReplyAt: st.lastAiReplyAt,
+              noActionCount: st.wakeConfig.noActionCount || 0
+            });
+          }
+          sendJson({ ok: true, conversations: list });
+          return;
+        }
         if (req.method === 'POST' && url.pathname === '/api/socialV2/wake') {
           const body = await readBody();
           const key = String(body.key ?? '').trim();
@@ -7129,7 +7166,17 @@ async function main() {
           }
           return;
         }
-        // moved to src/console/routes/social-read.js (R9-3)
+        if (url.pathname === '/api/plugins') { // PLUGINS_PATCH（D 批）
+          try {
+            const token = String(req.headers['x-agent-token'] || '');
+            const consoleOk = String(req.headers['x-console-token'] || '') === String(cfg.consoleToken || '');
+            const localOk = (req.socket?.remoteAddress === '127.0.0.1' || req.socket?.remoteAddress === '::1' || req.socket?.remoteAddress === '::ffff:127.0.0.1');
+            if (!isLiveAgentToken(token) && !consoleOk && !localOk) return sendJson({ ok: false, error: 'agent token 无效' }, 403);
+            return sendJson(buildPlugins());
+          } catch (e) {
+            return sendJson({ ok: false, error: String(e?.message || e) }, 500);
+          }
+        }
         if (url.pathname === '/api/socialV2/style-note' || url.pathname === '/api/socialV2/style-list' || url.pathname === '/api/socialV2/style-candidate' /* STYLE_GATE_PATCH */ || url.pathname === '/api/socialV2/group-recent' || url.pathname === '/api/socialV2/loop' || url.pathname === '/api/socialV2/person' || url.pathname === '/api/socialV2/impression' /* IMPR_EXT */ || url.pathname === '/api/socialV2/tech-notes' /* TECHNOTES_PATCH */ || url.pathname === '/api/socialV2/mute' /* MUTE_PATCH */ || url.pathname === '/api/socialV2/learnmode' /* LEARNMODE_PATCH */ || url.pathname === '/api/socialV2/grouprate' /* GROUPRATE_PATCH */ || url.pathname === '/api/socialV2/economy' /* ECONOMY_PATCH */ || url.pathname === '/api/socialV2/attention' /* ATTENTION_PATCH */ || url.pathname === '/api/socialV2/advice' /* ADVICE_PATCH */ || url.pathname === '/api/socialV2/names' /* NAMES_PATCH */ || url.pathname === '/api/socialV2/safetalk' /* GROUPRATE_PATCH */ || url.pathname === '/api/socialV2/owner-teach' /* OWNERTEACH_PATCH */ || url.pathname === '/api/socialV2/people' || url.pathname === '/api/socialV2/people-mark' /* PEOPLE_PATCH */) { // STYLE_PATCH LOOPS_PATCH NEXT_PATCH
           try {
             const token = String(req.headers['x-agent-token'] || '');
@@ -7862,7 +7909,11 @@ async function main() {
           return;
         }
         // ── 工具调用日志 ─────────────────────────────────────────────────────
-        // moved to src/console/routes/social-read.js (R9-3)
+        if (req.method === 'GET' && url.pathname === '/api/socialV2/tool-log') {
+          const limit = Math.min(500, Math.max(1, Number(url.searchParams.get('limit')) || 200));
+          sendJson({ ok: true, entries: readToolLog(limit) });
+          return;
+        }
         if (req.method === 'POST' && url.pathname === '/api/socialV2/tool-log/clear') {
           if (req.headers['x-agent-token']) { sendJson({ ok: false, error: '该接口仅控制台可用' }, 403); return; }
           try { fs.writeFileSync(TOOL_LOG_FILE, '', 'utf8'); } catch {}
