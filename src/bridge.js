@@ -72,6 +72,7 @@ import {
 import { createBiliMemory } from './bili-memory.js';
 import { createRouter } from './console/http.js';
 import { registerTokens } from './console/routes/tokens.js'; // R9-1
+import { registerRolesDebug } from './console/routes/roles-debug.js';
 import {
   appendMemoryInboxEvent, looksNoteworthyMessage, resolveMemoryCardPaths, loadMemoryCard, saveMemoryCardOutputs, touchMemories } from './memory-card.js';
 import { scopedMemoryText } from './ext/memory-scope.js'; // MEMSCOPE_PATCH
@@ -4129,6 +4130,28 @@ async function main() {
               priceSymbol: priceTable.symbol,
             },
           });
+          registerRolesDebug(consoleRouter, {
+            roles: {
+              readRoleState,
+              roleSummaries,
+              nameMax: ROLE_NAME_MAX,
+              contentMaxBytes: ROLE_CONTENT_MAX_BYTES,
+              getInjectMaxChars: () => roleInjectMaxChars,
+              validateRoleName,
+              roleFilePath,
+              readRoleContent,
+              roleWarnings,
+            },
+            debug: {
+              getConsoleToken: () => cfg.consoleToken,
+              analyzePromise,
+              relatedMemoryBlock,
+              cfg,
+              memoryCardPaths: MEMORY_CARD_PATHS,
+              tokenGuardDowngrade,
+              notifyDowngradeOnce,
+            },
+          });
         }
         if (await consoleRouter.handle(req, res)) return;
         if (req.method === 'GET' && url.pathname === '/') {
@@ -4166,28 +4189,9 @@ async function main() {
           return;
         }
 
-        if (req.method === 'GET' && url.pathname === '/api/debug/promise') { // PROMISE_PATCH
-          const want = String(url.searchParams.get('token') || '');
-          if (!want || want !== String(cfg.consoleToken || '')) { sendJson({ ok: false, error: '令牌无效' }, 403); return; }
-          const a = analyzePromise(url.searchParams.get('text') || '');
-          sendJson({ ok: true, text: a.text, will: a.will, when: a.when, act: a.act, selfPromise: a.selfPromise, done: a.done, captured: a.captured });
-          return;
-        }
-        if (req.method === 'GET' && url.pathname === '/api/debug/related') { // RELATEDMEM_PATCH
-          const want = String(url.searchParams.get('token') || '');
-          if (!want || want !== String(cfg.consoleToken || '')) { sendJson({ ok: false, error: '令牌无效' }, 403); return; }
-          const q = String(url.searchParams.get('text') || '');
-          const block = relatedMemoryBlock(q, { cfg, paths: MEMORY_CARD_PATHS });
-          sendJson({ ok: true, text: q, chars: block.length, block });
-          return;
-        }
-        if (req.method === 'GET' && url.pathname === '/api/debug/guard') {
-          const info = tokenGuardDowngrade();
-          const notify = url.searchParams.get('notify') === '1';
-          if (notify) notifyDowngradeOnce(info);
-          sendJson({ ok: true, now: new Date().toISOString(), todayCost: Number(info.cost || 0), cap: info.cap, ratio: info.ratio, downgraded: info.on, notified: notify });
-          return;
-        }
+        // moved to src/console/routes/roles-debug.js (R9-2)
+        // moved to src/console/routes/roles-debug.js (R9-2)
+        // moved to src/console/routes/roles-debug.js (R9-2)
         // STICKER_CAP_PATCH：看一眼/执行一次表情库淘汰（?dry=1 只返回候选，不删）
         if (req.method === 'GET' && url.pathname === '/api/debug/sticker-prune') {
           const dry = url.searchParams.get('dry') === '1';
@@ -4337,38 +4341,8 @@ async function main() {
           return;
         }
         // ── 人格管理 ──────────────────────────────────────────────────────────
-        if (req.method === 'GET' && url.pathname === '/api/roles') {
-          const rs = readRoleState();
-          const summaries = roleSummaries();
-          sendJson({
-            // roles 保持「人格名字符串数组」的既有契约（scripts/test-console.mjs 等调用方依赖它）；
-            // 富信息放在 summaries 里，新老调用方互不影响。
-            roles: summaries.map((role) => role.name),
-            summaries,
-            current: rs.role ?? null,
-            limits: { nameMax: ROLE_NAME_MAX, contentMaxBytes: ROLE_CONTENT_MAX_BYTES, injectMaxChars: roleInjectMaxChars },
-          });
-          return;
-        }
-        if (req.method === 'GET' && url.pathname === '/api/roles/content') {
-          let name;
-          try { name = validateRoleName(url.searchParams.get('name')); } catch (error) { sendJson({ ok: false, error: error.message }, 400); return; }
-          if (!fs.existsSync(roleFilePath(name))) { sendJson({ ok: false, error: `人格「${name}」不存在` }, 404); return; }
-          const content = readRoleContent(name);
-          sendJson({
-            ok: true,
-            name,
-            content,
-            chars: content.length,
-            bytes: Buffer.byteLength(content, 'utf8'),
-            warnings: roleWarnings(content),
-            limits: { injectMaxChars: roleInjectMaxChars },
-            stats: roleCharStats(content),
-            // 每个小节在各模式下是否会被注入，供控制台预览「这条规则到底生不生效」
-            sections: { v1: roleSectionReport(content, 'v1'), v2: roleSectionReport(content, 'v2') },
-          });
-          return;
-        }
+        // moved to src/console/routes/roles-debug.js (R9-2)
+        // moved to src/console/routes/roles-debug.js (R9-2)
         if (req.method === 'POST' && url.pathname === '/api/roles/limit') {
           const body = await readBody();
           const next = applyRoleInjectLimit(body.maxInjectChars);
