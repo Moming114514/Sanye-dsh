@@ -76,6 +76,7 @@ import { registerRolesDebug } from './console/routes/roles-debug.js';
 import { registerSocialRead } from './console/routes/social-read.js'; // R9-3
 import { registerSessionDetail } from './console/routes/session-detail.js'; // R9-4
 import { registerMiscRead } from './console/routes/misc-read.js'; // R9-5
+import { registerAgentRead } from './console/routes/agent-read.js'; // R9-6
 import {
   appendMemoryInboxEvent, looksNoteworthyMessage, resolveMemoryCardPaths, loadMemoryCard, saveMemoryCardOutputs, touchMemories } from './memory-card.js';
 import { scopedMemoryText } from './ext/memory-scope.js'; // MEMSCOPE_PATCH
@@ -4198,6 +4199,38 @@ async function main() {
             getSlangWritable: () => slangStoreWritable, // 等价：原读取 slangStoreWritable
             getSocial: () => social, // 等价：原读取 social.pendingSummaries / states / recentMessages
           });
+          registerAgentRead(consoleRouter, {
+            getCfg: () => cfg,
+            getSocialV2State,
+            getMode: () => currentMode,
+            agentTokenOk,
+            v2SessionAllowed,
+            v2ToolEnabled,
+            noteModelMessagesV2,
+            readThroughSeqV2,
+            stickerMatchFor,
+            resolveReplyInfo,
+            confirmedSlangListV2,
+            getSlangEntries: () => slangEntries,
+            buildSlangContext,
+            ensurePurposeDay,
+            getPurposeState: () => purposeState,
+            purposeOwnerId,
+            adminIdentity,
+            summarizePurposeState,
+            getPurposeRun: () => purposeRun,
+            fetchModelCatalog,
+            withTimeout,
+            unwrap,
+            log,
+            effortOptions: REASONING_EFFORT_OPTIONS,
+            effortDefault: REASONING_EFFORT_DEFAULT,
+            getModelCatalogCache: () => ({
+              get inflight() { return modelCatalogInFlight; },
+              set inflight(v) { modelCatalogInFlight = v; },
+              errors: modelCatalogErrorLogged,
+            }),
+          });
         }
         if (await consoleRouter.handle(req, res)) return;
         if (req.method === 'GET' && url.pathname === '/') {
@@ -4830,53 +4863,7 @@ async function main() {
         }
 
         // ── DSH 模型与思考强度 ───────────────────────────────────────────────
-        if (req.method === 'GET' && url.pathname === '/api/dsh/model') {
-          const provider = String(cfg.dsh?.provider || 'deepseek-official');
-          const model = String(cfg.dsh?.model || 'deepseek-flash');
-          // 档位优先取 DSH 实际公布的能力（DSH 换档位词汇或换 provider 时自动跟随），失败退回内置白名单。
-          let options = REASONING_EFFORT_OPTIONS.slice();
-          let labels = {};
-          let providerDefault = null;
-          let catalogSource = 'fallback';
-          try {
-            if (!modelCatalogInFlight) {
-              modelCatalogInFlight = withTimeout(fetchModelCatalog(), 3000, 'session/modelCatalog')
-                .finally(() => { modelCatalogInFlight = null; });
-            }
-            const catalog = unwrap(await modelCatalogInFlight, 'session.modelCatalog');
-            const group = (catalog?.groups ?? []).find((g) => g?.id === provider);
-            const entry = (group?.models ?? []).find((m) => m?.id === model);
-            const efforts = entry?.reasoning?.efforts ?? [];
-            const advertised = efforts.map((e) => String(e?.id ?? '')).filter((id) => REASONING_EFFORT_OPTIONS.includes(id));
-            if (advertised.length) {
-              options = advertised;
-              labels = Object.fromEntries(efforts.map((e) => [String(e.id), { name: e.name ?? '', description: e.description ?? '' }]));
-              providerDefault = entry.reasoning.defaultEffort ?? null;
-              catalogSource = 'dsh';
-            }
-          } catch (error) {
-            // 同一条失败原因只记一次：控制台每次刷新都会打这条接口，否则日志会被刷爆。
-            const reason = String(error?.message ?? error);
-            if (!modelCatalogErrorLogged.has(reason)) {
-              modelCatalogErrorLogged.add(reason);
-              log(`读取 DSH 模型能力失败，思考强度暂用内置清单：${reason}`);
-            }
-          }
-          sendJson({
-            provider,
-            model,
-            reasoningEffort: String(cfg.dsh?.reasoningEffort || REASONING_EFFORT_DEFAULT),
-            options,
-            labels,
-            default: REASONING_EFFORT_DEFAULT,
-            providerDefault,
-            catalogSource,
-            // selectModel 会同时写会话级与 DSH 全局默认（~/.dsh/settings.yaml 的 agent-default-model），
-            // 控制台要把这点明确告诉管理员，避免「只想调 QQ 助手却改了 Web GUI 新会话默认」的意外。
-            globalSideEffect: true,
-          });
-          return;
-        }
+        // moved to src/console/routes/agent-read.js (R9-6)
         if (req.method === 'POST' && url.pathname === '/api/dsh/effort') {
           const body = await readBody();
           let effort;
@@ -4993,20 +4980,7 @@ async function main() {
           return;
         }
         // ── 目的机制：状态 / 预览 / 立刻试一次（控制台专用，智能体不可见）─────
-        if (req.method === 'GET' && url.pathname === '/api/purpose/status') {
-          ensurePurposeDay(purposeState, Date.now());
-          sendJson({
-            ok: true,
-            enabled: cfg.purpose?.enabled !== false,
-            mode: currentMode,
-            ownerUin: purposeOwnerId(),
-            ownerName: String(adminIdentity()?.displayName || '').trim() || '主人',
-            config: cfg.purpose,
-            state: summarizePurposeState(purposeState, { config: cfg.purpose }),
-            running: Boolean(purposeRun),
-          });
-          return;
-        }
+        // moved to src/console/routes/agent-read.js (R9-6)
         if (req.method === 'POST' && url.pathname === '/api/purpose/preview') {
           // 只读预览：真的去读记忆/算目的/拼提示词，但**不投递、不写状态、不发 QQ**。
           try {
@@ -5572,46 +5546,8 @@ async function main() {
           return;
         }
         // moved to src/console/routes/session-detail.js (R9-4)
-        if (req.method === 'GET' && url.pathname === '/api/socialV2/unread') {
-          const key = String(url.searchParams.get('key') ?? '').trim();
-          const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit')) || 30));
-          if (!key) { sendJson({ ok: false, error: 'key 不能为空' }, 400); return; }
-          if (req.headers['x-agent-token'] && !agentTokenOk(key, req.headers['x-agent-token'])) { sendJson({ ok: false, error: 'agent token 无效' }, 403); return; }
-          if (req.headers['x-agent-token'] && !v2SessionAllowed(key)) { sendJson({ ok: false, error: '目标不在当前模式允许范围内' }, 403); return; }
-          if (req.headers['x-agent-token'] && !v2ToolEnabled('getUnread')) { sendJson({ ok: false, error: '工具未启用：qq_get_unread_messages' }, 403); return; }
-          const afterRaw = url.searchParams.get('afterSeq');
-          const afterSeq = afterRaw === null ? null : Number(afterRaw);
-          if (afterRaw !== null && (!/^\d+$/.test(afterRaw) || !Number.isSafeInteger(afterSeq) || afterSeq < 0)) {
-            sendJson({ ok: false, error: 'afterSeq 必须是非负安全整数；从最早未读开始请传 0' }, 400);
-            return;
-          }
-          const st = getSocialV2State(key);
-          // Preserve the old tail read by default; cursor paging lets a backlog
-          // larger than one response be read completely, even outside recent.
-          const messages = afterSeq === null ? st.unread.slice(-limit)
-            : st.unread.filter((m) => Number.isSafeInteger(m.seq) && m.seq > afterSeq).slice(0, limit);
-          const readThroughSeq = req.headers['x-agent-token'] ? noteModelMessagesV2(st, messages) : readThroughSeqV2(st);
-          // 翻未读是最常见的新消息入口，同样带上表情推荐
-          const stickerMatch = stickerMatchFor(messages);
-          sendJson({ ok: true, key, unreadCount: st.unread.length, ...(stickerMatch ? { stickerMatch } : {}), messages, readThroughSeq });
-          return;
-        }
-        if (req.method === 'GET' && url.pathname === '/api/socialV2/recent') {
-          const key = String(url.searchParams.get('key') ?? '').trim();
-          const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit')) || 20));
-          const offset = Math.max(0, Number(url.searchParams.get('offset')) || 0);
-          if (!key) { sendJson({ ok: false, error: 'key 不能为空' }, 400); return; }
-          if (req.headers['x-agent-token'] && !agentTokenOk(key, req.headers['x-agent-token'])) { sendJson({ ok: false, error: 'agent token 无效' }, 403); return; }
-          if (req.headers['x-agent-token'] && !v2SessionAllowed(key)) { sendJson({ ok: false, error: '目标不在当前模式允许范围内' }, 403); return; }
-          if (req.headers['x-agent-token'] && !v2ToolEnabled('getRecent')) { sendJson({ ok: false, error: '工具未启用：qq_get_recent_messages' }, 403); return; }
-          const st = getSocialV2State(key);
-          const start = Math.max(0, st.recentMessages.length - offset - limit);
-          const end = Math.max(0, st.recentMessages.length - offset);
-          const messages = st.recentMessages.slice(start, end);
-          const readThroughSeq = req.headers['x-agent-token'] ? noteModelMessagesV2(st, messages) : readThroughSeqV2(st);
-          sendJson({ ok: true, key, messages, readThroughSeq });
-          return;
-        }
+        // moved to src/console/routes/agent-read.js (R9-6)
+        // moved to src/console/routes/agent-read.js (R9-6)
         if (req.method === 'POST' && url.pathname === '/api/socialV2/mark-read') {
           const body = await readBody();
           const key = String(body.key ?? '').trim();
@@ -7823,73 +7759,13 @@ async function main() {
           sendJson({ ok: true, key, level, message });
           return;
         }
-        if (req.method === 'GET' && url.pathname === '/api/socialV2/my-recent') {
-          const key = String(url.searchParams.get('key') ?? '').trim();
-          const limit = Math.min(50, Math.max(1, Number(url.searchParams.get('limit')) || 10));
-          if (!key) { sendJson({ ok: false, error: 'key 不能为空' }, 400); return; }
-          if (req.headers['x-agent-token'] && !agentTokenOk(key, req.headers['x-agent-token'])) { sendJson({ ok: false, error: 'agent token 无效' }, 403); return; }
-          if (req.headers['x-agent-token'] && !v2SessionAllowed(key)) { sendJson({ ok: false, error: '目标不在当前模式允许范围内' }, 403); return; }
-          if (req.headers['x-agent-token'] && !v2ToolEnabled('getMyRecent')) { sendJson({ ok: false, error: '工具未启用：qq_get_my_recent_messages' }, 403); return; }
-          const st = getSocialV2State(key);
-          const mine = st.recentMessages.filter((m) => m.isSelf).slice(-limit);
-          sendJson({ ok: true, key, messages: mine, readThroughSeq: readThroughSeqV2(st) });
-          return;
-        }
+        // moved to src/console/routes/agent-read.js (R9-6)
         if (req.method === 'POST' && url.pathname === '/api/socialV2/record-sent') {
           // 内部接口不对外开放：防止持有会话 token 的调用方伪造“我说过…”的历史记录。
           sendJson({ ok: false, error: '该接口仅桥接内部使用，不接受外部调用' }, 403);
           return;
         }
-        if (req.method === 'GET' && url.pathname === '/api/socialV2/message-detail') {
-          const key = String(url.searchParams.get('key') ?? '').trim();
-          const messageId = String(url.searchParams.get('messageId') ?? '').trim();
-          if (!key || !messageId) { sendJson({ ok: false, error: 'key 和 messageId 不能为空' }, 400); return; }
-          if (req.headers['x-agent-token'] && !agentTokenOk(key, req.headers['x-agent-token'])) { sendJson({ ok: false, error: 'agent token 无效' }, 403); return; }
-          if (req.headers['x-agent-token'] && !v2SessionAllowed(key)) { sendJson({ ok: false, error: '目标不在当前模式允许范围内' }, 403); return; }
-          if (req.headers['x-agent-token'] && !v2ToolEnabled('getMessageDetail')) { sendJson({ ok: false, error: '工具未启用：qq_get_message_detail' }, 403); return; }
-          const keyMatch = /^(group|private):(\d+)$/.exec(key);
-          if (!keyMatch) { sendJson({ ok: false, error: 'key 格式应为 group:群号 或 private:QQ号' }, 400); return; }
-          const kind = keyMatch[1];
-          const id = Number(keyMatch[2]);
-          try {
-            const st = getSocialV2State(key);
-            const found = (st.recentMessages || []).find((m) => m && (String(m.seq) === messageId || (m.messageId && String(m.messageId) === messageId)));
-            const forwardFields = found ? {
-              forwardIds: Array.isArray(found.forwardIds) ? found.forwardIds : [],
-              hasForward: !!found.hasForward
-            } : {};
-            let info = null;
-            // 如果入参命中本地 seq 且本地存有真实 messageId，优先按 seq 展示，避免与真实 id 冲突。
-            if (found && found.messageId && String(found.messageId) !== messageId) {
-              info = {
-                sender: String(found.sender || ''),
-                text: String(found.text || found.plain || '').slice(0, 200),
-                userId: found.userId ? String(found.userId) : null,
-                messageId: String(found.messageId),
-                seq: found.seq
-              };
-            } else {
-              info = await resolveReplyInfo(kind, id, messageId);
-              if (!info && found) {
-                info = {
-                  sender: String(found.sender || ''),
-                  text: String(found.text || found.plain || '').slice(0, 200),
-                  userId: found.userId ? String(found.userId) : null,
-                  messageId: found.messageId ? String(found.messageId) : null,
-                  seq: found.seq
-                };
-              }
-            }
-            // 无论 info 来自本地还是 OneBot，只要本地有 found 就补充转发字段，避免提示词与实现不一致。
-            if (info && found) Object.assign(info, forwardFields);
-            // 正文本就是 200 字符预览；显式告知截断，避免模型把预览当成全文。
-            if (info) info.textTruncated = String(info.text ?? '').length >= 200;
-            sendJson({ ok: true, key, messageId, info });
-          } catch (error) {
-            sendJson({ ok: false, error: `获取消息详情失败：${error?.message ?? error}` }, 500);
-          }
-          return;
-        }
+        // moved to src/console/routes/agent-read.js (R9-6)
         // ── 合并转发消息查询端点（MCP qq_get_forward_msg 走这里） ────────────
         if (req.method === 'GET' && url.pathname === '/api/socialV2/forward-message') {
           const key = String(url.searchParams.get('key') ?? '').trim();
@@ -8132,29 +8008,7 @@ async function main() {
           return;
         }
         // ── 二代黑话学习（reserved2）：AI 查询/提交黑话候选 ─────────────────
-        if (req.method === 'GET' && url.pathname === '/api/socialV2/slang/query') {
-          const key = String(url.searchParams.get('key') ?? '').trim();
-          const q = String(url.searchParams.get('q') ?? '').trim().toLowerCase();
-          if (!key) { sendJson({ ok: false, error: 'key 不能为空' }, 400); return; }
-          if (req.headers['x-agent-token'] && !agentTokenOk(key, req.headers['x-agent-token'])) { sendJson({ ok: false, error: 'agent token 无效' }, 403); return; }
-          if (req.headers['x-agent-token'] && !v2SessionAllowed(key)) { sendJson({ ok: false, error: '目标不在当前模式允许范围内' }, 403); return; }
-          if (req.headers['x-agent-token'] && !v2ToolEnabled('slangQuery')) { sendJson({ ok: false, error: '工具未启用：qq_slang_query' }, 403); return; }
-          const list = confirmedSlangListV2().filter((e) => {
-            if (!q) return true;
-            return e.content.toLowerCase().includes(q)
-              || e.meaning.toLowerCase().includes(q)
-              || e.usage.toLowerCase().includes(q)
-              || e.example.toLowerCase().includes(q);
-          });
-          sendJson({
-            ok: true,
-            key,
-            total: list.length,
-            entries: list,
-            block: buildSlangContext(slangEntries, cfg.slang?.injectMax ?? 8)
-          });
-          return;
-        }
+        // moved to src/console/routes/agent-read.js (R9-6)
         if (req.method === 'POST' && url.pathname === '/api/socialV2/slang/submit') {
           const body = await readBody();
           const key = String(body.key ?? '').trim();

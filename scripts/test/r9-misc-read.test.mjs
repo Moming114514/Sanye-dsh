@@ -101,8 +101,8 @@ check('依赖缺失抛错', threw);
 const src = fs.readFileSync(new URL('../../src/bridge.js', import.meta.url), 'utf8');
 const markers = (src.match(/\/\/ moved to src\/console\/routes\/misc-read\.js \(R9-5\)/g) || []).length;
 check('marker=7', markers === 7, markers);
-check('purpose/status 仍在', src.includes("url.pathname === '/api/purpose/status'"));
-check('unread 仍在', src.includes("url.pathname === '/api/socialV2/unread'"));
+check('purpose/status 已在 R9-6 搬走', !src.includes("url.pathname === '/api/purpose/status'"));
+check('unread 已在 R9-6 搬走', !src.includes("url.pathname === '/api/socialV2/unread'"));
 
 if (fails.length) {
   console.error('R9_MISC_READ_FAIL');
