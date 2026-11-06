@@ -40,18 +40,14 @@ export function createRouter({ log = () => {} } = {}) {
     const url = new URL(req.url || '/', 'http://127.0.0.1');
     const hit = table.get(url.pathname);
     if (!hit) {
-      res.statusCode = 404;
-      res.setHeader('content-type', 'application/json; charset=utf-8');
-      res.end(JSON.stringify({ ok: false, error: 'not found' }));
+      // 未命中：不写任何字节，交给调用方继续走原来的路由链。
       return false;
     }
     const method = String(req.method || 'GET').toUpperCase();
     if (!hit.methods.has(method)) {
-      res.statusCode = 405;
-      res.setHeader('allow', [...hit.methods].join(', '));
-      res.setHeader('content-type', 'application/json; charset=utf-8');
+      res.writeHead(405, { 'content-type': 'application/json; charset=utf-8', allow: [...hit.methods].join(', ') });
       res.end(JSON.stringify({ ok: false, error: 'method not allowed' }));
-      return false;
+      return true;
     }
     const ctx = {
       url,

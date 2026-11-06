@@ -85,6 +85,10 @@ check('turns 404', turns.res.code === 404, turns.res.code);
 
 const miss = await call('/api/nope');
 check('未命中回落', miss.matched === false);
+check('未命中不写响应', miss.res.code === 0 && miss.res.body === '', { code: miss.res.code, body: miss.res.body });
+
+const wrongMethod = await call('/api/tokens/daily', {}, 'POST');
+check('方法不符 405', wrongMethod.matched === true && wrongMethod.res.code === 405, wrongMethod.res.code);
 
 if (fails.length) {
   console.error('R9_TOKENS_FAIL\n - ' + fails.join('\n - '));

@@ -98,6 +98,7 @@ check('guard notify 调用一次', guardNotify.body?.notified === true && notifi
 
 const miss = await call('/api/nope');
 check('未命中回落', miss.matched === false);
+check('未命中不写响应', miss.res.code === 0 && miss.res.body === '', { code: miss.res.code, body: miss.res.body });
 
 fs.rmSync(dir, { recursive: true, force: true });
 if (fails.length) {
