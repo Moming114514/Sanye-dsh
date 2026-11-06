@@ -1,6 +1,6 @@
 {
  "schema": "routes/v1",
- "at": "2026-11-06T11:31:17.556Z",
+ "at": "2026-11-06T11:43:13.394Z",
  "count": 176,
  "paths": {
   "/api/authorize/read": [
@@ -90,8 +90,7 @@
    "POST"
   ],
   "/api/presets": [
-   "GET",
-   "POST"
+   "GET"
   ],
   "/api/purpose/preview": [
    "POST"
@@ -143,9 +142,11 @@
    "POST"
   ],
   "/api/send/private": [
+   "GET",
    "POST"
   ],
   "/api/send/reply": [
+   "GET",
    "POST"
   ],
   "/api/send/voice": [
@@ -243,7 +244,6 @@
    "POST"
   ],
   "/api/socialV2/feedback-clear": [
-   "GET",
    "POST"
   ],
   "/api/socialV2/forward-media": [
@@ -300,8 +300,7 @@
    "POST"
   ],
   "/api/socialV2/message-detail": [
-   "GET",
-   "POST"
+   "GET"
   ],
   "/api/socialV2/mood": [
    "GET",
@@ -339,6 +338,7 @@
    "POST"
   ],
   "/api/socialV2/recall": [
+   "GET",
    "POST"
   ],
   "/api/socialV2/recent": [
@@ -422,7 +422,6 @@
    "GET"
   ],
   "/api/socialV2/tool-log/clear": [
-   "GET",
    "POST"
   ],
   "/api/socialV2/unread": [
@@ -475,7 +474,6 @@
    "GET"
   ],
   "/api/tokens/reset": [
-   "GET",
    "POST"
   ],
   "/api/tokens/series": [
@@ -491,8 +489,7 @@
    "GET"
   ],
   "/api/voice/packs": [
-   "GET",
-   "POST"
+   "GET"
   ],
   "/api/voice/packs/": [
    "GET"
@@ -511,8 +508,7 @@
    "POST"
   ],
   "/api/voice/packs/cloud-stats": [
-   "GET",
-   "POST"
+   "GET"
   ],
   "/api/voice/packs/enable": [
    "POST"
@@ -533,15 +529,13 @@
    "POST"
   ],
   "/api/voice/packs/install": [
-   "GET",
    "POST"
   ],
   "/api/voice/packs/remove": [
    "POST"
   ],
   "/api/voice/packs/sample": [
-   "GET",
-   "POST"
+   "GET"
   ],
   "/api/voice/packs/start": [
    "POST"

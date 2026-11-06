@@ -70,6 +70,8 @@ import { evaluateWakeBudget, evaluateOutbound, localDayStart } from './token-gua
 import {
   blockMessage, evaluateBudget, localDayKey, readBudget, readDailyUsage, } from './token-budget.js';
 import { createBiliMemory } from './bili-memory.js';
+import { createRouter } from './console/http.js';
+import { registerTokens } from './console/routes/tokens.js'; // R9-1
 import {
   appendMemoryInboxEvent, looksNoteworthyMessage, resolveMemoryCardPaths, loadMemoryCard, saveMemoryCardOutputs, touchMemories } from './memory-card.js';
 import { scopedMemoryText } from './ext/memory-scope.js'; // MEMSCOPE_PATCH
@@ -3828,6 +3830,7 @@ async function main() {
       return vpCache.vp;
     }
 
+    let consoleRouter = null;
     const server = http.createServer(async (req, res) => {
       let url;
       try { url = new URL(req.url ?? '/', `http://127.0.0.1:${port}`); }
@@ -4095,6 +4098,39 @@ async function main() {
             return;
           }
         }
+        // R9-1：控制台只读路由（tokens/status）先问 router，未命中回落原逻辑
+        if (!consoleRouter) {
+          consoleRouter = createRouter({ log });
+          registerTokens(consoleRouter, {
+            status: {
+              root: ROOT,
+              cfg,
+              getMode: () => currentMode,
+              readRoleState,
+              getDshReady: () => dshReady,
+              getSocialV2: () => socialV2,
+              getClosedAgentPreset: () => closedAgentPreset,
+              getOwnerAudit: () => ownerAudit,
+              getPurposeState: () => purposeState,
+              summarizePurposeState,
+              closureConfigV2,
+              assessClosureV2,
+              getSocialV2State,
+              closureStatus,
+              snowlumaHealthSnapshot,
+              readActivityTail,
+            },
+            tokens: {
+              ledger: tokenLedger,
+              dailyUsage: bridgeDailyUsage,
+              budgetLimits: bridgeBudgetLimits,
+              evaluateBudget,
+              localDayStart,
+              priceSymbol: priceTable.symbol,
+            },
+          });
+        }
+        if (await consoleRouter.handle(req, res)) return;
         if (req.method === 'GET' && url.pathname === '/') {
           res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', ...SECURITY_HEADERS });
           try {
@@ -4160,78 +4196,7 @@ async function main() {
           sendJson({ ok: true, ...r, maxItems: stickerMaxItems() });
           return;
         }
-        if (req.method === 'GET' && url.pathname === '/api/status') {
-          const rs = readRoleState();
-          // 带 agent token 的调用来自 QQ 群里的 AI：只能拿到它自己该知道的运行状态。
-          // activity 是**全局**收发摘要（含其它群的发言片段与告警），ownerQQ/白名单属于管理信息，
-          // 都不能给到会话级主体，否则 A 群的 AI 能读到 B 群的内容。
-          // 判定「是不是智能体调用」必须同时看 x-agent-call：无令牌的智能体调用
-          // （旧只读工具的模式探测）不带 x-agent-token，但它同样**绝不能**拿到管理端字段
-          // —— ownerQQ / 白名单 / activity（含其它群的发言片段）是跨群管理信息。
-          // 只认 token 会让这类请求落到下面的完整对象上，等于把 A 群的 AI 变成管理端。
-          if (req.headers['x-agent-token'] || req.headers['x-agent-call'] !== undefined) {
-            sendJson({
-              mode: currentMode,
-              role: rs.role ?? null,
-              roleMode: rs.mode ?? 'active',
-              dshReady,
-              socialV2Paused: socialV2.paused,
-            });
-            return;
-          }
-          sendJson({
-            mode: currentMode,
-            root: ROOT,
-            dshBaseUrl: cfg.dsh.baseUrl,
-            closedAgentPreset,
-            role: rs.role ?? null,
-            roleMode: rs.mode ?? 'active',
-            dshReady,
-            ownerQQ: cfg.ownerQQ ?? null,
-            ownerAudit: ownerAudit.health,
-            allowGroups: cfg.allow?.groups ?? [],
-            allowPrivate: cfg.allow?.private ?? [],
-            socialV2Paused: socialV2.paused,
-            purpose: {
-              enabled: cfg.purpose?.enabled !== false,
-              ...summarizePurposeState(purposeState, { config: cfg.purpose }),
-            },
-            // 对话收尾：给设置页卡片看「最近一次收在哪 / 下次怎么接 / 当前判断」。
-            // 只放管理端状态（含会话 key），不进 agent 的受限视图。
-            closure: (() => {
-              const config = closureConfigV2();
-              let latest = null;
-              for (const [key, st] of socialV2.conversations) {
-                if (!st?.closure?.at) continue;
-                if (!latest || Number(st.closure.at) > Number(latest.record.at)) {
-                  latest = { key, record: st.closure };
-                }
-              }
-              const assessment = latest ? assessClosureV2(latest.key, getSocialV2State(latest.key)) : null;
-              return {
-                enabled: config.enabled,
-                config,
-                active: latest ? {
-                  key: latest.key,
-                  ...closureStatus(latest.record, Date.now()),
-                  verdict: assessment?.verdict ?? null,
-                  score: assessment?.score ?? null,
-                  reasons: assessment?.reasons ?? [],
-                } : null,
-                recentlyClosed: [...socialV2.conversations.entries()]
-                  .filter(([, st]) => st?.closure?.at)
-                  .sort((a, b) => Number(b[1].closure.at) - Number(a[1].closure.at))
-                  .slice(0, 3)
-                  .map(([key, st]) => ({ key, ...closureStatus(st.closure, Date.now()) })),
-              };
-            })(),
-            // 上游健康只给操作者看：它包含网关诊断信息（good/hint），
-            // 属于管理侧观测，不该进 QQ 会话里那个受限的智能体视图。
-            snowluma: snowlumaHealthSnapshot(),
-            activity: readActivityTail(100)
-          });
-          return;
-        }
+        // moved to src/console/routes/tokens.js (R9-1)
         // ── B站记忆 / 动态 / 分享（管理端只读状态 + 手动触发，供排查）─────────
         if (req.method === 'GET' && url.pathname === '/api/bili/status') {
           sendJson({
@@ -7960,37 +7925,6 @@ async function main() {
         // 不应让某个群里的 AI 读到别的群烧了多少钱。这里再显式拒绝一次做双保险。
         if (url.pathname === '/api/tokens/summary' || url.pathname.startsWith('/api/tokens/')) {
           if (req.headers['x-agent-token']) { sendJson({ ok: false, error: '该接口仅控制台可用' }, 403); return; }
-          if (req.method === 'GET' && url.pathname === '/api/tokens/summary') {
-            const limit = Math.min(500, Math.max(1, Number(url.searchParams.get('limit')) || 200));
-            sendJson({ ...tokenLedger.summary({ limit }), ledger: tokenLedger.stats() });
-            return;
-          }
-          if (req.method === 'GET' && url.pathname === '/api/tokens/daily') {
-            const usage = bridgeDailyUsage();
-            const limits = bridgeBudgetLimits();
-            const qqGate = evaluateBudget(usage, limits, { scopes: ['qq', 'total'] });
-            sendJson({ ok: true, usage, limits, gate: { blocked: qqGate.blocked, hits: qqGate.hits }, cutoff: localDayStart() });
-            return;
-          }
-          if (req.method === 'GET' && url.pathname === '/api/tokens/series') {
-            const hours = Math.min(24 * 90, Math.max(1, Number(url.searchParams.get('hours')) || 24));
-            const maxBuckets = Math.min(120, Math.max(6, Number(url.searchParams.get('buckets')) || 48));
-            sendJson(tokenLedger.series({ hours, maxBuckets }));
-            return;
-          }
-          if (req.method === 'GET' && url.pathname === '/api/tokens/turns') {
-            const key = String(url.searchParams.get('key') ?? '').trim();
-            const limit = Math.min(1000, Math.max(1, Number(url.searchParams.get('limit')) || 200));
-            const detail = tokenLedger.conversation(key, { turnLimit: limit });
-            if (!detail) { sendJson({ ok: false, error: '未找到该会话的用量记录' }, 404); return; }
-            sendJson(detail);
-            return;
-          }
-          if (req.method === 'GET' && url.pathname === '/api/tokens/recent') {
-            const limit = Math.min(500, Math.max(1, Number(url.searchParams.get('limit')) || 50));
-            sendJson({ ok: true, symbol: priceTable.symbol, entries: tokenLedger.recent(limit) });
-            return;
-          }
           if (req.method === 'POST' && url.pathname === '/api/tokens/reset') {
             tokenLedger.reset();
             log('控制台：token 用量账本已重置');

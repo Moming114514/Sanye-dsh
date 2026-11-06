@@ -44,10 +44,23 @@ function extractFromText(text) {
     const lineNo = lineOf(text, m.index);
     const lo = Math.max(0, lineNo - 7);
     const hi = Math.min(lines.length, lineNo + 4);
-    const ctx = lines.slice(lo, hi).join('\n');
+    const same = lines[lineNo - 1] ?? '';
     const methods = new Set();
-    const mm = ctx.match(/\breq\.method\s*===?\s*['"](GET|POST|PUT|DELETE|PATCH)['"]/g) || [];
-    for (const x of mm) { const g = x.match(/['"]([A-Z]+)['"]/); if (g) methods.add(g[1]); }
+    const addFrom = (str) => {
+      const mm = str.match(/\breq\.method\s*===?\s*['"](GET|POST|PUT|DELETE|PATCH)['"]/g) || [];
+      for (const x of mm) { const g = x.match(/['"]([A-Z]+)['"]/); if (g) methods.add(g[1]); }
+      const rg = str.match(/register\(\s*['"][^'"]+['"]\s*,\s*['"]([A-Z]+)['"]/);
+      if (rg) methods.add(rg[1]);
+    };
+    // 先看路径所在行；再看窗口里「不含别的 /api 字面量」的行（避免邻居路由的方法串进来）
+    addFrom(same);
+    if (!methods.size) {
+      for (let i = lo; i < hi; i++) {
+        if (i === lineNo - 1) continue;
+        if (/['"]\/api\//.test(lines[i])) continue;
+        addFrom(lines[i]);
+      }
+    }
     if (!methods.size) methods.add('GET');
     if (!paths.has(p)) paths.set(p, new Set());
     for (const x of methods) paths.get(p).add(x);
