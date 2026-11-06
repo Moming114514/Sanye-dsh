@@ -17,6 +17,7 @@ const PAGES = [
   { id: 'memory', title: '记忆', render: pageMemoryHub },
   { id: 'style', title: '学说话', render: pageStyle }, // STYLE_GATE_PATCH
   { id: 'talk', title: '说话', render: pageTalk }, // P2-B
+  { id: 'entry', title: '入口', render: pageEntry }, // P2G
   { id: 'decisions', title: '决策记录', render: pageDecisions }, // P1
   { id: 'plugins', title: '插件', render: pagePlugins }, // P3-1：清单来自 /api/plugins
 ];
@@ -26,7 +27,7 @@ const PAGES = [
 
 // P2-B 第3段：目标导航（3 组 12 项）；state._legacyNav / localStorage her.legacyNav=1 可恢复旧入口
 const NAV_GROUPS = [
-  { title: '现在', ids: ['overview', 'decisions', 'cost', 'health'] },
+  { title: '现在', ids: ['overview', 'entry', 'decisions', 'cost', 'health'] },
   { title: '她', ids: ['personality', 'talk', 'memory', 'group-rules', 'people'] },
   { title: '系统', ids: ['settings', 'commands', 'maintenance'] },
 ];
@@ -44,7 +45,7 @@ const PAGE_ADJUST = {
   'group-rules': '一屏看完每个群：在不在白名单、怎么回、发言量、只回谁、抽样多少；改完 60 秒内生效，白名单增删建议重启一次。',
   decisions: '每一条「要不要回」的判决都在这里：哪层拦的、分数多少、最后回没回。只读，不改任何判断。',
   overview: '只读：今天的量——花费、她刚说的、欠着的事、自检结果。',
-  entry: '入口通道的状态；改通道要去「设置」。',
+  entry: '本机入口：看 DSH 会话花费（127.0.0.1:7788）；改通道去「设置」。',
   features: '全站的开关都在这里：拨完按右侧标记判断是「立即」还是「需重启」。',
   commands: '命令清单；前缀规则见页首（私聊 / 和 #，群里只能 # 和 ！）。',
   people: '按群看今天谁在说话、给谁打过标记；标记只影响她对那个人的态度。',
@@ -408,6 +409,7 @@ function pageOverview() {
     h('div', { class: 'kv' }, h('span', {}, '她记着要做的事'), h('span', {}, ((d.loops || []).length) + ' 条')),
     h('div', { class: 'kv' }, h('span', {}, '定时提醒'), h('span', {}, ((d.reminders || []).length) + ' 条'))));
   wrap.append(h('div', { class: 'card', style: 'margin-top:14px;display:flex;gap:16px;flex-wrap:wrap;font-size:13px' },
+    h('a', { href: '#entry', style: 'color:var(--accent)' }, '我的花费（本机）→'),
     h('a', { href: '#health', style: 'color:var(--accent)' }, '健康红绿灯 →'),
     h('a', { href: '#cost', style: 'color:var(--accent)' }, '花费明细 →'),
     h('a', { href: '#group-rules', style: 'color:var(--accent)' }, '群规则 →'),
@@ -2854,11 +2856,10 @@ async function decisionExport() {
 function decisionConvName(x) {
   const m = /^(group|private):(\d+)$/.exec(String(x.key || ''));
   if (!m) return x.key || '';
-  const kind = m[1] === 'group' ? 'group' : 'private';
-  const bucket = kind === 'group' ? 'groups' : 'users';
+  const bucket = m[1] === 'group' ? 'group' : 'private';
   const hit = state.names && state.names[bucket] && state.names[bucket][m[2]];
-  const nm = hit && hit.name ? hit.name + ' · ' : '';
-  return nm + (m[1] === 'group' ? '群 ' : '私聊 ') + m[2];
+  const nm = (typeof hit === 'string' ? hit : hit && hit.name) || '';
+  return nm ? nm + ' · ' + m[2] : (m[1] === 'group' ? '群 · ' : '私聊 · ') + m[2];
   const _n = (state.names && state.names.group && state.names.group[id]);
   if (typeof _n === 'string' && _n) return _n + ' · ' + id;
 }
@@ -3155,8 +3156,31 @@ function humanStatsCard() {
   return wrap;
 }
 
+
+// ==================== P2-G 入口页：本机 7788 花费面板 ====================
+function pageEntry() {
+  const wrap = h('div', {});
+  const btn = h('button', { class: 'btn primary', onclick: () => window.open('http://127.0.0.1:7788/', '_blank') }, '打开');
+  const status = h('span', { class: 'muted', style: 'font-size:12.5px' }, '正在检查本机 7788…');
+  try {
+    fetch('http://127.0.0.1:7788/', { mode: 'no-cors', signal: AbortSignal.timeout(2000) })
+      .then(() => { status.textContent = '本机服务已开（127.0.0.1:7788）'; })
+      .catch(() => { btn.disabled = true; btn.classList.add('disabled'); status.textContent = '本机服务没开，双击桌面「看我会话花费」'; });
+  } catch (e) { btn.disabled = true; status.textContent = '本机服务没开，双击桌面「看我会话花费」'; }
+  wrap.append(h('div', { class: 'card' }, [
+    h('div', { class: 'card-h' }, '我的花费（本机）'),
+    h('div', { style: 'font-size:13px;line-height:1.7' }, '看我和 DSH 每次对话花了多少；跑在你电脑上（127.0.0.1:7788）。'),
+    h('div', { style: 'margin-top:8px;display:flex;gap:10px;align-items:center' }, [btn, status]),
+  ]));
+  wrap.append(h('div', { class: 'card muted', style: 'font-size:12.5px' }, '其它入口：群规则、决策记录、花费、插件清单都在左侧导航；旧的独立页面收在「维护」。'));
+  return wrap;
+}
+
 function pageDecisions() {
-  if (!state.names) loadNames().catch(() => {});
+  if (!state.names && !state._namesPending) {
+    state._namesPending = true;
+    loadNames().catch(() => {}).finally(() => { state._namesPending = false; loadDecisions().catch(() => {}).finally(rerender); });
+  }
   const wrap = h('div', {});
   wrap.append(decisionStatsCard()); // P2-D 误判分析
   if (!state.decFilter) state.decFilter = { day: new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10) };
@@ -3172,6 +3196,9 @@ function pageDecisions() {
       h('input', { class: 'input', type: 'date', value: f.day, onchange: (e) => upd('day', e.target.value) }),
       sel('allow', [['', '全部'], ['true', '只看放行'], ['false', '只看拦截']]),
       sel('source', [['', '全部来源'], ['owner-only', 'owner-only'], ['mute', 'mute'], ['learnmode', 'learnmode'], ['economy', 'economy'], ['group-rate', 'group-rate'], ['attention', 'attention'], ['safe-talk', 'safe-talk'], ['ext', '其它放行']]),
+      h('select', { class: 'input', style: 'max-width:190px', onchange: (e) => upd('conv', e.target.value) },
+        [['', '全部会话'], ...Object.entries((state.names && state.names.group) || {}).map(([gid, v]) => ['group:' + gid, (typeof v === 'string' ? v : v && v.name ? v.name : '群 ' + gid)])]
+          .map(([v, t]) => h('option', { value: v, selected: (f.conv || '') === v ? 'selected' : null }, t))),
       input('key', '会话 key（可部分匹配）'),
       input('minScore', '最低分', 'max-width:90px'), input('maxScore', '最高分', 'max-width:90px'),
       h('label', { class: 'muted', style: 'display:flex;align-items:center;gap:6px' }, [h('input', { type: 'checkbox', checked: f.unmarked ? 'checked' : null, onchange: (e) => upd('unmarked', e.target.checked) }), '只看未标注']),
@@ -3185,7 +3212,7 @@ function pageDecisions() {
     h('div', { class: 'big', style: 'font-size:15px' }, `今日判断 ${st.total || 0} · 放行 ${st.allow || 0} · 拦截 ${st.block || 0} · 回了 ${st.replied || 0} · 已标 ${st.marked || 0}`),
     h('div', { class: 'muted', style: 'font-size:12.5px;margin-top:6px' }, (st.topSources || []).length ? ('拦截来源 top：' + st.topSources.map(([k, v]) => k + ' ' + v).join(' · ')) : '今天还没有拦截记录。'),
   ]));
-  const rows = (d.items || []).map((x) => {
+  const rows = (d.items || []).filter((x) => !f.conv || String(x.key || '').startsWith(f.conv)).map((x) => {
     const mark = (d.marks || {})[x.id] || '';
     return h('tr', {}, [
       h('td', { class: 'mono', style: 'font-size:11.5px' }, new Date(x.ts).toLocaleTimeString('zh-CN')),
