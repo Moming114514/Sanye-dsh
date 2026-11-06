@@ -1,6 +1,14 @@
-// src/console/http.js —— 控制台路由注册器骨架（R9-B 第 0 步，暂不接进 bridge）
-// 只做三件事：登记 path→methods→handler；按 path 精确匹配分派；给 handler 一个薄 helper。
-// 不依赖 bridge，不读全局状态。接进 bridge 是后续步骤的事。
+// src/console/http.js —— 控制台路由注册器
+// 只做三件事：登记 path→methods→handler；按 path 精确匹配分派；给 handler 一个薄 ctx。
+//
+// handle(req, res) 的契约（四种情况，每种只做一件事）：
+//   1) 未命中路径            → 不写任何字节，return false（调用方继续走原路由链）
+//   2) 命中且方法不符        → 写 405 + Allow，return true
+//   3) 命中且 handler 正常    → handler 自己写且只写一次，return true
+//   4) 命中但 handler 抛错    → 若 res.headersSent 为 false，本函数写一次 500；否则不动。
+//                              无论如何都 return true，异常不再冒泡，主流程不会再写第二遍。
+// 注意：绝不能出现「handle 已经写过响应、又返回 false」——那会让调用方再写一次，触发
+// ERR_HTTP_HEADERS_SENT（R9-3 回归就是这么来的）。
 import { URL } from 'node:url';
 
 export const METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
@@ -64,10 +72,19 @@ export function createRouter({ log = () => {} } = {}) {
         res.end(body);
       },
     };
-    await hit.handler(req, res, ctx);
+    try {
+      await hit.handler(req, res, ctx);
+    } catch (e) {
+      // 契约：命中且 handler 抛错 —— 这里写且只写一次 500，然后吞掉异常，
+      // 保证调用方不会再写第二遍（否则会 ERR_HTTP_HEADERS_SENT）。
+      if (!res.headersSent) {
+        res.writeHead(500, { 'content-type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: false, error: String(e?.message || e) }));
+      }
+      if (typeof log === 'function') log('[console] handler 失败 ' + url.pathname + '：' + String(e?.message || e));
+    }
     return true;
   }
-
   return api;
 }
 
