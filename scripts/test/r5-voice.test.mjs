@@ -13,7 +13,7 @@ fs.mkdirSync(stateDir, { recursive: true });
 fs.writeFileSync(path.join(root, 'audio', 'a.mp3'), 'x');
 fs.writeFileSync(path.join(root, 'audio', 'mix', 'b.silk'), 'y');
 
-const cfg = {
+const baseCfg = {
   ownerQQ: '1001',
   snowluma: { httpUrl: 'http://127.0.0.1:3999' },
   socialV2: { voice: { enabled: true, dir: 'audio', autoReadback: true } }
@@ -21,7 +21,6 @@ const cfg = {
 const logs = [];
 const activity = [];
 const cleaned = [];
-const sent = [];
 const state = {
   recentMessages: [],
   wakeConfig: { noActionCount: 3 },
@@ -29,23 +28,19 @@ const state = {
   lastActionAt: 0
 };
 let lastFetch = null;
-const fetchStub = async (url, opts) => {
-  lastFetch = { url, opts, body: JSON.parse(opts.body) };
-  if (String(url).endsWith('/get_msg')) {
-    return { ok: true, json: async () => ({ status: 'ok', retcode: 0, data: { message: [{ type: 'record', data: { duration: 3 } }] } }) };
-  }
-  if (String(url).endsWith('/fetch_ptt_text')) {
-    return { ok: true, json: async () => ({ status: 'ok', retcode: 0, data: { text: '读回来的字' } }) };
-  }
-  return { ok: true, status: 200, json: async () => ({ status: 'ok', retcode: 0, data: { message_id: 4242 } }) };
-};
 
-const voice = createVoice({
+const deps = (cfg, extra = {}) => ({
   cfg,
   root,
   stateDir,
   log: (m) => logs.push(String(m)),
-  fetch: fetchStub,
+  fetch: async (url, opts) => {
+    lastFetch = { url, opts, body: JSON.parse(opts.body) };
+    if (String(url).endsWith('/get_msg')) {
+      return { ok: true, json: async () => ({ status: 'ok', retcode: 0, data: { message: [{ type: 'record', data: { duration: 3 } }] } }) };
+    }
+    return { ok: true, status: 200, json: async () => ({ status: 'ok', retcode: 0, data: { message_id: 4242 } }) };
+  },
   enqueueSend: (fn) => fn(),
   maps: { sendTimes: new Map(), lastSpeaker: new Map(), lastSentAt: new Map(), ownerAt: new Map() },
   appendActivity: (m) => activity.push(String(m)),
@@ -67,8 +62,11 @@ const voice = createVoice({
   processAudioVolume: async (file) => ({ path: file, detail: 'original', volume: 1, loudness: 'normal', mode: 'original', converted: false }),
   describeAudio: () => '2 秒，silk，1.2KB',
   cleanupTemp: (f) => cleaned.push(f),
-  resolveAudioProcessing: () => ({})
+  resolveAudioProcessing: () => ({}),
+  ...extra
 });
+
+const voice = createVoice(deps(baseCfg));
 
 // 1) 语音库形状不变
 const lib = voice.voiceLibrary();
@@ -84,17 +82,10 @@ assert.deepEqual(lastFetch.body, { group_id: 555, message: [{ type: 'record', da
 assert.equal(cleaned.at(-1), path.join(root, 'audio', 'a.mp3'));
 
 // 3) 失败时 reject 且仍清临时文件
-const failVoice = createVoice({
-  cfg, root, stateDir, log: () => {}, fetch: async () => ({ ok: false, status: 500, json: async () => ({}) }),
-  enqueueSend: (fn) => fn(), maps: { sendTimes: new Map(), lastSpeaker: new Map(), lastSentAt: new Map(), ownerAt: new Map() },
-  appendActivity: () => {}, shouldAuditKey: () => false, SENSITIVE_RE: /zzz/, KNOWN_AGENT_TOKENS: new Set(),
-  getSocialV2State: () => state, saveSocialV2State: () => {}, truncateText: (s, n) => String(s).slice(0, n),
-  captureSendGuard: () => () => {}, classifyVoiceError: () => null, synthesizeToFile: async () => ({}),
-  pickFallbackRoute: () => null, listAudioFiles, safeJoinLibrary, resolveAudioSource, AUDIO_EXTS,
-  inspectAudio: async () => ({ ok: true, size: 1, duration: 1, codec: 'silk', warnings: [] }),
-  processAudioVolume: async (f) => ({ path: f, detail: 'original', volume: 1, loudness: 'normal', mode: 'original', converted: false }),
-  describeAudio: () => '', cleanupTemp: () => {}, resolveAudioProcessing: () => ({})
-});
+const failVoice = createVoice(deps(baseCfg, {
+  fetch: async () => ({ ok: false, status: 500, json: async () => ({}) }),
+  cleanupTemp: () => {}
+}));
 await assert.rejects(() => failVoice.sendVoiceV2('private:1001', path.join(root, 'audio', 'a.mp3'), { audit: false }), /OneBot send_private_msg 失败/);
 
 // 4) 回读校验只回 confirmed/duration，不泄露 path/url
@@ -112,6 +103,29 @@ assert.equal(state.wakeConfig.noActionCount, 0);
 
 // 6) 文件名词审仍生效
 assert.throws(() => voice.assertOutboundAuditOk('group:555', '[语音:C:\\Users\\a.mp3]'), /疑似包含敏感信息/);
+
+// 7) R5b: who==='list' 不再因 last 未定义而抛错
+const listCfg = {
+  ...baseCfg,
+  socialV2: { voice: { enabled: true, dir: 'audio', autoReadback: true, trigger: { who: 'list', members: ['2002'], groups: [] } } }
+};
+const listDeps = deps(listCfg);
+const listVoice = createVoice(listDeps);
+listDeps.maps.ownerAt.set('group:777', Date.now());
+listDeps.maps.lastSentAt.set('group:777', 0);
+listDeps.maps.lastSpeaker.set('group:777', { userId: '2002', isOwner: false, at: Date.now() });
+assert.equal(listVoice.voiceTriggerBlock('group:777', 'group', 2002), null);
+// 名单外的人：返回拒绝文案，不抛错
+listDeps.maps.lastSpeaker.set('group:777', { userId: '3003', isOwner: false, at: Date.now() });
+const blocked = listVoice.voiceTriggerBlock('group:777', 'group', 3003);
+assert.equal(typeof blocked, 'string');
+assert.match(blocked, /不在语音触发名单/);
+// 完全没有 last 记录：也不抛错
+listDeps.maps.lastSpeaker.delete('group:777');
+assert.equal(typeof listVoice.voiceTriggerBlock('group:777', 'group', 3003), 'string');
+// 最后说话的是主人：放行
+listDeps.maps.lastSpeaker.set('group:777', { userId: '1001', isOwner: true, at: Date.now() });
+assert.equal(listVoice.voiceTriggerBlock('group:777', 'group', 3003), null);
 
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log('R5_VOICE_OK lib=%d', lib.length);

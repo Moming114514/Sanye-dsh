@@ -87,7 +87,8 @@ function voiceTriggerBlock(key, kind, id) {
     return '这条消息已经发过语音了，等主人再说一句';
   }
   if (who === 'list') {
-    const ok = last.isOwner === true || cfgVoice.trigger.members.includes(String(last.userId));
+    const last = voiceLastSpeaker.get(String(key)) ?? null;
+    const ok = last?.isOwner === true || cfgVoice.trigger.members.includes(String(last?.userId ?? ''));
     if (!ok) return '该成员不在语音触发名单里';
   }
   return null;
