@@ -183,3 +183,14 @@
   deps 只放 cfg / 状态 Map / 函数引用这类进程级对象。
 - 注册时用 `REQUIRED` 列表校验依赖齐全，缺一个就 **throw（启动即失败）**，不要留到运行时 500。
 - 单测必须覆盖：未命中不写、命中只写一次、handler 抛错只写一次 500 并返回 true、先写成功再抛错不得写第二遍。
+
+
+## 搬迁路由：依赖语义检查（R9-4 事故）
+
+注入进 router 的函数必须与**原 inline 调用的签名语义**一致。典型错误：
+原代码 `getSocialV2State(key)`（按 key 返回一个会话对象），注册时传成 `getSocialV2: () => socialV2`（返回整个大对象）
+→ `st.recentMessages` 是 undefined → `for...of` 抛错 → 500。
+
+- 注册处写一行注释，标明「与原实现的等价调用」，例如 `// 等价：getSocialV2State(key)`；
+- 单测用**真实数据结构**（从 `state/social-v2.json` 摘样本）做 fixture，并覆盖「字段缺失」与「字段存在」两种；
+- 搬迁后的接口要带判空兜底（`?? {}`、`Array.isArray(x) ? x : []`），即便依赖正确也不该 500。
