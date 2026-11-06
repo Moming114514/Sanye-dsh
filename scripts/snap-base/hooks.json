@@ -1,6 +1,6 @@
 {
  "schema": "replay-hooks/v1",
- "at": "2026-11-06T10:09:52.128Z",
+ "at": "2026-11-06T16:06:17.128Z",
  "hooks": 12,
  "modules": 11,
  "cases": [
@@ -217,8 +217,8 @@
   {
    "id": "wakeGate:group-rate",
    "case": "group-ratelimited",
-   "hash": "4daa5b0b8a11ce62",
-   "bytes": 95
+   "hash": "b5bea41b6c623f7c",
+   "bytes": 4
   },
   {
    "id": "wakeGate:group-rate",
