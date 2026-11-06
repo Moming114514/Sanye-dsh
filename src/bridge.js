@@ -74,6 +74,7 @@ import { createRouter } from './console/http.js';
 import { registerTokens } from './console/routes/tokens.js'; // R9-1
 import { registerRolesDebug } from './console/routes/roles-debug.js';
 import { registerSocialRead } from './console/routes/social-read.js'; // R9-3
+import { registerSessionDetail } from './console/routes/session-detail.js'; // R9-4
 import {
   appendMemoryInboxEvent, looksNoteworthyMessage, resolveMemoryCardPaths, loadMemoryCard, saveMemoryCardOutputs, touchMemories } from './memory-card.js';
 import { scopedMemoryText } from './ext/memory-scope.js'; // MEMSCOPE_PATCH
@@ -4166,6 +4167,25 @@ async function main() {
             buildPlugins,
             isLiveAgentToken,
           });
+          registerSessionDetail(consoleRouter, {
+            getCfg: () => cfg,
+            getSocialV2: () => socialV2,
+            formatMemoryV2,
+            computeWakeSafetyV2,
+            assessClosureV2,
+            closureStatus,
+            buildContextSnapshot,
+            biliMemory,
+            currentRoleHint,
+            api,
+            unwrap,
+            knownPresetName,
+            presetNames: PRESET_NAMES,
+            listPresetBackups,
+            agentTokenOk,
+            v2SessionAllowed,
+            v2ToolEnabled,
+          });
         }
         if (await consoleRouter.handle(req, res)) return;
         if (req.method === 'GET' && url.pathname === '/') {
@@ -4213,19 +4233,7 @@ async function main() {
         // moved to src/console/routes/tokens.js (R9-1)
         // ── B站记忆 / 动态 / 分享（管理端只读状态 + 手动触发，供排查）─────────
         // moved to src/console/routes/social-read.js (R9-3)
-        if (req.method === 'GET' && url.pathname === '/api/bili/prompt-preview') {
-          // 只读排查：看看群友提到「B站那个号」时，实际会注入什么。
-          const text = String(url.searchParams.get('text') ?? '').slice(0, 500);
-          const roleHint = currentRoleHint();
-          sendJson({
-            ok: true,
-            text,
-            briefChars: (biliMemory.briefBlock() ?? '').length,
-            recall: biliMemory.recallBlock(text),
-            roleHint,
-          });
-          return;
-        }
+        // moved to src/console/routes/session-detail.js (R9-4)
         if (req.method === 'POST' && url.pathname === '/api/bili/memory/refresh') {
           const stats = await biliMemory.refresh({ force: true });
           sendJson({ ok: stats?.ok !== false, stats });
@@ -4243,15 +4251,7 @@ async function main() {
           sendJson({ ok: result?.ok !== false, result });
           return;
         }
-        if (req.method === 'GET' && url.pathname === '/api/presets') {
-          let presets = [];
-          try {
-            const { presets: list } = unwrap(await api.agentPresets.list({}), 'agentPreset.list');
-            presets = list.map((p) => ({ id: p.id, trust: p.trust ?? 'system' }));
-          } catch {}
-          sendJson({ presets });
-          return;
-        }
+        // moved to src/console/routes/session-detail.js (R9-4)
         if (req.method === 'POST' && url.pathname === '/api/mode') {
           const body = await readBody();
           // 规范名与历史名都接受，落盘的始终是内部拼写（见 MODE_INPUT_ALIASES）。
@@ -4481,16 +4481,7 @@ async function main() {
           });
           return;
         }
-        if (req.method === 'GET' && url.pathname === '/api/preset/sim-prompt/backups') {
-          const preset = knownPresetName(url.searchParams.get('preset'));
-          if (!preset) { sendJson({ ok: false, error: `未知预设（只支持 ${Object.values(PRESET_NAMES).join(' / ')}）` }, 400); return; }
-          try {
-            sendJson({ ok: true, backups: listPresetBackups(preset) });
-          } catch (error) {
-            sendJson({ ok: false, error: error?.message ?? '读取备份失败' }, 500);
-          }
-          return;
-        }
+        // moved to src/console/routes/session-detail.js (R9-4)
         if (req.method === 'POST' && url.pathname === '/api/preset/sim-prompt/restore') {
           const body = await readBody();
           const preset = knownPresetName(body.preset);
@@ -5491,31 +5482,7 @@ async function main() {
           sendJson({ ok: true });
           return;
         }
-        if (req.method === 'GET' && url.pathname === '/api/socialV2/state') {
-          const key = String(url.searchParams.get('key') ?? '').trim();
-          if (!key) { sendJson({ ok: false, error: 'key 不能为空' }, 400); return; }
-          if (req.headers['x-agent-token'] && !agentTokenOk(key, req.headers['x-agent-token'])) { sendJson({ ok: false, error: 'agent token 无效' }, 403); return; }
-          if (req.headers['x-agent-token'] && !v2SessionAllowed(key)) { sendJson({ ok: false, error: '目标不在当前模式允许范围内' }, 403); return; }
-          if (req.headers['x-agent-token'] && !v2ToolEnabled('socialState')) { sendJson({ ok: false, error: '工具未启用：qq_social_state' }, 403); return; }
-          const st = getSocialV2State(key);
-          sendJson({
-            ok: true,
-            key,
-            wakeConfig: st.wakeConfig,
-            wakeSafety: computeWakeSafetyV2(st.wakeConfig),
-            unreadCount: st.unread.length,
-            recentCount: st.recentMessages.length,
-            lastWakeReason: st.lastWakeReason,
-            lastAiReplyAt: st.lastAiReplyAt,
-            // 对话收尾：最近一次自然结束的位置 + 下次接法 + 是否还在冷却。
-            closure: closureStatus(st.closure, Date.now()),
-            closureAssessment: (() => {
-              const a = assessClosureV2(key, st);
-              return { verdict: a.verdict, score: a.score, reasons: a.reasons };
-            })()
-          });
-          return;
-        }
+        // moved to src/console/routes/session-detail.js (R9-4)
         if (req.method === 'GET' && url.pathname === '/api/socialV2/prompt') {
           const key = String(url.searchParams.get('key') ?? '').trim();
           if (!key) { sendJson({ ok: false, error: 'key 不能为空' }, 400); return; }
@@ -5633,31 +5600,7 @@ async function main() {
           });
           return;
         }
-        if (req.method === 'GET' && url.pathname === '/api/socialV2/snapshot') {
-          const key = String(url.searchParams.get('key') ?? '').trim();
-          if (!key) { sendJson({ ok: false, error: 'key 不能为空' }, 400); return; }
-          if (req.headers['x-agent-token'] && !agentTokenOk(key, req.headers['x-agent-token'])) { sendJson({ ok: false, error: 'agent token 无效' }, 403); return; }
-          if (req.headers['x-agent-token'] && !v2SessionAllowed(key)) { sendJson({ ok: false, error: '目标不在当前模式允许范围内' }, 403); return; }
-          if (req.headers['x-agent-token'] && !v2ToolEnabled('getSnapshot')) { sendJson({ ok: false, error: '工具未启用：qq_get_context_snapshot' }, 403); return; }
-          const include = String(url.searchParams.get('include') ?? '').split(',').map((x) => x.trim()).filter(Boolean);
-          const st = getSocialV2State(key);
-          const configured = cfg.socialV2?.snapshot ?? {};
-          const caps = {
-            unread: url.searchParams.get('unreadLimit') ?? configured.unread,
-            recent: url.searchParams.get('recentLimit') ?? configured.recent,
-            activeMembers: url.searchParams.get('activeLimit') ?? configured.activeMembers,
-            textChars: url.searchParams.get('textChars') ?? configured.textChars,
-          };
-          const snapshot = buildContextSnapshot({
-            key,
-            st,
-            include,
-            caps,
-            afterSeq: Number(url.searchParams.get('afterSeq') ?? 0) || 0,
-          });
-          sendJson(snapshot);
-          return;
-        }
+        // moved to src/console/routes/session-detail.js (R9-4)
         if (req.method === 'GET' && url.pathname === '/api/socialV2/unread') {
           const key = String(url.searchParams.get('key') ?? '').trim();
           const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit')) || 30));
@@ -8091,30 +8034,7 @@ async function main() {
           }
           return;
         }
-        if (req.method === 'GET' && url.pathname === '/api/socialV2/active-members') {
-          const key = String(url.searchParams.get('key') ?? '').trim();
-          const limit = Math.min(20, Math.max(1, Number(url.searchParams.get('limit')) || 10));
-          if (!key) { sendJson({ ok: false, error: 'key 不能为空' }, 400); return; }
-          if (req.headers['x-agent-token'] && !agentTokenOk(key, req.headers['x-agent-token'])) { sendJson({ ok: false, error: 'agent token 无效' }, 403); return; }
-          if (req.headers['x-agent-token'] && !v2SessionAllowed(key)) { sendJson({ ok: false, error: '目标不在当前模式允许范围内' }, 403); return; }
-          if (req.headers['x-agent-token'] && !v2ToolEnabled('getActiveMembers')) { sendJson({ ok: false, error: '工具未启用：qq_get_active_members' }, 403); return; }
-          const st = getSocialV2State(key);
-          const map = new Map();
-          for (const m of st.recentMessages) {
-            if (!m || m.isSelf) continue;
-            const uid = m.userId ? String(m.userId) : '';
-            const key2 = uid || String(m.sender || '未知');
-            const cur = map.get(key2) || { sender: m.sender || key2, userId: uid || undefined, count: 0, lastTime: 0, isOwner: !!m.isOwner };
-            if (!cur.userId && uid) cur.userId = uid;
-            cur.count += 1;
-            if (m.time > cur.lastTime) cur.lastTime = m.time;
-            if (m.isOwner) cur.isOwner = true;
-            map.set(key2, cur);
-          }
-          const members = [...map.values()].sort((a, b) => b.count - a.count || b.lastTime - a.lastTime).slice(0, limit);
-          sendJson({ ok: true, key, members });
-          return;
-        }
+        // moved to src/console/routes/session-detail.js (R9-4)
         if (req.method === 'POST' && url.pathname === '/api/socialV2/memory-append') {
           const body = await readBody();
           const key = String(body.key ?? '').trim();
@@ -8199,32 +8119,7 @@ async function main() {
           sendJson({ ok: true, key, category, memory: formatMemoryV2(st) });
           return;
         }
-        if (req.method === 'GET' && url.pathname === '/api/socialV2/memory') {
-          const key = String(url.searchParams.get('key') ?? '').trim();
-          const category = String(url.searchParams.get('category') ?? '').trim();
-          if (!key) { sendJson({ ok: false, error: 'key 不能为空' }, 400); return; }
-          if (req.headers['x-agent-token'] && !agentTokenOk(key, req.headers['x-agent-token'])) { sendJson({ ok: false, error: 'agent token 无效' }, 403); return; }
-          if (req.headers['x-agent-token'] && !v2SessionAllowed(key)) { sendJson({ ok: false, error: '目标不在当前模式允许范围内' }, 403); return; }
-          if (req.headers['x-agent-token'] && !v2ToolEnabled('memory')) { sendJson({ ok: false, error: '工具未启用：qq_memory_query' }, 403); return; }
-          const st = getSocialV2State(key);
-          const raw = {
-            activeTopics: Array.isArray(st.activeTopics) ? st.activeTopics.slice(-20) : [],
-            pendingThoughts: Array.isArray(st.pendingThoughts) ? st.pendingThoughts.filter((t) => !t.expiresAt || Date.now() < t.expiresAt).slice(-20) : [],
-            memberImpressions: st.memberImpressions && typeof st.memberImpressions === 'object' ? st.memberImpressions : {}
-          };
-          if (category === 'activeTopic') {
-            raw.pendingThoughts = [];
-            raw.memberImpressions = {};
-          } else if (category === 'pendingThought') {
-            raw.activeTopics = [];
-            raw.memberImpressions = {};
-          } else if (category === 'memberImpression') {
-            raw.activeTopics = [];
-            raw.pendingThoughts = [];
-          }
-          sendJson({ ok: true, key, category, formatted: formatMemoryV2({ ...st, ...raw }), raw });
-          return;
-        }
+        // moved to src/console/routes/session-detail.js (R9-4)
         if (req.method === 'POST' && url.pathname === '/api/socialV2/memory-remove') {
           const body = await readBody();
           const key = String(body.key ?? '').trim();
