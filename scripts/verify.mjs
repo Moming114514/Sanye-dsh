@@ -155,6 +155,19 @@ function toolsList() {
     violations.length ? ('未导入：' + violations.slice(0, 6).join(' | ')) : '被调用的导出都有 import');
 }
 
+// 2.7) 路由对照：/api 路径集合不许漂移（R9：控制台拆分前后必须一致）
+{
+  const basePath = path.join(ROOT, 'scripts/snap-base/routes.json');
+  if (!fs.existsSync(basePath)) {
+    record('路由对照（/api 路径集合）', true, '没有基准 scripts/snap-base/routes.json（先 node scripts/check-routes.mjs --save-base）');
+  } else {
+    const st = await run(NODE, ['scripts/check-routes.mjs', '--selftest']);
+    const rc = await run(NODE, ['scripts/check-routes.mjs']);
+    const line = ((rc.code === 0 ? rc.out : (rc.err || rc.out)).trim().split('\n').pop() || '').slice(0, 200);
+    record('路由对照（/api 路径集合）', st.code === 0 && rc.code === 0, line);
+  }
+}
+
 // 3) 代码结构快照：工具名 + 路由状态码
 //    比对逻辑只有一份——scripts/snap-split.mjs；verify 把探活结果用 stdin 递过去，
 //    免得两份实现慢慢漂移（人格侧不在这里，见 scripts/snap-split.mjs --check）。

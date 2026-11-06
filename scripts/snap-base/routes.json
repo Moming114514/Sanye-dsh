@@ -1,0 +1,572 @@
+{
+ "schema": "routes/v1",
+ "at": "2026-11-06T11:31:17.556Z",
+ "count": 176,
+ "paths": {
+  "/api/authorize/read": [
+   "GET",
+   "POST"
+  ],
+  "/api/bili/dynamics/poll": [
+   "POST"
+  ],
+  "/api/bili/memory/refresh": [
+   "POST"
+  ],
+  "/api/bili/prompt-preview": [
+   "GET"
+  ],
+  "/api/bili/share-now": [
+   "POST"
+  ],
+  "/api/bili/status": [
+   "GET"
+  ],
+  "/api/console/notify-ai": [
+   "POST"
+  ],
+  "/api/console/token": [
+   "POST"
+  ],
+  "/api/debug/frames": [
+   "GET"
+  ],
+  "/api/debug/guard": [
+   "GET"
+  ],
+  "/api/debug/promise": [
+   "GET"
+  ],
+  "/api/debug/prompt": [
+   "POST"
+  ],
+  "/api/debug/related": [
+   "GET"
+  ],
+  "/api/debug/sticker-prune": [
+   "GET"
+  ],
+  "/api/debug/stylelearn": [
+   "POST"
+  ],
+  "/api/dsh/effort": [
+   "POST"
+  ],
+  "/api/dsh/model": [
+   "GET"
+  ],
+  "/api/greeting/test": [
+   "POST"
+  ],
+  "/api/images/": [
+   "GET"
+  ],
+  "/api/images/message": [
+   "GET"
+  ],
+  "/api/memory-card/notify": [
+   "POST"
+  ],
+  "/api/mode": [
+   "POST"
+  ],
+  "/api/owner-audit": [
+   "GET"
+  ],
+  "/api/pending": [
+   "GET"
+  ],
+  "/api/plugins": [
+   "GET"
+  ],
+  "/api/preset/sim-prompt": [
+   "GET",
+   "POST"
+  ],
+  "/api/preset/sim-prompt/backups": [
+   "GET"
+  ],
+  "/api/preset/sim-prompt/restore": [
+   "POST"
+  ],
+  "/api/presets": [
+   "GET",
+   "POST"
+  ],
+  "/api/purpose/preview": [
+   "POST"
+  ],
+  "/api/purpose/run": [
+   "POST"
+  ],
+  "/api/purpose/status": [
+   "GET"
+  ],
+  "/api/restart": [
+   "POST"
+  ],
+  "/api/role": [
+   "POST"
+  ],
+  "/api/role-mode": [
+   "POST"
+  ],
+  "/api/roles": [
+   "GET"
+  ],
+  "/api/roles/content": [
+   "GET"
+  ],
+  "/api/roles/create": [
+   "POST"
+  ],
+  "/api/roles/delete": [
+   "POST"
+  ],
+  "/api/roles/limit": [
+   "POST"
+  ],
+  "/api/roles/rename": [
+   "POST"
+  ],
+  "/api/roles/update": [
+   "POST"
+  ],
+  "/api/security": [
+   "GET",
+   "POST"
+  ],
+  "/api/send/": [
+   "GET"
+  ],
+  "/api/send/group": [
+   "POST"
+  ],
+  "/api/send/private": [
+   "POST"
+  ],
+  "/api/send/reply": [
+   "POST"
+  ],
+  "/api/send/voice": [
+   "GET",
+   "POST"
+  ],
+  "/api/session/reset": [
+   "POST"
+  ],
+  "/api/sessions": [
+   "GET"
+  ],
+  "/api/slang": [
+   "GET",
+   "POST"
+  ],
+  "/api/slang/batch-": [
+   "GET"
+  ],
+  "/api/slang/batch-confirm": [
+   "POST"
+  ],
+  "/api/slang/batch-delete": [
+   "POST"
+  ],
+  "/api/slang/batch-reject": [
+   "POST"
+  ],
+  "/api/slang/clear": [
+   "GET",
+   "POST"
+  ],
+  "/api/slang/config": [
+   "POST"
+  ],
+  "/api/slang/extract": [
+   "GET",
+   "POST"
+  ],
+  "/api/slang/research": [
+   "GET",
+   "POST"
+  ],
+  "/api/social": [
+   "GET",
+   "POST"
+  ],
+  "/api/social/flush": [
+   "POST"
+  ],
+  "/api/social/state": [
+   "POST"
+  ],
+  "/api/socialV2/": [
+   "GET"
+  ],
+  "/api/socialV2/active-members": [
+   "GET"
+  ],
+  "/api/socialV2/activity": [
+   "GET",
+   "POST"
+  ],
+  "/api/socialV2/advice": [
+   "GET"
+  ],
+  "/api/socialV2/attention": [
+   "GET"
+  ],
+  "/api/socialV2/attn-set": [
+   "GET"
+  ],
+  "/api/socialV2/check-send": [
+   "POST"
+  ],
+  "/api/socialV2/close": [
+   "POST"
+  ],
+  "/api/socialV2/collect-sticker": [
+   "GET",
+   "POST"
+  ],
+  "/api/socialV2/config": [
+   "GET",
+   "POST"
+  ],
+  "/api/socialV2/diary": [
+   "POST"
+  ],
+  "/api/socialV2/economy": [
+   "GET"
+  ],
+  "/api/socialV2/feedback": [
+   "GET",
+   "POST"
+  ],
+  "/api/socialV2/feedback-clear": [
+   "GET",
+   "POST"
+  ],
+  "/api/socialV2/forward-media": [
+   "POST"
+  ],
+  "/api/socialV2/forward-message": [
+   "GET"
+  ],
+  "/api/socialV2/group-policy": [
+   "GET"
+  ],
+  "/api/socialV2/group-recent": [
+   "GET"
+  ],
+  "/api/socialV2/grouprate": [
+   "GET"
+  ],
+  "/api/socialV2/history-catchup": [
+   "GET",
+   "POST"
+  ],
+  "/api/socialV2/impression": [
+   "GET"
+  ],
+  "/api/socialV2/initial-prompt": [
+   "GET",
+   "POST"
+  ],
+  "/api/socialV2/learnmode": [
+   "GET"
+  ],
+  "/api/socialV2/limit-mute": [
+   "POST"
+  ],
+  "/api/socialV2/loop": [
+   "GET"
+  ],
+  "/api/socialV2/mark-read": [
+   "POST"
+  ],
+  "/api/socialV2/memory": [
+   "GET"
+  ],
+  "/api/socialV2/memory-append": [
+   "POST"
+  ],
+  "/api/socialV2/memory-clear": [
+   "POST"
+  ],
+  "/api/socialV2/memory-remove": [
+   "POST"
+  ],
+  "/api/socialV2/memory-update": [
+   "POST"
+  ],
+  "/api/socialV2/message-detail": [
+   "GET",
+   "POST"
+  ],
+  "/api/socialV2/mood": [
+   "GET",
+   "POST"
+  ],
+  "/api/socialV2/mute": [
+   "GET"
+  ],
+  "/api/socialV2/my-recent": [
+   "GET"
+  ],
+  "/api/socialV2/names": [
+   "GET"
+  ],
+  "/api/socialV2/owner-teach": [
+   "GET"
+  ],
+  "/api/socialV2/people": [
+   "GET"
+  ],
+  "/api/socialV2/people-mark": [
+   "GET"
+  ],
+  "/api/socialV2/person": [
+   "GET"
+  ],
+  "/api/socialV2/prompt": [
+   "GET"
+  ],
+  "/api/socialV2/qzone-comment": [
+   "POST"
+  ],
+  "/api/socialV2/qzone-feed": [
+   "GET",
+   "POST"
+  ],
+  "/api/socialV2/recall": [
+   "POST"
+  ],
+  "/api/socialV2/recent": [
+   "GET"
+  ],
+  "/api/socialV2/record-sent": [
+   "POST"
+  ],
+  "/api/socialV2/reset": [
+   "GET",
+   "POST"
+  ],
+  "/api/socialV2/safetalk": [
+   "GET"
+  ],
+  "/api/socialV2/self-image": [
+   "GET"
+  ],
+  "/api/socialV2/send-burst": [
+   "POST"
+  ],
+  "/api/socialV2/send-message": [
+   "POST"
+  ],
+  "/api/socialV2/send-poke": [
+   "POST"
+  ],
+  "/api/socialV2/send-sticker": [
+   "POST"
+  ],
+  "/api/socialV2/send-voice": [
+   "POST"
+  ],
+  "/api/socialV2/slang/query": [
+   "GET"
+  ],
+  "/api/socialV2/slang/submit": [
+   "GET",
+   "POST"
+  ],
+  "/api/socialV2/snapshot": [
+   "GET"
+  ],
+  "/api/socialV2/state": [
+   "GET"
+  ],
+  "/api/socialV2/states": [
+   "GET"
+  ],
+  "/api/socialV2/sticker-frames": [
+   "POST"
+  ],
+  "/api/socialV2/sticker-image": [
+   "GET"
+  ],
+  "/api/socialV2/sticker-list": [
+   "GET",
+   "POST"
+  ],
+  "/api/socialV2/sticker-note": [
+   "GET",
+   "POST"
+  ],
+  "/api/socialV2/sticker-remark": [
+   "GET",
+   "POST"
+  ],
+  "/api/socialV2/style-candidate": [
+   "GET"
+  ],
+  "/api/socialV2/style-list": [
+   "GET"
+  ],
+  "/api/socialV2/style-note": [
+   "GET"
+  ],
+  "/api/socialV2/tech-notes": [
+   "GET"
+  ],
+  "/api/socialV2/tool-log": [
+   "GET"
+  ],
+  "/api/socialV2/tool-log/clear": [
+   "GET",
+   "POST"
+  ],
+  "/api/socialV2/unread": [
+   "GET"
+  ],
+  "/api/socialV2/voices": [
+   "GET"
+  ],
+  "/api/socialV2/wait": [
+   "POST"
+  ],
+  "/api/socialV2/wake": [
+   "GET",
+   "POST"
+  ],
+  "/api/socialV2/wake-config": [
+   "POST"
+  ],
+  "/api/status": [
+   "GET"
+  ],
+  "/api/stickers": [
+   "GET"
+  ],
+  "/api/stickers/": [
+   "GET"
+  ],
+  "/api/stickers/note": [
+   "GET",
+   "POST"
+  ],
+  "/api/stickers/remark": [
+   "GET",
+   "POST"
+  ],
+  "/api/stickers/sync": [
+   "GET",
+   "POST"
+  ],
+  "/api/test-send": [
+   "POST"
+  ],
+  "/api/tokens/": [
+   "GET"
+  ],
+  "/api/tokens/daily": [
+   "GET"
+  ],
+  "/api/tokens/recent": [
+   "GET"
+  ],
+  "/api/tokens/reset": [
+   "GET",
+   "POST"
+  ],
+  "/api/tokens/series": [
+   "GET"
+  ],
+  "/api/tokens/summary": [
+   "GET"
+  ],
+  "/api/tokens/turns": [
+   "GET"
+  ],
+  "/api/voice/list": [
+   "GET"
+  ],
+  "/api/voice/packs": [
+   "GET",
+   "POST"
+  ],
+  "/api/voice/packs/": [
+   "GET"
+  ],
+  "/api/voice/packs/activate": [
+   "POST"
+  ],
+  "/api/voice/packs/cancel": [
+   "POST"
+  ],
+  "/api/voice/packs/clean": [
+   "POST"
+  ],
+  "/api/voice/packs/cloud-config": [
+   "GET",
+   "POST"
+  ],
+  "/api/voice/packs/cloud-stats": [
+   "GET",
+   "POST"
+  ],
+  "/api/voice/packs/enable": [
+   "POST"
+  ],
+  "/api/voice/packs/import": [
+   "POST"
+  ],
+  "/api/voice/packs/import-cancel": [
+   "POST"
+  ],
+  "/api/voice/packs/import-delete-backup": [
+   "POST"
+  ],
+  "/api/voice/packs/import-delete-source": [
+   "POST"
+  ],
+  "/api/voice/packs/import-inspect": [
+   "POST"
+  ],
+  "/api/voice/packs/install": [
+   "GET",
+   "POST"
+  ],
+  "/api/voice/packs/remove": [
+   "POST"
+  ],
+  "/api/voice/packs/sample": [
+   "GET",
+   "POST"
+  ],
+  "/api/voice/packs/start": [
+   "POST"
+  ],
+  "/api/voice/packs/stop": [
+   "POST"
+  ],
+  "/api/voice/packs/test": [
+   "POST"
+  ],
+  "/api/voice/rules": [
+   "GET"
+  ],
+  "/api/voice/send": [
+   "POST"
+  ],
+  "/api/voice/tts-check": [
+   "POST"
+  ],
+  "/api/whitelist": [
+   "GET",
+   "POST"
+  ],
+  "/api/workspace/reset": [
+   "POST"
+  ]
+ }
+}
