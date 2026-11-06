@@ -1023,7 +1023,7 @@ function pageStyle() { // STYLE_GATE_PATCH
 
 function pageTalk() {
   return tabbed('talk', [
-    { title: '人味指标', render: () => { const w = h('div', {}); w.append(humanStatsCard()); return w; } },
+    { title: '人味指标', render: () => { const w = h('div', {}); w.append(humanStatsCard()); w.append(humanReportCard()); return w; } },
     { title: '学到的说法', render: pageStyle },
     { title: '她的看法', render: pageImpr },
     { title: '她说的话', render: pageUtter },
@@ -3202,6 +3202,37 @@ function decisionStatsCard() {
 }
 
 // P2-D：人味指标卡（说话页）
+async function loadHumanReport(force) {
+  if (state.humanReport && !force) return state.humanReport;
+  try { state.humanReport = await api('/api/human-report'); }
+  catch (e) { state.humanReport = { ok: false, error: String(e.message || e) }; }
+  return state.humanReport;
+}
+function humanReportCard() {
+  const d = state.humanReport;
+  const card = h('div', { class: 'card' }, [h('h3', {}, '最近 4 周（周报）')]);
+  if (!d) {
+    card.append(h('p', { class: 'mono' }, '正在读周报…'));
+    loadHumanReport().then(() => { if (state.page === 'talk') rerender(); });
+    return card;
+  }
+  if (!d.ok || !Array.isArray(d.weeks) || !d.weeks.length) {
+    card.append(h('p', { class: 'mono' }, '还没有周报：在服务器上跑 node scripts/human-report.mjs 生成（或等每日任务）。'));
+    return card;
+  }
+  const rows = d.weeks.slice(-4).reverse();
+  card.append(h('table', { class: 'tbl-fit' }, [
+    h('thead', {}, h('tr', {}, ['周', '样本', '句长（群/私）', '实词重合', '总结句'].map((t) => h('th', {}, t)))),
+    h('tbody', {}, rows.map((w) => h('tr', {}, [
+      h('td', {}, String(w.week || '')), h('td', {}, String(w.n ?? '')),
+      h('td', {}, (w.lenG ?? 0) + ' / ' + (w.lenP ?? 0)),
+      h('td', {}, ((Number(w.ov) || 0) * 100).toFixed(1) + '%'),
+      h('td', {}, ((Number(w.sumRatio) || 0) * 100).toFixed(1) + '%'),
+    ]))),
+  ]));
+  card.append(h('p', { class: 'mono', style: 'margin-top:8px;color:#7f8b99' }, '周报按 ISO 自然周（周一起，东八区）切分；上方「近 7 天」是滚动窗口，用来和面板对数字。'));
+  return card;
+}
 function humanStatsCard() {
   const wrap = h('div', { class: 'card', style: 'margin-bottom:12px' }, h('h3', {}, '人味指标（近两周）'));
   const box = h('div', { class: 'muted' }, '正在计算…'); wrap.append(box);

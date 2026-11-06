@@ -762,6 +762,16 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true, total: list.reduce((s, x) => s + x.total, 0), marked: list.reduce((s, x) => s + x.marked, 0), sources: list });
     }
 
+    if (p === '/api/human-report') { // B3：人味周报（脚本生成的 JSON，只读）
+      if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
+      const file = path.join(SURFCORE, 'docs/reports/human-report.json');
+      try {
+        const d = JSON.parse(fs.readFileSync(file, 'utf8'));
+        return send(res, 200, { ok: true, ...d, file });
+      } catch {
+        return send(res, 200, { ok: true, weeks: [], missing: true });
+      }
+    }
     if (p === '/api/human-stats') { // P2-D：人味指标
       if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
       let social = { conversations: {} };
