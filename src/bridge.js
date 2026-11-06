@@ -13419,7 +13419,7 @@ function logSpeakPredict(key, reason) {
       const rt = decideReplyTarget({
         key: String(key || ''),
         last: lastMsg,
-        recent: unread.slice(-6),
+        recent: [...(Array.isArray(st2?.recentMessages) ? st2.recentMessages : []), ...unread].slice(-10),
         reason: String(reason || ''),
         now: Date.now(),
         policy: { allow: r.allow, source: r.source },

@@ -1,19 +1,14 @@
 // 回谁：把群里「这条该回谁」写成显式规则表（shadow 观测用）。
 // 纯函数：不读文件、不写文件、不调任何状态；所有输入由调用方从 state 快照传入。
 // 接入方式：bridge 在 [策略·预测] 之后旁路调用一次，只打一行 [回谁] 日志，不改变发送逻辑。
-//
-// 判定顺序（固定，见 REPLY_RULES）：
-//   private > at > name > quote > question > sample > none
-//   - at 由唤醒原因（atMention/ownerMention）或消息上的 atSelf 标记得出；
-//   - question 要求「问句 + 30 秒内没有别人接话」；
-//   - 现状里 attention 放行本身就含抽样，所以「放行但非直呼」统一记为 sample；
+// 判定顺序：private > owner > at > name > quote > question > sample > none
 
-export const REPLY_RULES = ['private', 'at', 'name', 'quote', 'question', 'sample', 'none'];
+export const REPLY_RULES = ['private', 'owner', 'at', 'name', 'quote', 'question', 'sample', 'none'];
 
 const NAME_RE = /三叶|三葉|叶子/;
 const QUESTION_RE = /[?？]|吗|呢|怎么|为什么|有没有|是不是|能不能|会不会/;
 const AT_REASON_RE = /atMention|ownerMention/;
-const FRESH_MS = 30 * 1000;
+const OWNER_FRESH_MS = 5 * 60 * 1000;
 
 function norm(s) {
   return String(s || '')
@@ -39,12 +34,12 @@ function isAtSelf(last, reason) {
 /**
  * @param {object} input
  * @param {string} input.key        会话键（group:gid / private:uin）
- * @param {object|null} input.last  触发唤醒的那条消息（state.unread 的最后一条）
- * @param {object[]} [input.recent] 最近 N 条消息（含 last）
+ * @param {object|null} input.last  触发唤醒的那条消息
+ * @param {object[]} [input.recent] 最近 N 条消息（chronological，含 last，可含 isSelf）
  * @param {string} [input.reason]   唤醒原因
  * @param {number} [input.now]      判定时间
- * @param {{allow?:boolean, source?:string}} [input.policy]  speak-policy 的结论
- * @param {string[]} [input.selfUins] 她自己的 QQ（用于从候选里排除）
+ * @param {{allow?:boolean, source?:string}} [input.policy]
+ * @param {string[]} [input.selfUins]
  * @returns {{target:string|null, rule:string, candidates:string[]}}
  */
 export function decideReplyTarget(input = {}) {
@@ -58,52 +53,39 @@ export function decideReplyTarget(input = {}) {
   const candidates = [];
   for (const m of recent) {
     const u = senderOf(m);
-    if (u && !self.has(u) && !candidates.includes(u)) candidates.push(u);
+    if (u && !m?.isSelf && !self.has(u) && !candidates.includes(u)) candidates.push(u);
   }
 
   const target = senderOf(last) || null;
 
-  // 1) 私聊：永远回对方
-  if (!key.startsWith('group:')) {
-    return { target, rule: 'private', candidates };
-  }
-
+  if (!key.startsWith('group:')) return { target, rule: 'private', candidates };
   if (!last) return { target: null, rule: 'none', candidates };
 
-  // 2) 群里被 @
-  if (isAtSelf(last, input.reason)) {
-    return { target, rule: 'at', candidates };
-  }
-
-  // 3) 没 @ 但叫了名字
-  if (NAME_RE.test(norm(textOf(last)))) {
-    return { target, rule: 'name', candidates };
-  }
-
-  // 4) 引用了我的消息
-  if (last.quoteTargetIsSelf === true) {
-    return { target, rule: 'quote', candidates };
-  }
-
-  // 5) 问句且 30 秒内没有别人接话
-  if (QUESTION_RE.test(norm(textOf(last)))) {
-    const t0 = Number(last.time || 0);
-    const fresh = now - t0 <= FRESH_MS;
-    const answered = recent.some((m) => {
-      const u = senderOf(m);
-      return u && u !== target && Number(m?.time || 0) > t0;
-    });
-    if (fresh && !answered) {
-      return { target, rule: 'question', candidates };
+  // 主人优先级：最近 5 分钟内主人说过话，就先回主人
+  for (let i = recent.length - 1; i >= 0; i -= 1) {
+    const m = recent[i];
+    if (!m || !m.isOwner) continue;
+    if (now - Number(m.time || 0) <= OWNER_FRESH_MS) {
+      return { target: senderOf(m) || target, rule: 'owner', candidates };
     }
+    break;
   }
 
-  // 6) 其余：现有策略放行即视为抽样命中（attention 内部含抽样）
-  if (policy.allow !== false) {
-    return { target, rule: 'sample', candidates };
+  if (isAtSelf(last, input.reason)) return { target, rule: 'at', candidates };
+  if (NAME_RE.test(norm(textOf(last)))) return { target, rule: 'name', candidates };
+  if (last.quoteTargetIsSelf === true) return { target, rule: 'quote', candidates };
+
+  // 未回答的问句：从后往前找，跳过她已回过的
+  for (let i = recent.length - 1; i >= 0; i -= 1) {
+    const m = recent[i];
+    if (!m || m.isSelf) continue;
+    if (!QUESTION_RE.test(norm(textOf(m)))) continue;
+    const answered = recent.slice(i + 1).some((x) => x && x.isSelf);
+    if (answered) continue;
+    return { target: senderOf(m) || target, rule: 'question', candidates };
   }
 
-  // 7) 不放行
+  if (policy.allow !== false) return { target, rule: 'sample', candidates };
   return { target: null, rule: 'none', candidates };
 }
 

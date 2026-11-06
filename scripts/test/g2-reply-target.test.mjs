@@ -55,13 +55,13 @@ const cases = [];
   cases.push('question');
 }
 
-// 5b) 问句但已有人接 → 落到 sample
+// 5b) 问句后只有别人接话 → 仍算未回答（新规则只认她自己的回复）
 {
   const q = m({ sender: '4004', text: '有人知道怎么弄吗？', time: now - 6000 });
   const a = m({ sender: '5005', text: '我知道', time: now - 3000 });
   const r = decideReplyTarget({ key: 'group:1', last: q, recent: [q, a], now, policy: { allow: true } });
-  assert.equal(r.rule, 'sample');
-  cases.push('question-answered');
+  assert.equal(r.rule, 'question');
+  cases.push('question-others-replied');
 }
 
 // 6) 抽样/普通放行
