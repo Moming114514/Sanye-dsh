@@ -86,3 +86,28 @@
 
 ### 记忆注入瘦身（待做）
 - 计划：24 条 → 4 常驻 + 2 动态；见 `docs/V2-ROADMAP.md`。
+
+## 2026-11-06（v1.2 · 记忆/人设/面板/瘦身）
+
+**控制台拆分（R9 收尾）**
+- bridge `18,632 → 16,337` 行（−2,295，−12.3%）：拆出 `src/console/routes/{tokens,roles-debug,social-read,session-detail,misc-read,agent-read,voice-read}.js` 与 `src/console/http.js` router 契约。
+- 留下 `scripts/check-routes.mjs` + 176 条路径快照、`replay-hooks` 金丝雀；停止理由与后续路径见 `docs/CONSOLE-SPLIT-FINAL.md`。
+
+**记忆**
+- 按话题挑记忆上线：骨架 3 条（初次/最重要/近 7 天）+ 相关 5 条，800 字上限，`socialV2.memoryTopic` 可关。
+- 修真实唤醒不注入：`buildWakePromptV2` 追加 `relMemLine`（原先挂在废弃的 `roleHint` 上）。
+- 零依赖别名检索：`src/lib/mem-alias.js` + 15 组同义词（米饭↔大白饭、研考↔考研），实测 0→4 / 0→3 条。
+
+**人设**
+- 瘦身切换：`persona.tone.md` 2,317 → 1,518 字、`scenes/qq-group.md` 1,525 → 1,246 字；私聊 hint 8,985 → 8,210。
+- 记录与回滚见 `docs/PERSONA-SLIM-20261106.md`。
+
+**面板**
+- 导航收 3 组 12 项；群规则单表（在群里/怎么回/发言量/只回谁/抽样/今天）；决策记录（判决书 + 标注 + 误判分析 + 「→ 她：正文」）；说话页四 Tab（人味指标/学到的说法/她的看法/她说的话）；媒体卡。
+- 插件页按 layer 分组，manifest 支持 `pages` 自动追加导航。
+
+**群策略**
+- 清理测试残留：清空静音、清 `replyOnly`、抽样归零、四群统一「正常聊」；现在只剩「发言量」与「省钱模式」两处可调。
+
+**文档**
+- 新增 `docs/reports/GAPS-RESEARCH.md`（5 个差距 × 3 个高星参考）、`docs/PERMISSIONS.md`（56 工具分级）、`docs/DECOUPLE-DRILL.md`（脱壳演练 7 步）、`docs/OPEN-QUESTIONS.md`（对外咨询 10 问）。
