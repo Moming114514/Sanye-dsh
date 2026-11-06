@@ -13269,6 +13269,14 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
     // 二代不自动注入完整角色卡，但记忆卡必须每轮都在：否则她记不起和主人的事。
     const memoryCardText = memoryCardPromptBlock();
     const memoryCardLine = memoryCardText ? `${memoryCardText}\n\n` : '';
+    // RELMEM_V2_PATCH：把「按这句挑出来的旧记忆」接进真实唤醒（原先只挂在 roleHint 上，真实唤醒路径不走）
+    let relMemLine = '';
+    try {
+      const _ms0 = Array.isArray(st.recentMessages) ? st.recentMessages : [];
+      const _lastMsg0 = _ms0.length ? _ms0[_ms0.length - 1] : null;
+      const _lastTxt0 = _lastMsg0 ? String(_lastMsg0.text || _lastMsg0.plain || '') : '';
+      if (_lastTxt0) relMemLine = relatedMemorySuffix({ key, text: _lastTxt0, cfg, paths: MEMORY_CARD_PATHS, log });
+    } catch (_e0) { try { log('[相关记忆] v2 注入失败：' + (_e0 && _e0.message ? _e0.message : _e0)); } catch {} }
     // CACHEORDER_PATCH：把「每次唤醒都会变」的段落全部挪到最后，让前面一大段保持稳定——
     // 前缀稳定 = 缓存命中，命中价 ¥0.02/百万，未命中 ¥1/百万，差 50 倍。
     // 顺序：角色/人格/身份/规则（几乎不变）→ B站与记忆卡（一天变几次）→ 此刻状态/唤醒/表情匹配（每次都变）。
@@ -13278,7 +13286,7 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
       + stickerTodoBlock + walletLine + tokenGuardLine
       + statusLine + wakeLine + memoryLine + participationLine + fishGuardLine + stickerMatchLine + mediaRuleLine
       /* CACHEORDER2: 易变段必须在末尾，新增易变段请追加到此处 */
-      + closureLine + replyLine + biliLine;
+      + closureLine + replyLine + biliLine + relMemLine;
     lastWakePromptMeta = {
       role: roleLine.length,
       identity: identityLine.length,
