@@ -82,7 +82,7 @@ import * as githubLearnMod from '../src/ext/github-learn.js';
 
 const __autoSkip = new Set(['bridge.js', 'self-test.js', 'mcp-snowluma-safe.js', 'mcp-snowluma.js', 'mcp-servers.js']);
 const autoBindings = {};
-for (const dir of ['../src/', '../src/ext/']) {
+for (const dir of ['../src/', '../src/ext/', '../src/lib/']) {
   const base = new URL(dir, import.meta.url);
   for (const f of fs.readdirSync(base)) {
     if (!f.endsWith('.js') || __autoSkip.has(f)) continue;
