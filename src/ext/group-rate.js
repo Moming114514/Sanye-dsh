@@ -137,12 +137,16 @@ export default {
       return 'rate:none';
     }
   },
-  wakeGate({ key, reason }) {
+  wakeGate({ key, reason, isOwner }) {
     const k = String(key || '');
     if (!k.startsWith('group:')) return true;
     const why = String(reason || '');
     // 这些不占群额度
     if (why === 'manual' || why === 'admin' || /style-learn/.test(why)) return true;
+    // 主人直呼不占群额度（2026-11-06：主人的话被群频率挡了）
+    if (why === 'ownerMention' || (isOwner && /^(atMention|nameMention|ownerMention)$/.test(why))) {
+      return { allow: true, reason: `[频繁度] 主人消息，跳过限制 ${k}（${why}）` };
+    }
     const gid = k.slice('group:'.length).replace(/\D/g, '');
     const lv = groupLevel(gid);
     const cfg = LEVELS[lv];

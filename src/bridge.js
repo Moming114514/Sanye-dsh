@@ -13466,7 +13466,9 @@ function logSpeakActual(key, allow, source, reason) {
         return String((last && (last.plain || last.text)) || '');
       } catch { return ''; }
     })();
+    const __decisionLast = (() => { try { const arr = getSocialV2State(key).unread || []; return arr[arr.length - 1] || null; } catch { return null; } })();
     const wakeGate = extWakeGate({ key: String(key), reason: String(reason), cfg, mode: qqMode(),
+      isOwner: Boolean(__decisionLast?.isOwner),
       economyOn: tokenGuardDowngrade().on, text: __decisionText, stateDir: STATE_DIR }); // ECONOMY_PATCH
     if (wakeGate && wakeGate.allow === false) {
       const extReason = wakeGate.reason || `[ext] 跳过唤醒 ${key}（${reason}）`;
