@@ -77,6 +77,7 @@ import { registerSocialRead } from './console/routes/social-read.js'; // R9-3
 import { registerSessionDetail } from './console/routes/session-detail.js'; // R9-4
 import { registerMiscRead } from './console/routes/misc-read.js'; // R9-5
 import { registerAgentRead } from './console/routes/agent-read.js'; // R9-6
+import { registerVoiceRead } from './console/routes/voice-read.js'; // R9-7
 import {
   appendMemoryInboxEvent, looksNoteworthyMessage, resolveMemoryCardPaths, loadMemoryCard, saveMemoryCardOutputs, touchMemories } from './memory-card.js';
 import { scopedMemoryText } from './ext/memory-scope.js'; // MEMSCOPE_PATCH
@@ -4231,6 +4232,9 @@ async function main() {
               errors: modelCatalogErrorLogged,
             }),
           });
+          registerVoiceRead(consoleRouter, {
+            getVoicePacks: () => getVoicePacksCached(),
+          });
         }
         if (await consoleRouter.handle(req, res)) return;
         if (req.method === 'GET' && url.pathname === '/') {
@@ -6509,10 +6513,7 @@ async function main() {
           // 前端只能看到"开始安装…"、永远没有进度条（2026-10-28 用户反馈）。
           const vp = getVoicePacksCached();
           try {
-            if (req.method === 'GET' && url.pathname === '/api/voice/packs') {
-              sendJson(await vp.list());
-              return;
-            }
+            // moved to src/console/routes/voice-read.js (R9-7)
             if (req.method === 'POST' && url.pathname === '/api/voice/packs/install') {
               const body = await readBody();
               sendJson(await vp.install(String(body.id || ''), {
@@ -6580,14 +6581,8 @@ async function main() {
               sendJson(await vp.stop(String(body.id || '')));
               return;
             }
-            if (req.method === 'GET' && url.pathname === '/api/voice/packs/cloud-stats') {
-              sendJson(await vp.cloudStats(String(url.searchParams.get('id') || 'voice-cloud')));
-              return;
-            }
-            if (req.method === 'GET' && url.pathname === '/api/voice/packs/cloud-config') {
-              sendJson(await vp.readCloudConfig(String(url.searchParams.get('id') || 'voice-cloud')));
-              return;
-            }
+            // moved to src/console/routes/voice-read.js (R9-7)
+            // moved to src/console/routes/voice-read.js (R9-7)
             if (req.method === 'POST' && url.pathname === '/api/voice/packs/cloud-config') {
               const body = await readBody();
               sendJson(await vp.cloudConfig(String(body.id || ''), body));
