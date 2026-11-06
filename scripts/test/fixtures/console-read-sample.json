@@ -1,0 +1,539 @@
+{
+  "source": "config.json + state/slang.json",
+  "present": {
+    "allow": {
+      "private": [
+        "3160624852",
+        "3122513140",
+        "3057627032",
+        "1461634968"
+      ],
+      "groups": [
+        "389834620",
+        "680787260",
+        "1025377431",
+        "1043145514"
+      ]
+    },
+    "deny": {
+      "users": [],
+      "private": [],
+      "groups": []
+    },
+    "ownerQQ": "3160624852",
+    "security": {
+      "interceptNotify": true
+    },
+    "socialV2": {
+      "enabled": true,
+      "autoReplyCheckMs": 30000,
+      "agentPreset": "qq-chat-v2",
+      "provideRecommendations": true,
+      "tools": {
+        "getPrompt": true,
+        "getUnread": true,
+        "getRecent": true,
+        "socialState": true,
+        "sendGroup": true,
+        "sendPrivate": true,
+        "reply": true,
+        "sendBurst": true,
+        "sendMessage": true,
+        "waitMessages": true,
+        "feedback": true,
+        "getMyRecent": true,
+        "getMessageDetail": true,
+        "getActiveMembers": true,
+        "setWakeConfig": true,
+        "markRead": true,
+        "closeConversation": true,
+        "memory": true,
+        "slangQuery": true,
+        "slangSubmit": true,
+        "getImages": true,
+        "getForwardMsg": true,
+        "sendPoke": true,
+        "listStickers": true,
+        "getStickerImage": true,
+        "sendSticker": true,
+        "setStickerRemark": true,
+        "stickerNote": true,
+        "collectSticker": true,
+        "getSelfImage": true,
+        "sendVoice": false,
+        "sendQzone": true,
+        "loops": true,
+        "people": true
+      },
+      "wake": {
+        "defaultMode": "diving",
+        "preSleepWaitEnabled": true,
+        "preSleepWaitMs": 300000,
+        "recommendedDefaultInfinite": true,
+        "sleepMinMs": 60000,
+        "sleepMaxMs": 0,
+        "recommendedSleepMinMs": 300000,
+        "recommendedSleepMaxMs": 7200000,
+        "recommendedProbability": 0.05,
+        "recommendedKeywords": [
+          "三叶",
+          "小鱼",
+          "大肥鱼",
+          "肥鱼",
+          "鱼儿"
+        ],
+        "recommendedAtMention": true,
+        "recommendedNameMention": true,
+        "recommendedQuestion": true,
+        "recommendedPoke": true,
+        "recommendedHint": "如果你要潜水，推荐先调用 qq_wait_for_messages(timeoutMs=300000) 完成一次沉睡前观察：5 分钟内没人说话就可以设置下一次唤醒并沉睡；若期间有人发新消息，先查看 newMessages，判断不需要你参与可直接沉睡，若参与了则下次想睡需再等观察窗口。潜水时长推荐 5~120 分钟，普通消息概率 0.05；@/名字/关键词/提问唤醒建议保持开启。需要等特定某人/某几人时，可额外设置 triggers.speakerIds。",
+        "batchWindowMs": 8000,
+        "maxWakePerMinute": 1,
+        "maxWakePerHour": 12,
+        "noActionLimit": 3,
+        "maxWakeConfigReminders": 2
+      },
+      "closure": {
+        "enabled": true,
+        "cooldownMs": 1200000,
+        "requireNoOpenQuestion": true,
+        "promptInWake": true,
+        "maxSummaryChars": 160,
+        "maxNextOpeningChars": 120
+      },
+      "send": {
+        "burstEnabled": true,
+        "burstMaxMessages": 8,
+        "burstIntervalMinMs": 1000,
+        "burstIntervalMaxMs": 3000,
+        "longGapProbability": 0.2,
+        "longGapMinMs": 5000,
+        "longGapMaxMs": 10000,
+        "maxSendPerMinute": 8,
+        "maxSendPerHour": 60,
+        "maxMessageChars": 500,
+        "maxGapMs": 10000,
+        "gapBaseMs": 800,
+        "gapPerCharMs": 20,
+        "recommendedHint": "单条消息不要用空格断句，中文短句用逗号/顿号或直接连写；分条时每条都要读起来完整，不要把同一句话拆到两条里；普通闲聊建议一次 1~3 条，条间 1~3 秒；讲故事/回忆可以 5~10 秒间隔；不要连续刷屏。"
+      },
+      "tokenGuard": {
+        "enabled": true,
+        "maxWakesPerDay": 120,
+        "privateMaxWakesPerDay": 60,
+        "minWakeGapMs": 300000,
+        "directBypassGap": true,
+        "maxOutboundPerTurn": 8,
+        "maxDailyCostCNY": 8,
+        "downgradeAtRatio": 0.5,
+        "downgradeNotifyOwner": true,
+        "downgradeGroupNotice": true
+      },
+      "wait": {
+        "defaultMs": 30000,
+        "minMs": 5000,
+        "maxMs": 600000,
+        "defaultQuietMs": 8000,
+        "minQuietAfterNewMs": 10000
+      },
+      "sticker": {
+        "enabled": true,
+        "syncTtlMs": 60000,
+        "maxListCount": 100,
+        "includeInPrompt": true,
+        "promptMaxStickers": 8,
+        "match": {
+          "topK": 3,
+          "minScore": 0.3
+        },
+        "collect": {
+          "enabled": true,
+          "maxPerMinute": 2,
+          "maxPerHour": 10,
+          "maxRemarkChars": 20
+        },
+        "maxItems": 50
+      },
+      "voice": {
+        "enabled": false,
+        "dir": "audio",
+        "maxSeconds": 300,
+        "maxBytes": 20971520,
+        "maxPerMinute": 2,
+        "maxPerHour": 10,
+        "allowAbsolutePath": false,
+        "defaultVolume": 1,
+        "loudness": "normal",
+        "ffmpegPath": "",
+        "autoReadback": true,
+        "tts": {
+          "enabled": false,
+          "baseUrl": "http://127.0.0.1:8765",
+          "timeoutMs": 60000,
+          "maxChars": 120,
+          "character": "",
+          "route": "local",
+          "endpoints": {
+            "local": "http://127.0.0.1:8765",
+            "cloud": "http://127.0.0.1:8767"
+          }
+        },
+        "trigger": {
+          "who": "owner",
+          "groups": [],
+          "members": []
+        }
+      },
+      "proactive": {
+        "enabled": true,
+        "checkIntervalMinMs": 1800000,
+        "checkIntervalMaxMs": 5400000,
+        "idleThresholdMs": 900000,
+        "probability": 0.3
+      },
+      "feedback": {
+        "maxLength": 500,
+        "notifyOwnerOnError": true
+      },
+      "context": {
+        "recentLimit": 100,
+        "unreadLimit": 30,
+        "contextWindow": 20,
+        "inlineWakeMessages": true,
+        "wakeMessageLimit": 12,
+        "wakeRecentLimit": 4,
+        "wakeMaxChars": 6000,
+        "wakeFoldOld": true
+      },
+      "history": {
+        "enabled": true,
+        "limit": 30,
+        "maxAgeMinutes": 720,
+        "wake": true,
+        "includePrivate": true
+      },
+      "initialPromptMaxChars": 2000,
+      "media": {
+        "maxBytes": 8388608,
+        "maxPixels": 64000000,
+        "maxCount": 5
+      },
+      "command": {
+        "prefixes": [
+          "/"
+        ],
+        "groupPrefixes": [
+          "#",
+          "！"
+        ]
+      },
+      "qzone": {
+        "enabled": true,
+        "defaultUgcRight": 64,
+        "watchOwner": true,
+        "watchCheckMinMs": 900000,
+        "watchCheckMaxMs": 1800000,
+        "watchDelayMinMs": 300000,
+        "watchDelayMaxMs": 1500000,
+        "watchMaxPerDay": 3,
+        "watchOnlyOffPeak": true
+      },
+      "biliStudy": {
+        "enabled": false,
+        "keywords": [
+          "MCP 服务器 搭建",
+          "DeepSeek Harness",
+          "prompt caching 原理",
+          "Agent 工具调用",
+          "本地大模型 部署 教程",
+          "LoRA 微调 教程"
+        ],
+        "dailyMax": 1,
+        "minDurationSec": 90,
+        "maxDurationSec": 2400,
+        "minPlay": 1000,
+        "maxAgeDays": 400,
+        "folderId": "4374163087",
+        "noteKeywords": [],
+        "tellOwner": false,
+        "requireTech": true
+      },
+      "friends": {
+        "notifyCooldownMs": 600000,
+        "notifyMaxPerDay": 8
+      },
+      "styleLearn": {
+        "enabled": false,
+        "hour": 20,
+        "minute": 30,
+        "groups": [
+          "680787260"
+        ],
+        "maxPerDay": 4,
+        "maxSamples": 160,
+        "rounds": [
+          [
+            20,
+            30
+          ],
+          [
+            23,
+            30
+          ]
+        ],
+        "targetQQ": "2775128622",
+        "perRound": 3,
+        "strictTarget": true,
+        "injectMaxChars": 520,
+        "autoPromote": true,
+        "promoteDistinct": 2,
+        "candidateDays": 14,
+        "injectMaxItems": 6,
+        "exemptEconomy": true
+      },
+      "loops": {
+        "enabled": true,
+        "maxItems": 10,
+        "expireDays": 14,
+        "injectMaxChars": 320,
+        "autoCapture": true
+      },
+      "people": {
+        "enabled": true,
+        "maxItems": 8,
+        "injectMaxChars": 260
+      },
+      "reminders": {
+        "enabled": true
+      },
+      "alerts": {
+        "enabled": true,
+        "gapMin": 25,
+        "cooldownMin": 60
+      },
+      "report": {
+        "enabled": true,
+        "hour": 23,
+        "minute": 30
+      },
+      "relatedMemories": {
+        "enabled": true,
+        "maxItems": 3,
+        "injectMaxChars": 300,
+        "minHits": 2,
+        "log": true
+      },
+      "mood": {
+        "enabled": true
+      },
+      "safeTalk": {
+        "enabled": true,
+        "mode": "record",
+        "windowMin": 30,
+        "hits": 3,
+        "coolMin": 30,
+        "words": [
+          "你是ai",
+          "是ai吗",
+          "是不是ai",
+          "什么模型",
+          "哪个模型",
+          "谁做的",
+          "谁在管",
+          "谁写的",
+          "住哪",
+          "地址",
+          "电话",
+          "手机号",
+          "身份证",
+          "密码",
+          "账号",
+          "银行卡",
+          "转账",
+          "借钱",
+          "打钱"
+        ]
+      },
+      "attention": {
+        "enabled": true,
+        "minScore": 2,
+        "log": true,
+        "sample": {
+          "389834620": 2,
+          "680787260": 0.3,
+          "1043145514": 0.3,
+          "default": 0,
+          "maxPerDay": 20
+        },
+        "replyOnly": {
+          "389834620": [
+            "1962605653"
+          ]
+        },
+        "maxPerDay": 40
+      },
+      "githubLearn": {
+        "enabled": true,
+        "minStars": 800,
+        "weekday": 1,
+        "hour": 10,
+        "maxChars": 6000,
+        "weekdays": [
+          1,
+          4
+        ]
+      },
+      "adviceCapture": {
+        "enabled": true,
+        "uins": [
+          "1962605653"
+        ],
+        "minLen": 15
+      },
+      "botPolicy": {
+        "whitelist": [],
+        "note": "whitelist 里的号永远当人看"
+      },
+      "paused": false,
+      "toolProfile": "core-min",
+      "groupPolicyFile": {
+        "enabled": true
+      }
+    },
+    "social": {
+      "enabled": true,
+      "maxReplyChars": 500,
+      "mustReplyKeywords": [
+        "deepseek",
+        "小鲸鱼",
+        "大肥鱼",
+        "鲸鱼",
+        "d指导",
+        "在吗"
+      ],
+      "contextWindow": 20,
+      "triggerProbability": 0.1,
+      "activeCheckMinMs": 8000,
+      "activeCheckMaxMs": 30000,
+      "idleWindowMs": 360000,
+      "idleRetryProbability": 0.4,
+      "proactiveEnabled": true,
+      "proactiveIdleThresholdMs": 1800000,
+      "proactiveCheckMinMs": 2700000,
+      "proactiveCheckMaxMs": 5400000,
+      "proactiveProbability": 0.2,
+      "activeReplyDelayMinMs": 1000,
+      "activeReplyDelayMaxMs": 5000,
+      "activeDurationEnabled": true,
+      "activeDurationMinMs": 1200000,
+      "activeDurationMaxMs": 3000000,
+      "skipProbability": 0.05,
+      "surrenderProbability": 0,
+      "idleRetryWaitMs": 120000,
+      "burstEnabled": true,
+      "burstIntervalMinMs": 1000,
+      "burstIntervalMaxMs": 3000,
+      "longGapProbability": 0.2,
+      "longGapMinMs": 5000,
+      "longGapMaxMs": 10000
+    },
+    "slang": {
+      "enabled": true,
+      "extractMinMessages": 40,
+      "extractCooldownMs": 3600000,
+      "inferenceThresholds": [
+        4,
+        8,
+        16
+      ],
+      "injectMax": 8,
+      "learnerPreset": "qq-chat",
+      "workspaceTitle": "QQ 黑话学习",
+      "autoResearch": true
+    },
+    "slangEntries": [
+      {
+        "id": "mvu70mu2-jggest",
+        "content": "我嘞个艹艹",
+        "meaning": "",
+        "usage": "",
+        "example": "",
+        "risk": "",
+        "sources": [],
+        "status": "candidate",
+        "source": "ai",
+        "count": 1,
+        "evidence": [
+          {
+            "key": "group:1025377431",
+            "sender": "25大数据二班刘君皓",
+            "text": "我嘞个艹艹",
+            "time": 1793317626476
+          }
+        ],
+        "lastInferenceCount": 0,
+        "createdAt": "2026-10-29T23:47:14.713Z",
+        "updatedAt": "2026-10-29T23:47:14.713Z"
+      },
+      {
+        "id": "mvu70mu2-mj3dnz",
+        "content": "写人格",
+        "meaning": "",
+        "usage": "",
+        "example": "",
+        "risk": "",
+        "sources": [],
+        "status": "candidate",
+        "source": "ai",
+        "count": 1,
+        "evidence": [
+          {
+            "key": "group:1025377431",
+            "sender": "摆烂ing…",
+            "text": "我还没写人格呢，感觉目前也还行",
+            "time": 1793317405021
+          }
+        ],
+        "lastInferenceCount": 0,
+        "createdAt": "2026-10-29T23:47:14.714Z",
+        "updatedAt": "2026-10-29T23:47:14.714Z"
+      },
+      {
+        "id": "mvu7y4kb-biwawg",
+        "content": "早八",
+        "meaning": "",
+        "usage": "",
+        "example": "",
+        "risk": "",
+        "sources": [],
+        "status": "candidate",
+        "source": "ai",
+        "count": 3,
+        "evidence": [
+          {
+            "key": "group:1025377431",
+            "sender": "摆烂ing…",
+            "text": "还要上早八",
+            "time": 1793319194736
+          },
+          {
+            "key": "group:680787260",
+            "sender": "Checkmate的怠惰现象",
+            "text": "明天还有早八，睡觉了，晚安",
+            "time": 1793808475536
+          },
+          {
+            "key": "group:680787260",
+            "sender": "半俗（考研版）",
+            "text": "明天早八",
+            "time": 1793814544885
+          }
+        ],
+        "lastInferenceCount": 0,
+        "createdAt": "2026-10-30T00:13:17.338Z",
+        "updatedAt": "2026-11-04T22:53:10.843Z"
+      }
+    ]
+  },
+  "missing": {}
+}

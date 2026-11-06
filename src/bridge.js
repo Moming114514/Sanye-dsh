@@ -75,6 +75,7 @@ import { registerTokens } from './console/routes/tokens.js'; // R9-1
 import { registerRolesDebug } from './console/routes/roles-debug.js';
 import { registerSocialRead } from './console/routes/social-read.js'; // R9-3
 import { registerSessionDetail } from './console/routes/session-detail.js'; // R9-4
+import { registerMiscRead } from './console/routes/misc-read.js'; // R9-5
 import {
   appendMemoryInboxEvent, looksNoteworthyMessage, resolveMemoryCardPaths, loadMemoryCard, saveMemoryCardOutputs, touchMemories } from './memory-card.js';
 import { scopedMemoryText } from './ext/memory-scope.js'; // MEMSCOPE_PATCH
@@ -4186,6 +4187,17 @@ async function main() {
             v2SessionAllowed,
             v2ToolEnabled,
           });
+          registerMiscRead(consoleRouter, {
+            getCfg: () => cfg, // 等价：原调用 cfg.allow / cfg.deny / cfg.security / cfg.social / cfg.slang
+            getStateDirHardened: () => stateDirHardened, // 等价：原读取 stateDirHardened
+            stateDir: STATE_DIR, // 等价：原读取 STATE_DIR
+            manualDirCommand, // 等价：原调用 manualDirCommand(STATE_DIR)
+            getSocialV2Root: () => socialV2, // 等价：原读取 socialV2.paused（是整对象，不是按 key 的会话）
+            readFeedbackEntries, // 等价：原调用 readFeedbackEntries()
+            getSlangEntries: () => slangEntries, // 等价：原读取 slangEntries
+            getSlangWritable: () => slangStoreWritable, // 等价：原读取 slangStoreWritable
+            getSocial: () => social, // 等价：原读取 social.pendingSummaries / states / recentMessages
+          });
         }
         if (await consoleRouter.handle(req, res)) return;
         if (req.method === 'GET' && url.pathname === '/') {
@@ -4517,12 +4529,7 @@ async function main() {
         }
 
         // ── 黑话库管理 ──────────────────────────────────────────────────────
-        if (req.method === 'GET' && url.pathname === '/api/slang') {
-          const status = url.searchParams.get('status') || '';
-          const list = status ? slangEntries.filter((e) => e.status === status) : slangEntries;
-          sendJson({ entries: list, config: cfg.slang, writable: slangStoreWritable });
-          return;
-        }
+        // moved to src/console/routes/misc-read.js (R9-5)
         if (req.method === 'POST' && url.pathname === '/api/slang') {
           const body = await readBody();
           const content = String(body.content ?? '').trim();
@@ -4776,10 +4783,7 @@ async function main() {
         // ── 挂起审批 / 提问 ───────────────────────────────────────────────────
         // moved to src/console/routes/social-read.js (R9-3)
         // ── 白名单可视化编辑（写 config.json + 热更新内存） ───────────────────
-        if (req.method === 'GET' && url.pathname === '/api/whitelist') {
-          sendJson({ allow: cfg.allow ?? { private: [], groups: [] }, deny: cfg.deny ?? { users: [], private: [], groups: [] }, ownerQQ: cfg.ownerQQ ?? null });
-          return;
-        }
+        // moved to src/console/routes/misc-read.js (R9-5)
         if (req.method === 'POST' && url.pathname === '/api/whitelist') {
           const body = await readBody();
           const toNum = (arr) => Array.isArray(arr) ? [...new Set(arr.map((x) => Number(String(x).trim())).filter((n) => Number.isFinite(n)))] : undefined;
@@ -4892,23 +4896,7 @@ async function main() {
         }
 
         // ── 安全拦截通知设置 ─────────────────────────────────────────────────
-        if (req.method === 'GET' && url.pathname === '/api/security') {
-          sendJson({
-            security: cfg.security ?? { interceptNotify: true },
-            // state/ 的 ACL 收紧结果：Windows 上改 ACL 需要管理员权限，未提权时会失败。
-            // 控制台据此显示警告与可复制的命令（而不是让用户以为已经安全）。
-            // 命令必须取自 state-acl 的**安全**版本：把 (OI)(CI) 授权和 /T 混在一句里
-            // 会把子文件 DACL 清空，用户照抄就会把自己的 state/ 弄坏。
-            stateDir: {
-              hardened: stateDirHardened,
-              path: STATE_DIR,
-              manualCommand: process.platform === 'win32'
-                ? manualDirCommand(STATE_DIR)
-                : `chmod 700 "${STATE_DIR}"`
-            }
-          });
-          return;
-        }
+        // moved to src/console/routes/misc-read.js (R9-5)
         if (req.method === 'POST' && url.pathname === '/api/security') {
           const body = await readBody();
           // 支持从控制台**重试**收紧 state/ 权限（用户在管理员终端里配好了权限/换了启动方式后）。
@@ -5082,18 +5070,7 @@ async function main() {
           return;
         }
         // ── 仿真群友模式（社交引擎）配置 ──────────────────────────────────────
-        if (req.method === 'GET' && url.pathname === '/api/social') {
-          const stats = {};
-          for (const [k, e] of social.pendingSummaries.entries()) stats[k] = e.items.length;
-          const states = {};
-          const keys = new Set([...social.states.keys(), ...social.recentMessages.keys()]);
-          for (const k of keys) {
-            const st = social.states.get(k);
-            states[k] = { phase: st?.phase ?? 'idle' };
-          }
-          sendJson({ config: cfg.social, pendingSummaries: stats, states });
-          return;
-        }
+        // moved to src/console/routes/misc-read.js (R9-5)
         if (req.method === 'POST' && url.pathname === '/api/social') {
           const body = await readBody();
           const configFile = path.join(ROOT, 'config.json');
@@ -5229,10 +5206,7 @@ async function main() {
             return sendJson({ ok: false, error: String(err?.message || err) }, 500);
           }
         }
-        if (req.method === 'GET' && url.pathname === '/api/socialV2/config') {
-          sendJson({ ok: true, config: cfg.socialV2 ?? {} });
-          return;
-        }
+        // moved to src/console/routes/misc-read.js (R9-5)
         if (req.method === 'POST' && url.pathname === '/api/socialV2/config') {
           const body = await readBody();
           const configFile = path.join(ROOT, 'config.json');
@@ -5418,10 +5392,7 @@ async function main() {
           sendJson({ ok: true, config: cfg.socialV2 });
           return;
         }
-        if (req.method === 'GET' && url.pathname === '/api/socialV2/activity') {
-          sendJson({ ok: true, paused: socialV2.paused });
-          return;
-        }
+        // moved to src/console/routes/misc-read.js (R9-5)
         if (req.method === 'POST' && url.pathname === '/api/socialV2/activity') {
           const body = await readBody();
           const paused = body.paused === true;
@@ -7813,10 +7784,7 @@ async function main() {
           return;
         }
         // ── 反馈 / 自己消息 / 消息详情 / 活跃成员 ────────────────────────────
-        if (req.method === 'GET' && url.pathname === '/api/socialV2/feedback') {
-          sendJson({ ok: true, entries: readFeedbackEntries() });
-          return;
-        }
+        // moved to src/console/routes/misc-read.js (R9-5)
         if (req.method === 'POST' && url.pathname === '/api/socialV2/feedback-clear') {
           if (req.headers['x-agent-token']) { sendJson({ ok: false, error: '该接口仅控制台可用' }, 403); return; }
           atomicWriteJson(FEEDBACK_FILE, []);
