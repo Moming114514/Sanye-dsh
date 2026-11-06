@@ -103,3 +103,12 @@ export async function segmentsToText(segments, options = {}) {
   }
   return out.join('').trim();
 }
+
+
+// 群消息行渲染：主人的消息署名「他」，其他成员保持昵称（不改消息正文）。
+export function contextLines(list, hint = null) {
+  const hintOf = typeof hint === 'function' ? hint : () => '';
+  return (list || [])
+    .map((m) => `${m && m.isOwner ? '他' : String(m?.sender ?? '')}：${m?.text ?? ''}${hintOf(m) || ''}`)
+    .join('\n') || '（无）';
+}
