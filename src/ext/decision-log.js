@@ -239,4 +239,5 @@ export const manifest = {
   hooks: [],
   config: [],
   stateFiles: [],
+  pages: [{ id: 'decisions', title: '决策记录' }],
 };

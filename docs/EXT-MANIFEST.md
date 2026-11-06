@@ -37,8 +37,9 @@ export const manifest = {
 | `order` | number | 有 `promptBlock` 时必填 | 提示词注入顺序。**固定写成「`src/ext/index.js` 里 EXTENSIONS 的下标 ×10 + 10」**（10,20,…,170），全仓唯一，校验器会核对是否与注册位一致。**不写 = 不参与排序，回退到注册顺序** | `60` |
 | `config` | string[] | 否 | 读的 cfg 点路径；用于校验 features.json 的 `path` 是否存在 | `['socialV2.mood.decay']` |
 | `stateFiles` | string[] | 否 | 写在 `SURFCORE_STATE_DIR` 下的文件名（不含路径） | `['attention.json']` |
+| `pages` | {id,title}[] | 否 | 扩展声明的面板页；面板据此把入口并入导航（内置 PAGES 优先，冲突忽略） | `[{ id: 'group-rules', title: '群规则' }]` |
 
-> **v1 没有 `pages` 字段**（决策 m00399）：面板继续用 `PAGES` + `/opt/her/features.json`。
+> **`pages` 是可选字段（B1 起）**：面板启动时读 `/api/plugins`，把带 `pages` 的扩展并入侧栏；内置 `PAGES` 优先级更高，冲突以内置为准；没有 `pages` 或接口失败时行为与原来完全一致。
 > 等 `/api/plugins` 真的被面板消费、且能证明「页面只从一个来源渲染」再加；现在写了校验器直接判不合格。
 
 **7 个钩子**（来自 `docs/PLUGIN-CONTRACT.md`，不要自创）：
@@ -63,7 +64,7 @@ export const manifest = {
 | R5 | `hooks` 每项 ∈ 7 个白名单 | `未知钩子 X` |
 | R6 | `hooks` 里声明的，模块（或它的**工厂实例**）上必须真有对应函数（`routes` 可以是数组或函数）。默认导出是 `createX` 函数的模块，校验器会先 `create({ log: () => {} })` 取实例再查——与 loader 同一语义 | `声明了 X 但没实现` |
 | R7 | 有 `promptBlock` 必须有 `order`；`order` 为正整数、全仓唯一，且等于 `EXTENSIONS 下标×10+10` | `缺 order / order 冲突 / order 应为 N` |
-| R8 | v1 **禁止** `pages` 字段（面板仍用 PAGES + features.json） | `v1 不支持 pages 字段` |
+| R8 | `pages` 可选；必须是数组（≤5），元素 `{id,title}` 为非空字符串，id 不重复 | `pages 必须是数组` / `pages[i].id 必须是非空字符串` |
 | R9 | `config` 每项是 `a.b.c` 点路径；`stateFiles` 不含 `/`、`..` | `config/stateFiles 非法` |
 | R10 | 模块没有 `manifest` 导出 | `缺 manifest`（波 2 期间这是预期失败） |
 | R11 | `layer` 必填且必须是五层之一（W4 起，所有 ext 模块都要标） | `layer 必填` / `layer 非法` |

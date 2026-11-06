@@ -19,3 +19,17 @@ export function buildSidecarPrompt(reason, key, agentToken = '') {
     '输出要求：纯文本，1~3 句或条目式要点；工具报错就把错误原文附上；不需要引用设定或回忆过去。',
   ].filter(Boolean).join('\n\n') + '\n';
 }
+
+
+// B1：补齐 manifest（ext 清单要求每个模块有；副手模式无钩子、无页面）
+export const manifest = {
+  id: 'sidecar-task',
+  layer: '判断',
+  title: '副手模式（无 persona 任务）',
+  kind: 'tool',
+  enabledByDefault: true,
+  hot: true,
+  hooks: [],
+  config: ['socialV2.tasks.noPersona'],
+  stateFiles: [],
+};

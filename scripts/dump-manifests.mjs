@@ -113,9 +113,22 @@ function validate(m, ctx = {}) {
     errors.push('有 promptBlock 必须给 order（提示词注入顺序）');
   }
 
-  // R8 pages（v1 删除：等 /api/plugins 真被消费、且能证明"页面只从一个来源渲染"再加，见 m00399）
+  // R8 pages（B1）：可选；面板据此把插件页并入导航（内置 PAGES 优先，冲突忽略）
   if (m.pages !== undefined) {
-    errors.push('v1 不支持 pages 字段（决策 m00399：面板仍用 PAGES + features.json）');
+    if (!Array.isArray(m.pages)) errors.push('pages 必须是数组');
+    else {
+      if (m.pages.length > 5) errors.push('pages 最多 5 项');
+      const seen = new Set();
+      m.pages.forEach((pg, i) => {
+        if (!pg || typeof pg !== 'object') { errors.push(`pages[${i}] 必须是对象`); return; }
+        if (typeof pg.id !== 'string' || !pg.id.trim()) errors.push(`pages[${i}].id 必须是非空字符串`);
+        if (typeof pg.title !== 'string' || !pg.title.trim()) errors.push(`pages[${i}].title 必须是非空字符串`);
+        if (typeof pg.id === 'string' && pg.id.trim()) {
+          if (seen.has(pg.id)) errors.push(`pages 里 id 重复：${pg.id}`);
+          seen.add(pg.id);
+        }
+      });
+    }
   }
 
   // R9 config / stateFiles
@@ -185,7 +198,7 @@ function selftestRun() {
     { name: '带 route', expect: null, manifest: { layer: '感知', id: 'tech-notes', title: '技术笔记', kind: 'hook', enabledByDefault: true, hot: true, order: 140, hooks: ['promptBlock', 'routes', 'stateKey'] }, impl: implOk() },
     { name: '反例：钩子拼错 route', expect: '未知钩子', manifest: { layer: '感知', id: 'x-bad1', title: '拼错', kind: 'hook', enabledByDefault: true, hot: true, order: 10, hooks: ['promptBlock', 'route'] }, impl: implOk() },
     { name: '反例：声明了没实现', expect: '但没实现', manifest: { layer: '感知', id: 'x-bad2', title: '空声明', kind: 'hook', enabledByDefault: true, hot: true, hooks: ['afterSend'] }, impl: { default: () => {} } },
-    { name: '反例：pages 字段', expect: 'v1 不支持 pages', manifest: { layer: '感知', id: 'x-bad3', title: '页', kind: 'panel', enabledByDefault: true, hot: false, hooks: [], pages: [{ id: 'p1', title: 'P', api: '/api/x' }] }, impl: {} },
+    { name: '反例：pages 不是数组', expect: 'pages 必须是数组', manifest: { layer: '感知', id: 'x-bad3', title: '页', kind: 'panel', enabledByDefault: true, hot: false, hooks: [], pages: 'nope' }, impl: {} },
     { name: '反例：layer 非法', expect: 'layer 非法', manifest: { layer: '平台', id: 'x-bad5', title: '层错', kind: 'core', enabledByDefault: true, hot: false, hooks: [] }, impl: { default: () => {} } },
     { name: '反例：promptBlock 缺 order', expect: '必须给 order', manifest: { layer: '感知', id: 'x-bad4', title: '缺序', kind: 'hook', enabledByDefault: true, hot: true, hooks: ['promptBlock', 'stateKey'] }, impl: implOk() },
   ];
@@ -331,6 +344,7 @@ async function main() {
       hooks: Array.isArray(m.hooks) ? m.hooks : [], order: m.order ?? null,
       config: Array.isArray(m.config) ? m.config : [],
       stateFiles: Array.isArray(m.stateFiles) ? m.stateFiles : [],
+      pages: Array.isArray(m.pages) ? m.pages : [],
       kind: m.kind || '', layer: m.layer || '', registered: expectedOrder.has(f),
       status: errors.length ? 'fail' : 'ok', errors, warnings,
     });
@@ -360,7 +374,7 @@ async function main() {
     const payload = {
       schema: 'ext-manifests/v1',
       at: new Date().toISOString(),
-      modules: rows.filter((r) => r.status === 'ok').map((r) => ({ file: r.file, id: r.id, title: r.title, hooks: r.hooks, order: r.order, config: r.config, stateFiles: r.stateFiles, kind: r.kind, layer: r.layer, registered: r.registered, wave: r.registered ? 1 : 2 })),
+      modules: rows.filter((r) => r.status === 'ok').map((r) => ({ file: r.file, id: r.id, title: r.title, hooks: r.hooks, order: r.order, config: r.config, stateFiles: r.stateFiles, pages: r.pages || [], kind: r.kind, layer: r.layer, registered: r.registered, wave: r.registered ? 1 : 2 })),
       pending: rows.filter((r) => r.status !== 'ok').map((r) => ({ file: r.file, status: r.status, errors: r.errors })),
     };
     fs.mkdirSync(path.dirname(OUT_FILE), { recursive: true });

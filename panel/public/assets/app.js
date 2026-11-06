@@ -3553,6 +3553,38 @@ function renderPills() {
   }, p.k + ' ', h('b', {}, p.v))));
 }
 
+// B1：插件清单里的 pages 并入导航（内置 PAGES 优先；无 pages/接口失败时行为不变）
+const PLUGIN_LAYER_GROUP = { 判断: '她', 表达: '她', 记忆: '她', 感知: '系统', 运维: '系统' };
+function pluginNavPages() {
+  const list = Array.isArray(state.plugins) ? state.plugins : [];
+  const builtin = new Set(PAGES.map((p) => p.id));
+  const out = [];
+  for (const m of list) {
+    const pages = Array.isArray(m.pages) ? m.pages : [];
+    for (const p of pages) {
+      if (!p || typeof p.id !== 'string' || !p.id || typeof p.title !== 'string' || !p.title) continue;
+      if (builtin.has(p.id) || out.some((x) => x.id === p.id)) continue;
+      out.push({ id: p.id, title: p.title, group: PLUGIN_LAYER_GROUP[m.layer] || '系统', moduleId: m.id || '' });
+    }
+  }
+  return out;
+}
+function pluginPageById(id) { return pluginNavPages().find((p) => p.id === id) || null; }
+function renderPluginPage(id) {
+  const pp = pluginPageById(id);
+  const m = (Array.isArray(state.plugins) ? state.plugins : []).find((x) => x.id === (pp && pp.moduleId)) || {};
+  const wrap = h('div', {});
+  wrap.append(h('div', { class: 'card' }, [
+    h('h3', {}, pp ? pp.title : id),
+    h('div', { class: 'kv' }, h('span', {}, '来源'), h('span', {}, '扩展 ' + (m.id || '-'))),
+    h('div', { class: 'kv' }, h('span', {}, '层 / 类型'), h('span', {}, (m.layer || '-') + ' / ' + (m.kind || '-'))),
+    h('div', { class: 'kv' }, h('span', {}, '钩子'), h('span', {}, (Array.isArray(m.hooks) && m.hooks.length ? m.hooks.join('、') : '无'))),
+    h('div', { class: 'kv' }, h('span', {}, '配置'), h('span', {}, (Array.isArray(m.config) && m.config.length ? m.config.join('、') : '无'))),
+    h('div', { class: 'kv' }, h('span', {}, '状态文件'), h('span', {}, (Array.isArray(m.stateFiles) && m.stateFiles.length ? m.stateFiles.join('、') : '无'))),
+    h('p', { class: 'mono', style: 'margin-top:10px;color:#7f8b99' }, '这个入口来自扩展 manifest 的 pages 声明；该扩展还没提供面板界面，所以这里只展示它的清单信息。'),
+  ]));
+  return wrap;
+}
 function renderNav() {
   const nodes = [];
   for (const g of navGroups()) {
@@ -3565,6 +3597,12 @@ function renderNav() {
         onclick: (e) => { e.preventDefault(); location.hash = '#' + p.id; },
       }, p.title));
     }
+    for (const pp of pluginNavPages().filter((x) => x.group === g.title)) {
+      nodes.push(h('a', {
+        href: '#' + pp.id, class: state.page === pp.id ? 'active' : '',
+        onclick: (e) => { e.preventDefault(); location.hash = '#' + pp.id; },
+      }, pp.title));
+    }
   }
   $('#nav').replaceChildren(...nodes);
 }
@@ -3572,7 +3610,9 @@ function renderNav() {
 function rerender() {
   renderNav();
   renderPills();
-  const page = PAGES.find((p) => p.id === state.page) || PAGES[0];
+  const _pp = pluginPageById(state.page);
+  const page = PAGES.find((p) => p.id === state.page)
+    || (_pp ? { id: _pp.id, title: _pp.title, render: () => renderPluginPage(_pp.id) } : PAGES[0]);
   const _view = page.render();
   const _adj = PAGE_ADJUST[page.id];
   if (_adj) $('#view').replaceChildren(h('div', { class: 'page-adjust' }, (_adj.indexOf('只读') === 0 ? '本页只读：' : '本页能改：') + _adj.replace(/^只读[:：]?\s*/, '')), _view);
@@ -3586,7 +3626,7 @@ async function boot() {
   if (!TOKEN) { showGate(); return; }
   try {
     await loadOverview(); await loadFeatures(); loadNames().catch(() => {});
-    await Promise.all([loadMuted().catch(() => {}), loadPending().catch(() => {}), loadLearn().catch(() => {})]);
+    await Promise.all([loadMuted().catch(() => {}), loadPending().catch(() => {}), loadLearn().catch(() => {}), loadPlugins().catch(() => {})]);
     if (state.page === 'cost' && !state.cost) await loadCost();
     if (state.page === 'entry' && !state.entry) await loadEntry();
     if (state.page === 'access' && !state.access) await loadAccess();
@@ -3603,7 +3643,8 @@ function route() {
   const id = (location.hash || '#overview').slice(1);
   const _bootPage = window.__dshPage;
   window.__dshPage = null; // 只生效一次，之后按正常导航走
-  state.page = PAGES.some((p) => p.id === _bootPage) ? _bootPage : (PAGES.some((p) => p.id === id) ? id : 'overview');
+  // B1：插件 manifest 声明的页面 id 也允许直接进来（渲染前会再判断是否存在，不存在回落到 overview）
+  state.page = PAGES.some((p) => p.id === _bootPage) ? _bootPage : id;
   boot();
 }
 window.addEventListener('hashchange', route);

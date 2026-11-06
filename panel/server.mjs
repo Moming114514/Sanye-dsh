@@ -613,9 +613,12 @@ const server = http.createServer(async (req, res) => {
       // P2F_F2：桥接不返回 layer，面板从仓库里的 manifest 快照补上
       try {
         const gen = readJSON(path.join(SURFCORE, 'docs/generated/manifests.json'), { modules: [] });
-        const byId = new Map((gen.modules || []).map((m) => [m.id, m.layer]));
+        const byId = new Map((gen.modules || []).map((m) => [m.id, m]));
         for (const m of (r.modules || [])) {
-          if (!m.layer) m.layer = byId.get(m.id) || (m.kind === 'core' ? '运维' : '判断');
+          const g = byId.get(m.id);
+          if (!m.layer) m.layer = (g && g.layer) || (m.kind === 'core' ? '运维' : '判断');
+          // B1：manifest 里声明的 pages 透传给面板（内置 PAGES 优先，冲突由前端忽略）
+          if (!Array.isArray(m.pages) && g && Array.isArray(g.pages)) m.pages = g.pages;
         }
       } catch {}
       return send(res, 200, r);

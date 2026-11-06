@@ -217,4 +217,5 @@ export function handleWrite({ pathname, body, cfg, sendJson, log }) {
 export const manifest = {
   id: 'group-policy', layer: '判断', title: '群规则唯一事实源', kind: 'tool',
   enabledByDefault: false, hot: true, order: 210, hooks: [], config: [], stateFiles: ['group-policy.json'],
+  pages: [{ id: 'group-rules', title: '群规则' }],
 };

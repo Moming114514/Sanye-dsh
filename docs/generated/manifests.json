@@ -1,6 +1,6 @@
 {
  "schema": "ext-manifests/v1",
- "at": "2026-11-05T13:49:32.979Z",
+ "at": "2026-11-06T13:49:51.696Z",
  "modules": [
   {
    "file": "active-window.js",
@@ -14,6 +14,7 @@
    "stateFiles": [
     "active-window.json"
    ],
+   "pages": [],
    "kind": "tool",
    "layer": "判断",
    "registered": false,
@@ -34,6 +35,7 @@
    "stateFiles": [
     "bot-advice.jsonl"
    ],
+   "pages": [],
    "kind": "hook",
    "layer": "记忆",
    "registered": true,
@@ -54,10 +56,27 @@
     "socialV2.attention"
    ],
    "stateFiles": [],
+   "pages": [],
    "kind": "hook",
    "layer": "判断",
    "registered": true,
    "wave": 1
+  },
+  {
+   "file": "bili.js",
+   "id": "bili",
+   "title": "B站同步装配",
+   "hooks": [],
+   "order": null,
+   "config": [
+    "biliBridge"
+   ],
+   "stateFiles": [],
+   "pages": [],
+   "kind": "tool",
+   "layer": "感知",
+   "registered": false,
+   "wave": 2
   },
   {
    "file": "blackbox.js",
@@ -67,6 +86,7 @@
    "order": null,
    "config": [],
    "stateFiles": [],
+   "pages": [],
    "kind": "core",
    "layer": "运维",
    "registered": false,
@@ -83,6 +103,7 @@
     "bot-ids.json",
     "human-marks.json"
    ],
+   "pages": [],
    "kind": "tool",
    "layer": "感知",
    "registered": false,
@@ -98,6 +119,7 @@
    "stateFiles": [
     "channel-caps.json"
    ],
+   "pages": [],
    "kind": "tool",
    "layer": "感知",
    "registered": false,
@@ -111,6 +133,12 @@
    "order": 200,
    "config": [],
    "stateFiles": [],
+   "pages": [
+    {
+     "id": "decisions",
+     "title": "决策记录"
+    }
+   ],
    "kind": "tool",
    "layer": "判断",
    "registered": false,
@@ -130,6 +158,7 @@
    "stateFiles": [
     "economy.json"
    ],
+   "pages": [],
    "kind": "hook",
    "layer": "判断",
    "registered": true,
@@ -147,6 +176,7 @@
    "stateFiles": [
     "github-learn.json"
    ],
+   "pages": [],
    "kind": "tool",
    "layer": "运维",
    "registered": false,
@@ -161,6 +191,12 @@
    "config": [],
    "stateFiles": [
     "group-policy.json"
+   ],
+   "pages": [
+    {
+     "id": "group-rules",
+     "title": "群规则"
+    }
    ],
    "kind": "tool",
    "layer": "判断",
@@ -181,6 +217,7 @@
    "stateFiles": [
     "group-rate.json"
    ],
+   "pages": [],
    "kind": "hook",
    "layer": "判断",
    "registered": true,
@@ -200,6 +237,7 @@
     "socialV2.impressions"
    ],
    "stateFiles": [],
+   "pages": [],
    "kind": "hook",
    "layer": "记忆",
    "registered": true,
@@ -223,6 +261,7 @@
    "stateFiles": [
     "learn-mode.json"
    ],
+   "pages": [],
    "kind": "hook",
    "layer": "判断",
    "registered": true,
@@ -241,6 +280,7 @@
     "loops.json",
     "people.json"
    ],
+   "pages": [],
    "kind": "hook",
    "layer": "记忆",
    "registered": true,
@@ -254,6 +294,7 @@
    "order": null,
    "config": [],
    "stateFiles": [],
+   "pages": [],
    "kind": "core",
    "layer": "记忆",
    "registered": false,
@@ -267,6 +308,7 @@
    "order": null,
    "config": [],
    "stateFiles": [],
+   "pages": [],
    "kind": "core",
    "layer": "记忆",
    "registered": false,
@@ -286,6 +328,7 @@
    "stateFiles": [
     "muted-keys.json"
    ],
+   "pages": [],
    "kind": "hook",
    "layer": "判断",
    "registered": true,
@@ -304,6 +347,7 @@
     "ownerQQ"
    ],
    "stateFiles": [],
+   "pages": [],
    "kind": "hook",
    "layer": "判断",
    "registered": true,
@@ -323,6 +367,7 @@
    "stateFiles": [
     "owner-teach.json"
    ],
+   "pages": [],
    "kind": "hook",
    "layer": "表达",
    "registered": true,
@@ -338,10 +383,32 @@
    "order": 80,
    "config": [],
    "stateFiles": [],
+   "pages": [],
    "kind": "hook",
    "layer": "感知",
    "registered": true,
    "wave": 1
+  },
+  {
+   "file": "profile-ops.js",
+   "id": "profile-ops",
+   "title": "资料 / 头像 / 好友操作",
+   "hooks": [],
+   "order": null,
+   "config": [
+    "socialV2.profile",
+    "ownerQQ"
+   ],
+   "stateFiles": [
+    "friend-requests.json",
+    "avatar-pending.json",
+    "friend-notify.json"
+   ],
+   "pages": [],
+   "kind": "tool",
+   "layer": "判断",
+   "registered": false,
+   "wave": 2
   },
   {
    "file": "profile.js",
@@ -357,6 +424,7 @@
     "avatar-pending.json",
     "friend-notify.json"
    ],
+   "pages": [],
    "kind": "tool",
    "layer": "记忆",
    "registered": false,
@@ -374,6 +442,7 @@
     "socialV2.loops"
    ],
    "stateFiles": [],
+   "pages": [],
    "kind": "hook",
    "layer": "记忆",
    "registered": true,
@@ -391,6 +460,7 @@
    "stateFiles": [
     "qzone-seen.json"
    ],
+   "pages": [],
    "kind": "tool",
    "layer": "感知",
    "registered": false,
@@ -407,6 +477,7 @@
     "ownerQQ"
    ],
    "stateFiles": [],
+   "pages": [],
    "kind": "tool",
    "layer": "表达",
    "registered": false,
@@ -422,6 +493,7 @@
     "socialV2.relatedMemories"
    ],
    "stateFiles": [],
+   "pages": [],
    "kind": "core",
    "layer": "记忆",
    "registered": false,
@@ -440,6 +512,7 @@
     "ownerQQ"
    ],
    "stateFiles": [],
+   "pages": [],
    "kind": "tool",
    "layer": "运维",
    "registered": false,
@@ -464,10 +537,27 @@
     "safe-talk.json",
     "muted-keys.json"
    ],
+   "pages": [],
    "kind": "hook",
    "layer": "判断",
    "registered": true,
    "wave": 1
+  },
+  {
+   "file": "sidecar-task.js",
+   "id": "sidecar-task",
+   "title": "副手模式（无 persona 任务）",
+   "hooks": [],
+   "order": null,
+   "config": [
+    "socialV2.tasks.noPersona"
+   ],
+   "stateFiles": [],
+   "pages": [],
+   "kind": "tool",
+   "layer": "判断",
+   "registered": false,
+   "wave": 2
   },
   {
    "file": "speak-policy.js",
@@ -477,6 +567,7 @@
    "order": 180,
    "config": [],
    "stateFiles": [],
+   "pages": [],
    "kind": "tool",
    "layer": "判断",
    "registered": false,
@@ -490,6 +581,7 @@
    "order": null,
    "config": [],
    "stateFiles": [],
+   "pages": [],
    "kind": "core",
    "layer": "感知",
    "registered": false,
@@ -503,6 +595,7 @@
    "order": 170,
    "config": [],
    "stateFiles": [],
+   "pages": [],
    "kind": "core",
    "layer": "表达",
    "registered": true,
@@ -522,6 +615,7 @@
     "style-learn.json",
     "style-learn-now.json"
    ],
+   "pages": [],
    "kind": "tool",
    "layer": "表达",
    "registered": false,
@@ -543,6 +637,7 @@
     "socialV2.tools"
    ],
    "stateFiles": [],
+   "pages": [],
    "kind": "hook",
    "layer": "表达",
    "registered": true,
@@ -562,6 +657,7 @@
     "socialV2.techNotes"
    ],
    "stateFiles": [],
+   "pages": [],
    "kind": "hook",
    "layer": "表达",
    "registered": true,
@@ -579,6 +675,7 @@
    "stateFiles": [
     "utterance-marks.json"
    ],
+   "pages": [],
    "kind": "hook",
    "layer": "表达",
    "registered": true,
