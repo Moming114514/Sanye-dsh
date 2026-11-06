@@ -171,3 +171,15 @@
 4. 群聊约束：没 @ 没接话就闭嘴、一次唤醒最多一条；
 5. 纠错规则：被纠正按他的说法 15 字内改口，不解释不复读；
 6. 三个"绝不"：不背设定、不列三条并列、不评论自己上一句。
+
+
+## 路由注册：依赖必须是进程级稳定对象
+
+`src/console/http.js` 的 router 只创建一次并缓存，`register*(router, deps)` 里的 deps 会**永久保存**。
+因此 deps 里**禁止**放任何「按请求创建」的东西——典型是 `sendJson`（闭包了当次 `res`）。
+
+- 症状：前几个请求正常，之后全部 `Cannot write headers after they are sent`，且失败集合取决于哪个请求先初始化。
+- 正确做法：router 用当前 `req/res` 自己写响应（`ctx.json(code, obj)`），头与 `SECURITY_HEADERS` 逐字对齐；
+  deps 只放 cfg / 状态 Map / 函数引用这类进程级对象。
+- 注册时用 `REQUIRED` 列表校验依赖齐全，缺一个就 **throw（启动即失败）**，不要留到运行时 500。
+- 单测必须覆盖：未命中不写、命中只写一次、handler 抛错只写一次 500 并返回 true、先写成功再抛错不得写第二遍。
