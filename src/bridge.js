@@ -58,6 +58,8 @@ import { createClosureClassifier } from './lib/closure.js'; // R3
 import { createMediaFetch } from './lib/media.js'; // R4
 import { createVoice } from './lib/voice.js'; // R5
 import { createSendGuard } from './lib/send-guard.js'; // R6
+import { createProfileOps } from './ext/profile-ops.js'; // R7
+import { startBiliSync } from './ext/bili.js'; // R7
 import { createTurnGuard } from './turn-guard.js';
 import { createGateEventStore } from './gate-events.js';
 import { normalizeAllowlist, pickBacklogSessions } from './allowlist.js';
@@ -13172,20 +13174,19 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
   const profile = createProfile({ getCfg: () => cfg, log, stateDir: STATE_DIR, sendToQQ });
   const { readFriendReqs, writeFriendReqs, readAvatarPend, writeAvatarPend, describeFriendReq, notifyFriendBatched } = profile;
 
-  // 把 base64 / URL 落成「容器内可读」的绝对路径（NapCat 只认它能 stat 到的文件）
-  async function resolveAvatarFile(src) {
-    const s = String(src ?? '').trim();
-    if (!s) throw new Error('头像来源为空');
-    if (s.startsWith('base64://')) {
-      const buf = Buffer.from(s.slice('base64://'.length), 'base64');
-      return stickerTempPath(buf, 'image/png');
-    }
-    if (/^https?:\/\//i.test(s)) {
-      const fetched = await safeFetchBuffer(s, MAX_MEDIA_BYTES);
-      return stickerTempPath(fetched.buffer, mimeFromUrl(s));
-    }
-    return s;
-  }
+  const profileOps = createProfileOps({
+    log,
+    sendToQQ,
+    appendActivity,
+    getBot: () => bot,
+    profile,
+    stickerTempPath,
+    safeFetchBuffer,
+    maxMediaBytes: MAX_MEDIA_BYTES,
+    mimeFromUrl,
+  });
+  // moved to src/ext/profile-ops.js (R7)
+  const resolveAvatarFile = profileOps.resolveAvatarFile;
 
   async function askOwnerPeakPermission(key, event, textContent) {
     const owner = String(cfg.ownerQQ ?? '');
@@ -15348,56 +15349,17 @@ function logSpeakActual(key, allow, source, reason) {
         setTimeout(() => process.exit(0), 1000);
         return;
       }
-      // ── 好友申请处理（PROFILE_PATCH）───────────────────────────────────
+      // ── 好友申请 / 头像（R7 → src/ext/profile-ops.js）──────────────────
       if (lowerCmd === '/好友' || lowerCmd === '/好友申请' || lowerCmd === '/好友列表') {
-        const list = readFriendReqs();
-        if (!list.length) {
-          await sendToQQ(key, '现在没有待处理的好友申请。');
-          return;
-        }
-        const lines = list.map((r, i) => `${i + 1}. ${describeFriendReq(r)}`).join('\n');
-        await sendToQQ(key, `待处理的好友申请（${list.length} 条）：\n${lines}\n同意发 /同意好友 QQ号，拒绝发 /拒绝好友 QQ号。`);
+        await profileOps.handleFriendList(key);
         return;
       }
       if (lowerCmd.startsWith('/同意好友') || lowerCmd.startsWith('/拒绝好友')) {
-        const approve = lowerCmd.startsWith('/同意好友');
-        const arg = cmdLine.trim().replace(/^\/(同意|拒绝)好友\s*/, '').trim();
-        const list = readFriendReqs();
-        const item = list.find((r) => String(r.userId) === arg) || (list.length === 1 ? list[0] : null);
-        if (!item) {
-          await sendToQQ(key, arg ? `没找到 ${arg} 的好友申请。发 /好友 看看。` : '没找到好友申请。发 /好友 看看。');
-          return;
-        }
-        try {
-          await bot.request('set_friend_add_request', { flag: item.flag, approve });
-          writeFriendReqs(list.filter((r) => String(r.flag) !== String(item.flag)));
-          appendActivity(`${key} [好友] 管理员${approve ? '同意' : '拒绝'}了 ${item.userId}`);
-          await sendToQQ(key, approve ? `同意了，她已经是 ${item.userId} 的好友。` : `好，拒绝了 ${item.userId}。`);
-        } catch (error) {
-          await sendToQQ(key, `处理失败了：${error?.message ?? error}`);
-        }
+        await profileOps.handleFriendDecision(key, lowerCmd.startsWith('/同意好友'), cmdLine);
         return;
       }
-      // ── 头像确认（PROFILE_PATCH）───────────────────────────────────────
       if (lowerCmd === '/同意头像' || lowerCmd === '/不同意头像') {
-        const pend = readAvatarPend();
-        if (!pend) {
-          await sendToQQ(key, '现在没有等她换的头像。');
-          return;
-        }
-        if (lowerCmd === '/不同意头像') {
-          writeAvatarPend(null);
-          await sendToQQ(key, '好，这次不换。');
-          return;
-        }
-        try {
-          await bot.request('set_qq_avatar', { file: pend.file });
-          writeAvatarPend(null);
-          appendActivity(`${key} [头像] 管理员批准了换头像`);
-          await sendToQQ(key, '换好了。');
-        } catch (error) {
-          await sendToQQ(key, `换头像失败了：${error?.message ?? error}`);
-        }
+        await profileOps.handleAvatarDecision(key, lowerCmd === '/同意头像');
         return;
       }
       if (cmdLine === '/reset' || cmdLine === '/new') {
@@ -16753,29 +16715,10 @@ function logSpeakActual(key, allow, source, reason) {
       // ── 好友/群申请（PROFILE_PATCH）────────────────────────────────────
       // 之前这里完全没人处理 request 事件：别人加她，申请会被静默丢弃。
       if (post === 'request' && event?.request_type === 'friend') {
-        try {
-          const flag = String(event.flag ?? '');
-          const userId = String(event.user_id ?? '');
-          if (flag && userId) {
-            const req = {
-              flag,
-              userId,
-              nickname: String(event.nickname ?? event.comment ?? '').replace(/^.*?昵称[:：]\s*/, ''),
-              comment: String(event.comment ?? ''),
-              at: Date.now()
-            };
-            const list = readFriendReqs().filter((r) => String(r.userId) !== userId);
-            list.push(req);
-            writeFriendReqs(list);
-            appendActivity(`[好友] 收到好友申请：${describeFriendReq(req)}`);
-            log(`[好友] 收到好友申请 ${userId} flag=${flag}`);
-            notifyFriendBatched(req);
-          }
-        } catch (error) {
-          log('[好友] 处理好友申请异常：' + (error?.message ?? error));
-        }
+        profileOps.onFriendRequest(event);
         return;
       }
+
     });
   } catch (error) {
     log(`（上游事件旁路订阅不可用，健康检测退化：${error?.message ?? error}）`);
@@ -17000,50 +16943,22 @@ function logSpeakActual(key, allow, source, reason) {
     return enabled;
   }
 
-  const biliGroupList = (list) => (Array.isArray(list) ? list : [])
-    .map((v) => String(v).trim())
-    .filter((v) => /^\d+$/.test(v));
-  if (cfg.biliBridge?.enabled) {
-    const shareGroups = biliGroupList(cfg.biliBridge.share.groups.length ? cfg.biliBridge.share.groups : cfg.allow.groups);
-    const dynamicsGroups = biliGroupList(cfg.biliBridge.dynamics.groups.length ? cfg.biliBridge.dynamics.groups : cfg.allow.groups);
-    if (cfg.biliBridge.memory.enabled) {
-      void biliMemory.refresh({ force: true });
-      const t = setInterval(() => { void biliMemory.refresh(); }, cfg.biliBridge.memory.refreshIntervalMs);
-      t.unref?.();
-    }
-    if (cfg.biliBridge.dynamics.enabled && dynamicsGroups.length) {
-      biliDynamics = createBiliDynamicsSync({
-        stateDir: PLATFORM_STATE_DIR,
-        log,
-        sendToQQ,
-        groups: dynamicsGroups,
-        isReady: () => snowlumaHealth.connected === true,
-        intervalMs: cfg.biliBridge.dynamics.pollIntervalMs,
-        selfName: biliMemory.selfName?.() ?? '',
-      });
-      biliDynamics.start();
-    } else if (cfg.biliBridge.dynamics.enabled) {
-      log('[B站动态] 没有白名单群，未启动');
-    }
-    if (cfg.biliBridge.share.enabled && shareGroups.length) {
-      biliShare = createBiliShareScheduler({
-        stateDir: PLATFORM_STATE_DIR,
-        log,
-        deliverPrompt,
-        groups: shareGroups,
-        memory: biliMemory,
-        isReady: () => dshReady,
-        times: cfg.biliBridge.share.times,
-        gapMs: cfg.biliBridge.share.gapMs,
-        getMode: () => currentMode,
-        sendCard: sendBiliCard,
-        isEnabled: () => cfg.biliBridge?.enabled !== false && biliStartEnabledByUnified(),
-      });
-      biliShare.start();
-    } else if (cfg.biliBridge.share.enabled) {
-      log('[B站分享] 没有白名单群，未启动');
-    }
-  }
+  // moved to src/ext/bili.js (R7)：只搬装配，动态/分享/记忆各自的实现在 bili-*.js
+  const biliWiring = startBiliSync({
+    cfg,
+    log,
+    platformStateDir: PLATFORM_STATE_DIR,
+    sendToQQ,
+    deliverPrompt,
+    memory: biliMemory,
+    isSnowlumaReady: () => snowlumaHealth.connected === true,
+    isDshReady: () => dshReady,
+    currentMode: () => currentMode,
+    sendBiliCard,
+    isUnifiedEnabled: biliStartEnabledByUnified,
+  });
+  biliDynamics = biliWiring.dynamics;
+  biliShare = biliWiring.share;
 
   startDshWatch();
   startSnowlumaWatch();
