@@ -315,6 +315,7 @@ export async function bridgeHarness({ config = {}, savedState, files = {}, globa
     // 锁文件探测用（bridge.js 顶层的 consolePortInUse）；
     // 固定桩掉：测试不应该真去 netstat 宿主机。
     execFileSync: () => '',
+    execFile: (f, a, o, cb) => (typeof cb === 'function' ? cb(new Error('harness stub')) : undefined),
     // process 桩要带 env：voice-core / bridge 会读 process.env.FFMPEG_PATH、FFPROBE_PATH 等。
     // 之前只给 pid/platform/kill/exit，导致 `process.env.FFMPEG_PATH` 直接抛 TypeError。
     // DSH_HOME 指向临时目录：记忆卡的 inbox / 注入块只能写在 fixture 里，绝不能碰真实用户数据。
