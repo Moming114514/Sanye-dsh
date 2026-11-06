@@ -15245,10 +15245,12 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
     // 前缀稳定 = 缓存命中，命中价 ¥0.02/百万，未命中 ¥1/百万，差 50 倍。
     // 顺序：角色/人格/身份/规则（几乎不变）→ B站与记忆卡（一天变几次）→ 此刻状态/唤醒/表情匹配（每次都变）。
     const base = roleLine + personaV2Line + identityLine + provenanceLine + adminLine
-      + tokenLine + antiAiLine + proactiveLine + closureLine + stickerLine + replyLine + preSleepLine
-      + biliLine + memoryCardLine + initialPromptLine
+      + tokenLine + antiAiLine + proactiveLine + stickerLine + preSleepLine
+      + memoryCardLine + initialPromptLine
       + stickerTodoBlock + walletLine + tokenGuardLine
-      + statusLine + wakeLine + memoryLine + participationLine + fishGuardLine + stickerMatchLine + mediaRuleLine;
+      + statusLine + wakeLine + memoryLine + participationLine + fishGuardLine + stickerMatchLine + mediaRuleLine
+      /* CACHEORDER2: 易变段必须在末尾，新增易变段请追加到此处 */
+      + closureLine + replyLine + biliLine;
     lastWakePromptMeta = {
       role: roleLine.length,
       identity: identityLine.length,
