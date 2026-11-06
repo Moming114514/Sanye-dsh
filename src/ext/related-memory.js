@@ -149,7 +149,10 @@ export function relatedMemoryBlock(text, { cfg, paths } = {}) {
 // 只在私聊注入：群聊里不能把「和主人」的旧事塞给所有人看
 export function relatedMemorySuffix({ key, text, cfg, paths, log } = {}) {
   try {
-    if (!String(key || '').startsWith('private:')) return '';
+    const _rc0 = (cfg && cfg.socialV2 && cfg.socialV2.relatedMemories) || {};
+    const _k0 = String(key || '');
+    // MEMTOPIC：群聊也注入（受 groups 开关控制）
+    if (!_k0.startsWith('private:') && !(_rc0.groups && _k0.startsWith('group:'))) return '';
     const block = relatedMemoryBlock(text, { cfg, paths });
     if (!block) return '';
     if (cfg?.socialV2?.relatedMemories?.log !== false && typeof log === 'function') {
