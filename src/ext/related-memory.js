@@ -201,7 +201,15 @@ export function relatedMemorySuffix({ key, text, cfg, paths, log } = {}) {
     const block = _mt0.enabled ? topicMemoryBlock(text, { cfg, paths }) : relatedMemoryBlock(text, { cfg, paths });
     if (!block) return '';
     if (cfg?.socialV2?.relatedMemories?.log !== false && typeof log === 'function') {
-      log(`[相关记忆] ${key} 注入 ${block.split('\n').length - 1} 条 for「${String(text).slice(0, 30)}」`);
+      // REL_LOG_DEDUP：一次唤醒里 buildWakePromptV2 会被调用两次（预览 + 投递），
+      // 同一 key+同一句话在 30 秒内只打一行日志，避免刷屏。
+      const _lk = key + '|' + String(text).slice(0, 30);
+      const _now = Date.now();
+      const _last = _relLogSeen.get(_lk) || 0;
+      if (_now - _last > 30000) {
+        _relLogSeen.set(_lk, _now);
+        log(`[相关记忆] ${key} 注入 ${block.split('\n').length - 1} 条 for「${String(text).slice(0, 30)}」`);
+      }
     }
     return '\n\n' + block;
   } catch (e) {
@@ -209,6 +217,9 @@ export function relatedMemorySuffix({ key, text, cfg, paths, log } = {}) {
     return '';
   }
 }
+
+// REL_LOG_DEDUP：日志去重表
+const _relLogSeen = new Map();
 
 export default {
   id: 'related-memory',
