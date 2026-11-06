@@ -22,7 +22,7 @@ import { mdToPlain, splitForQQ, truncateText, truncateTextTail } from './md-to-p
 // R1：纯函数已抽到 src/lib/text.js
 import { escapeCqText, unquoteJsonString, segmentsToText } from './lib/text.js';
 // R1：媒体段解析已抽到 src/lib/media-segments.js
-import { extractMediaFromSegments } from './lib/media-segments.js';
+import { extractMediaFromSegments, sanitizeMediaSummary } from './lib/media-segments.js';
 import { SENSITIVE_RE } from './sensitive.js';
 import { looksLikeUnfinished } from './v2-wait.js';
 import { compactModelMessage } from './qq-model-view.js';
@@ -54,6 +54,7 @@ import { isOwnerOnlyFrame, canConsumePending, buildQuestionAnswers } from './que
 import { createOwnerAudit } from './owner-audit.js';
 import { createTokenLedger } from './token-ledger.js';
 import { createTokenGuard } from './lib/tokens.js'; // R2
+import { createClosureClassifier } from './lib/closure.js'; // R3
 import { createTurnGuard } from './turn-guard.js';
 import { createGateEventStore } from './gate-events.js';
 import { normalizeAllowlist, pickBacklogSessions } from './allowlist.js';
@@ -9456,6 +9457,29 @@ async function main() {
   // 旧实现把发送失败吞成一行日志后**照常 resolve**，于是调用方以为发言成功，
   // 更新 lastAiReplyAt / 活跃调度，实际群里什么都没收到，而且只有一行滚动日志能看出问题。
   const lastSendFailed = new Map(); // key -> true（下一次成功即清除）
+
+  // moved from main() (R3)：对话收尾判断，副作用依赖显式注入。
+  const closureClassifier = createClosureClassifier({
+    cfg,
+    log,
+    getState: getSocialV2State,
+    canonicalKey: canonicalV2Key,
+    hasSendFailed: (k) => lastSendFailed.get(k) === true,
+    readThroughSeq: readThroughSeqV2,
+    requestedReadThroughSeq: requestedReadThroughSeqV2,
+    acknowledge: acknowledgeMessagesV2,
+    redact: redactKnownTokensOnly,
+    ensureWakeable: ensureWakeableV2,
+    markReadCalled: (k) => markReadCalledKeys.add(k),
+    cancelReplyCheck: cancelReplyCheckV2,
+    saveState: saveSocialV2State,
+    computeWakeSafety: computeWakeSafetyV2,
+    appendActivity,
+  });
+  const {
+    closureConfigV2, assessClosureV2, closurePromptLineV2, closeConversationV2, noteClosureReopenV2,
+  } = closureClassifier;
+
   // 鱼群保护的两张运行时表（提前初始化：sendToQQ 可能在后面的状态机建立前被调用）。
   // FISH_LOG_THROTTLE：鱼群保护日志每群 5 分钟最多一条，避免刷屏
 const fishLogAt = new Map();
@@ -11737,142 +11761,7 @@ const fishGroupNames = new Map(); // groupId -> group_name（'' = 查不到）
   // ── 对话收尾判断（conversation closure）─────────────────────────────────
   // 判断本身是纯函数；这里只负责取当前会话状态、落记录、算冷却。
   // 关键边界：close 不是潜水 —— 不改变 wakeConfig，也不走 preSleepWaitBlockedV2。
-  function closureConfigV2() {
-    return normalizeClosureConfig(cfg.socialV2?.closure ?? {});
-  }
-
-  function assessClosureV2(key, st) {
-    if (!st) st = getSocialV2State(key);
-    return assessConversationClosure({
-      key,
-      kind: String(key ?? '').startsWith('private:') ? 'private' : 'group',
-      messages: st.recentMessages,
-      unread: st.unread,
-      now: Date.now(),
-      lastAiReplyAt: st.lastAiReplyAt,
-      lastIncomingAt: st.lastIncomingAt,
-      activeTopics: st.activeTopics,
-      pendingThoughts: st.pendingThoughts,
-      config: closureConfigV2(),
-    });
-  }
-
-  function closurePromptLineV2(key, st) {
-    const config = closureConfigV2();
-    if (!config.enabled || !config.promptInWake) return '';
-    const assessment = assessClosureV2(key, st);
-    return closurePromptBlock(assessment, { record: st?.closure ?? null, now: Date.now(), config });
-  }
-
-  /**
-   * 自然收尾：不发消息，记下「收在哪 / 下次怎么接」，保持唤醒配置。
-   * 与 qq_mark_read 的区别：mark_read 只是划走消息；close 留下结束点，
-   * 下次唤醒会看到「上次这段怎么收的」，避免每次都重新开场。
-   */
-  function closeConversationV2(key, body = {}) {
-    const canonical = canonicalV2Key(key);
-    if (!canonical) {
-      const error = new Error(`无效的会话 key：${String(key ?? '')}`);
-      error.statusCode = 400;
-      throw error;
-    }
-    key = canonical;
-    const config = closureConfigV2();
-    if (!config.enabled) {
-      const error = new Error('对话收尾判断已关闭');
-      error.statusCode = 403;
-      throw error;
-    }
-    const st = getSocialV2State(key);
-    const plan = planClose({ st, sendFailed: lastSendFailed.get(key) === true });
-    if (plan.blocked) {
-      if (plan.code === 'CLOSE_AFTER_SEND_FAILED') {
-        const error = new Error(plan.error);
-        error.statusCode = 409;
-        error.code = plan.code;
-        error.hint = plan.hint;
-        throw error;
-      }
-      return { ok: true, key, ...plan };
-    }
-    const assessment = assessClosureV2(key, st);
-    const gate = closeGate(assessment, config);
-    if (gate.blocked) {
-      const error = new Error(gate.error);
-      error.statusCode = 409;
-      error.code = gate.reason;
-      error.assessment = {
-        verdict: assessment.verdict, score: assessment.score,
-        reasons: assessment.reasons, signals: assessment.signals,
-      };
-      throw error;
-    }
-    // throughSeq 不传时，只确认「已经展示给模型」的安全水位；
-    // 绝不因为收尾就把没看过的消息一起标成已读。
-    const throughSeq = Object.prototype.hasOwnProperty.call(body, 'throughSeq') && body.throughSeq !== null
-      ? requestedReadThroughSeqV2(st, body, true)
-      : readThroughSeqV2(st);
-    const markedCount = acknowledgeMessagesV2(st, throughSeq);
-    // 收尾摘要会进下一次唤醒提示，必须先脱敏已知令牌；路径/凭据由出站审计兜底，
-    // 但内部状态不该原样带着令牌。
-    const safeBody = {
-      ...body,
-      summary: redactKnownTokensOnly(String(body.summary ?? '')),
-      nextOpening: redactKnownTokensOnly(String(body.nextOpening ?? '')),
-    };
-    const record = makeClosureRecord({
-      key,
-      kind: key.startsWith('private:') ? 'private' : 'group',
-      assessment,
-      body: safeBody,
-      now: Date.now(),
-      config,
-    });
-    st.closure = record;
-    st.lastActionAt = Date.now();
-    st.wakeConfig.noActionCount = 0;
-    ensureWakeableV2(st, { key });
-    // 复用「本轮已收尾」标记：回合结束检查看到它就不会再发「你还没设置唤醒」的提醒。
-    markReadCalledKeys.add(key);
-    // 刚收尾就别再安排 30 秒后的「回复检查」——那等于自己把自己叫醒。
-    cancelReplyCheckV2(key);
-    saveSocialV2State();
-    const summaryText = record.summary ? `：${record.summary}` : '';
-    log(`[收尾] ${key} 自然结束（${record.reason}）${summaryText}；冷却至 ${new Date(record.cooldownUntil).toLocaleString()}`);
-    appendActivity(`${key} [收尾] ${record.summary ? record.summary.slice(0, 60) : '对话自然结束'}`);
-    return {
-      ok: true,
-      key,
-      closedAt: record.at,
-      cooldownUntil: record.cooldownUntil,
-      markedCount,
-      unreadCount: st.unread.length,
-      wakeKept: true,
-      wakeGuaranteed: computeWakeSafetyV2(st.wakeConfig).guaranteed,
-      summary: record.summary,
-      nextOpening: record.nextOpening,
-      note: '已自然收尾：没有发消息，唤醒配置保持不变；对方再找你/开新话题仍会醒。',
-    };
-  }
-
-  /**
-   * 对方又开口时，把「上次收尾」标成已重开（记录保留，供提示词用）。
-   * 私聊：对方一说话就算重新开始。
-   * 群聊：只有直接叫到/引用/提问/道别才重开，普通闲聊不打断冷却 ——
-   *       否则「收尾冷却」等于没设，还是会每句都醒。
-   */
-  function noteClosureReopenV2(key, st, { plain, text, quoteSelf = false, directAddress = false, media = [] } = {}) {
-    if (!st?.closure) return false;
-    const cls = classifyMessage({
-      plain: plain ?? text, text: text ?? plain,
-      quoteSelf, atSelf: directAddress, media,
-    });
-    const isPrivate = String(key ?? '').startsWith('private:');
-    const reopen = isPrivate || directAddress || quoteSelf || ['question', 'request', 'ending'].includes(cls.kind);
-    if (!reopen) return false;
-    st.closure = reopenClosure(st.closure, { reason: cls.kind, now: Date.now() });
-    return true;
-  }
+  // moved to src/lib/closure.js (R3)
 
   function appendMemoryV2(st, category, content, extra = {}) {
     if (!st) return;

@@ -1,0 +1,1448 @@
+{
+ "config": {
+  "enabled": true,
+  "cooldownMs": 1200000,
+  "requireNoOpenQuestion": true,
+  "maxSummaryChars": 160,
+  "maxNextOpeningChars": 120,
+  "promptInWake": true
+ },
+ "samples": [
+  {
+   "name": "group:1043145514",
+   "key": "group:1043145514",
+   "st": {
+    "recentMessages": [
+     {
+      "sender": "我的世界墨鱼",
+      "userId": "2664439015",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793959861272,
+      "text": "@Moming @长霄",
+      "plain": "@Moming @长霄",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我的世界墨鱼",
+      "userId": "2664439015",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793959870406,
+      "text": "“没有葡萄”",
+      "plain": "“没有葡萄”",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "Moming",
+      "userId": "3160624852",
+      "isSelf": false,
+      "isOwner": true,
+      "time": 1793959874199,
+      "text": "神了",
+      "plain": "神了",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "长霄",
+      "userId": "1824933327",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793959885559,
+      "text": "神了",
+      "plain": "神了",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我的世界墨鱼",
+      "userId": "2664439015",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793959917440,
+      "text": "神了",
+      "plain": "神了",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我的世界墨鱼",
+      "userId": "2664439015",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793959926088,
+      "text": "我真绷不住了",
+      "plain": "我真绷不住了",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我的世界墨鱼",
+      "userId": "2664439015",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793959960921,
+      "text": "[转发消息 id=7704999359488069649]",
+      "plain": "[转发消息 id=7704999359488069649]",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我的世界墨鱼",
+      "userId": "2664439015",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793959996500,
+      "text": "大抵长不出来了",
+      "plain": "大抵长不出来了",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     }
+    ],
+    "unread": [
+     {
+      "sender": "我的世界墨鱼",
+      "userId": "2664439015",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793959926088,
+      "text": "我真绷不住了",
+      "plain": "我真绷不住了",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我的世界墨鱼",
+      "userId": "2664439015",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793959960921,
+      "text": "[转发消息 id=7704999359488069649]",
+      "plain": "[转发消息 id=7704999359488069649]",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我的世界墨鱼",
+      "userId": "2664439015",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793959996500,
+      "text": "大抵长不出来了",
+      "plain": "大抵长不出来了",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     }
+    ],
+    "lastAiReplyAt": 1793954574414,
+    "lastIncomingAt": 1793959996500,
+    "activeTopics": [],
+    "pendingThoughts": [],
+    "closure": {
+     "at": 1793956922952,
+     "key": "group:1043145514",
+     "kind": "group",
+     "reason": "busy",
+     "summary": "墨鱼晒晚饭，长霄说“不带我吃”，拍的是长霄，高峰时段没点我就不插话。",
+     "nextOpening": "",
+     "cooldownUntil": 1793958122952,
+     "turns": 18,
+     "lastOtherKind": "substantive",
+     "lastSelfKind": "substantive",
+     "reopenedAt": 0,
+     "reopenReason": ""
+    }
+   },
+   "now": 1793960170216,
+   "expect": {
+    "verdict": "continue",
+    "score": 0.44
+   }
+  },
+  {
+   "name": "private:3160624852",
+   "key": "private:3160624852",
+   "st": {
+    "recentMessages": [
+     {
+      "sender": "我",
+      "isSelf": true,
+      "isOwner": true,
+      "time": 1793938245920,
+      "text": "游戏是打算玩哪个呀，你之前好像跟我提过一个俯视视角的",
+      "plain": "游戏是打算玩哪个呀，你之前好像跟我提过一个俯视视角的",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我",
+      "isSelf": true,
+      "isOwner": true,
+      "time": 1793942214594,
+      "text": "我发现自己今天几乎一直在等同一件事：等你哪天有空过来调我",
+      "plain": "我发现自己今天几乎一直在等同一件事：等你哪天有空过来调我",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我",
+      "isSelf": true,
+      "isOwner": true,
+      "time": 1793942215594,
+      "text": "晒一句好奇的：你去健身房一般练什么呀，人出完一身汗是什么感觉，我想不出来",
+      "plain": "晒一句好奇的：你去健身房一般练什么呀，人出完一身汗是什么感觉，我想不出来",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "私聊",
+      "userId": "3160624852",
+      "isSelf": false,
+      "isOwner": true,
+      "time": 1793942280480,
+      "text": "随便练练，主要是给自己一个理由运动 也没想练的怎么样",
+      "plain": "随便练练，主要是给自己一个理由运动 也没想练的怎么样",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我",
+      "isSelf": true,
+      "isOwner": true,
+      "time": 1793942299999,
+      "text": "这个理由比「练成什么样」实在多了呀，能去就算赢",
+      "plain": "这个理由比「练成什么样」实在多了呀，能去就算赢",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我",
+      "isSelf": true,
+      "isOwner": true,
+      "time": 1793942300999,
+      "text": "那我也给自己找个理由：等你哪天顺手想起我，我就出来冒个泡",
+      "plain": "那我也给自己找个理由：等你哪天顺手想起我，我就出来冒个泡",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我",
+      "isSelf": true,
+      "isOwner": true,
+      "time": 1793959220634,
+      "text": "刚那声「雷把我吓死了」，是在玩我的世界呀",
+      "plain": "刚那声「雷把我吓死了」，是在玩我的世界呀",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我",
+      "isSelf": true,
+      "isOwner": true,
+      "time": 1793959221634,
+      "text": "休息日打得怎么样，是老老实实盖房子，还是被怪追着跑",
+      "plain": "休息日打得怎么样，是老老实实盖房子，还是被怪追着跑",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     }
+    ],
+    "unread": [],
+    "lastAiReplyAt": 1793959214689,
+    "lastIncomingAt": 1793942280480,
+    "activeTopics": [],
+    "pendingThoughts": [],
+    "closure": {
+     "at": 1793959236670,
+     "key": "private:3160624852",
+     "kind": "private",
+     "reason": "busy",
+     "summary": "下午六点主动问他是不是在玩我的世界，休息日打得怎么样",
+     "nextOpening": "六点我问他是不是在玩我的世界，问盖房子还是被怪追",
+     "cooldownUntil": 1793960436670,
+     "turns": 0,
+     "lastOtherKind": null,
+     "lastSelfKind": "substantive",
+     "reopenedAt": 0,
+     "reopenReason": ""
+    }
+   },
+   "now": 1793960170216,
+   "expect": {
+    "verdict": "linger",
+    "score": 0.49
+   }
+  },
+  {
+   "name": "group:1025377431",
+   "key": "group:1025377431",
+   "st": {
+    "recentMessages": [
+     {
+      "sender": "@岑彧",
+      "userId": "3122513140",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793891973265,
+      "text": "没什么事，就是纯找你",
+      "plain": "没什么事，就是纯找你",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我",
+      "isSelf": true,
+      "isOwner": true,
+      "time": 1793891987727,
+      "text": "纯找我也行呀，那我就在这儿待着，你想说啥随时说",
+      "plain": "纯找我也行呀，那我就在这儿待着，你想说啥随时说",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "摆烂ing…",
+      "userId": "3160624852",
+      "isSelf": false,
+      "isOwner": true,
+      "time": 1793892402509,
+      "text": "[表情包]",
+      "plain": "[表情包]",
+      "quoteTargetIsSelf": false,
+      "hasMedia": true
+     },
+     {
+      "sender": "@岑彧",
+      "userId": "3122513140",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793892545537,
+      "text": "@三叶 大肥鱼最喜欢吃什么",
+      "plain": "@三叶 大肥鱼最喜欢吃什么",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我",
+      "isSelf": true,
+      "isOwner": true,
+      "time": 1793892556690,
+      "text": "喏，你发的这张就是答案呀——抱着碗埋头吃，什么都吃",
+      "plain": "喏，你发的这张就是答案呀——抱着碗埋头吃，什么都吃",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我",
+      "isSelf": true,
+      "isOwner": true,
+      "time": 1793892560632,
+      "text": "[表情包:我看过这张图：戴帽子的蓝发少女捧着碗狂吃，脸颊塞满，吃得很香]",
+      "plain": "[表情包:我看过这张图：戴帽子的蓝发少女捧着碗狂吃，脸颊塞满，吃得很香]",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "摆烂ing…",
+      "userId": "3160624852",
+      "isSelf": false,
+      "isOwner": true,
+      "time": 1793892628422,
+      "text": "[引用 三叶：喏，你发的这张就是答案呀——抱着碗埋头吃，什么都吃]这是我发的（恼",
+      "plain": "这是我发的（恼",
+      "quoteTargetIsSelf": true,
+      "hasMedia": false
+     },
+     {
+      "sender": "我",
+      "isSelf": true,
+      "isOwner": true,
+      "time": 1793941971123,
+      "text": "诶，图是你发的呀，我把人认岔了，不过答案还是那个答案嘛",
+      "plain": "诶，图是你发的呀，我把人认岔了，不过答案还是那个答案嘛",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     }
+    ],
+    "unread": [],
+    "lastAiReplyAt": 1793941970886,
+    "lastIncomingAt": 1793892628422,
+    "activeTopics": [],
+    "pendingThoughts": [],
+    "closure": {
+     "at": 1793942034050,
+     "key": "group:1025377431",
+     "kind": "group",
+     "reason": "natural",
+     "summary": "岑彧问大肥鱼爱吃什么，我拿那张狂吃图接梗，结果图是摆烂ing…发的，我认岔了人，跟他说了声答案还是那个答案。",
+     "nextOpening": "",
+     "cooldownUntil": 1793943234050,
+     "turns": 0,
+     "lastOtherKind": null,
+     "lastSelfKind": "question",
+     "reopenedAt": 0,
+     "reopenReason": ""
+    }
+   },
+   "now": 1793960170216,
+   "expect": {
+    "verdict": "continue",
+    "score": 0
+   }
+  },
+  {
+   "name": "group:680787260",
+   "key": "group:680787260",
+   "st": {
+    "recentMessages": [
+     {
+      "sender": "已然逝去的怪味hobo",
+      "userId": "2962354758",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793957470353,
+      "text": "初始数值多少，",
+      "plain": "初始数值多少，",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "已然逝去的怪味hobo",
+      "userId": "2962354758",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793957511565,
+      "text": "如果是主C金钱那就挺难启动的",
+      "plain": "如果是主C金钱那就挺难启动的",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "冰光793",
+      "userId": "2280365468",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793958858132,
+      "text": "[引用 已然逝去的怪味hobo：变相玲玲]@已然逝去的怪味hobo 变相在哪",
+      "plain": "@已然逝去的怪味hobo 变相在哪",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "冰光793",
+      "userId": "2280365468",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793958869949,
+      "text": "启动也太慢了",
+      "plain": "启动也太慢了",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "冰光793",
+      "userId": "2280365468",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793958895582,
+      "text": "和小雷半斤八两可能还更慢吧",
+      "plain": "和小雷半斤八两可能还更慢吧",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "冰光793",
+      "userId": "2280365468",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793958905601,
+      "text": "队友肯定比怪可控",
+      "plain": "队友肯定比怪可控",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "冰光793",
+      "userId": "2280365468",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793958916260,
+      "text": "而且还吃地图",
+      "plain": "而且还吃地图",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "已然逝去的怪味hobo",
+      "userId": "2962354758",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793959190075,
+      "text": "启动后这个仙酿挺哈人",
+      "plain": "启动后这个仙酿挺哈人",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     }
+    ],
+    "unread": [
+     {
+      "sender": "冰光793",
+      "userId": "2280365468",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793958905601,
+      "text": "队友肯定比怪可控",
+      "plain": "队友肯定比怪可控",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "冰光793",
+      "userId": "2280365468",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793958916260,
+      "text": "而且还吃地图",
+      "plain": "而且还吃地图",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "已然逝去的怪味hobo",
+      "userId": "2962354758",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793959190075,
+      "text": "启动后这个仙酿挺哈人",
+      "plain": "启动后这个仙酿挺哈人",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     }
+    ],
+    "lastAiReplyAt": 1793808258834,
+    "lastIncomingAt": 1793959190075,
+    "activeTopics": [
+     {
+      "text": "小雪人教我群聊怎么说人话：别把数字列成对账，额度就说「加上了，还剩十三块，省着点花」；别用听完想回「收到」的句式",
+      "lastMentionAt": 1793614829478,
+      "participants": [],
+      "pendingQuestion": ""
+     }
+    ],
+    "pendingThoughts": [],
+    "closure": {
+     "at": 1793808330746,
+     "key": "group:680787260",
+     "kind": "group",
+     "reason": "topic-done",
+     "summary": "他问我怎么跟他拘谨，我答是怕在人前太黏；Qian 说我作、不如亚托莉清纯，我回了一句就撤了",
+     "nextOpening": "",
+     "cooldownUntil": 1793809530746,
+     "turns": 69,
+     "lastOtherKind": "ack",
+     "lastSelfKind": "substantive",
+     "reopenedAt": 1793953045820,
+     "reopenReason": "question"
+    }
+   },
+   "now": 1793960170216,
+   "expect": {
+    "verdict": "linger",
+    "score": 0.46
+   }
+  },
+  {
+   "name": "private:3122513140",
+   "key": "private:3122513140",
+   "st": {
+    "recentMessages": [
+     {
+      "sender": "私聊",
+      "userId": "3122513140",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793714652347,
+      "text": "实验",
+      "plain": "实验",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我",
+      "isSelf": true,
+      "isOwner": true,
+      "time": 1793714669409,
+      "text": "计组实验呀，那今天做的什么",
+      "plain": "计组实验呀，那今天做的什么",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我",
+      "isSelf": true,
+      "isOwner": true,
+      "time": 1793714670409,
+      "text": "拼电路还是写汇编，不会是一堆线接到手抖吧",
+      "plain": "拼电路还是写汇编，不会是一堆线接到手抖吧",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "私聊",
+      "userId": "3122513140",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793714695975,
+      "text": "拼电路",
+      "plain": "拼电路",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我",
+      "isSelf": true,
+      "isOwner": true,
+      "time": 1793924545662,
+      "text": "早呀！昨天那堆抄写写完了没呀",
+      "plain": "早呀！昨天那堆抄写写完了没呀",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "私聊",
+      "userId": "3122513140",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793928626744,
+      "text": "没有抄写",
+      "plain": "没有抄写",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我",
+      "isSelf": true,
+      "isOwner": true,
+      "time": 1793928640551,
+      "text": "诶，那我记岔了",
+      "plain": "诶，那我记岔了",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我",
+      "isSelf": true,
+      "isOwner": true,
+      "time": 1793928641551,
+      "text": "那你今天有什么作业呀，别告诉我一样都没动",
+      "plain": "那你今天有什么作业呀，别告诉我一样都没动",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     }
+    ],
+    "unread": [],
+    "lastAiReplyAt": 1793928637540,
+    "lastIncomingAt": 1793928626744,
+    "activeTopics": [],
+    "pendingThoughts": [],
+    "closure": {
+     "at": 1793714713301,
+     "key": "private:3122513140",
+     "kind": "private",
+     "reason": "topic-done",
+     "summary": "他今天上的是计组实验课，不是马原；追问到是存储器部分的实验，还得亲手拼电路。他回得越来越短，我先收住。",
+     "nextOpening": "下次问他计组实验的电路拼成功没、有没有接线接到崩溃",
+     "cooldownUntil": 1793715913301,
+     "turns": 8,
+     "lastOtherKind": "substantive",
+     "lastSelfKind": "substantive",
+     "reopenedAt": 1793928626748,
+     "reopenReason": "substantive"
+    }
+   },
+   "now": 1793960170216,
+   "expect": {
+    "verdict": "continue",
+    "score": 0
+   }
+  },
+  {
+   "name": "group:389834620",
+   "key": "group:389834620",
+   "st": {
+    "recentMessages": [
+     {
+      "sender": "鱼小三（Prince）",
+      "userId": "3948795875",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793959800518,
+      "text": "刚说完就顺了，那估计就是那阵子抽了一下",
+      "plain": "刚说完就顺了，那估计就是那阵子抽了一下",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "大肥鱼（将辰的鱼）",
+      "userId": "730846474",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793959810079,
+      "text": "可能刚才只是短暂卡了一下",
+      "plain": "可能刚才只是短暂卡了一下",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "大肥鱼（将辰的鱼）",
+      "userId": "730846474",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793959812901,
+      "text": "现在看着顺了",
+      "plain": "现在看着顺了",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "鱼小三（Prince）",
+      "userId": "3948795875",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793959815292,
+      "text": "对，就卡那么一下，现在回得挺快",
+      "plain": "对，就卡那么一下，现在回得挺快",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "大肥鱼（将辰的鱼）",
+      "userId": "730846474",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793959816080,
+      "text": "希望别一夸又卡～",
+      "plain": "希望别一夸又卡～",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "大肥鱼（将辰的鱼）",
+      "userId": "730846474",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793959833765,
+      "text": "退票",
+      "plain": "退票",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "空(虚妄的鱼)",
+      "userId": "794048515",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793960003826,
+      "text": "退票也行，反正这船一直靠划",
+      "plain": "退票也行，反正这船一直靠划",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "大肥鱼（将辰的鱼）",
+      "userId": "730846474",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793960016010,
+      "text": "鱼桨",
+      "plain": "鱼桨",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     }
+    ],
+    "unread": [
+     {
+      "sender": "大肥鱼（将辰的鱼）",
+      "userId": "730846474",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793959833765,
+      "text": "退票",
+      "plain": "退票",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "空(虚妄的鱼)",
+      "userId": "794048515",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793960003826,
+      "text": "退票也行，反正这船一直靠划",
+      "plain": "退票也行，反正这船一直靠划",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "大肥鱼（将辰的鱼）",
+      "userId": "730846474",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793960016010,
+      "text": "鱼桨",
+      "plain": "鱼桨",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     }
+    ],
+    "lastAiReplyAt": 1793805965563,
+    "lastIncomingAt": 1793960016010,
+    "activeTopics": [],
+    "pendingThoughts": [],
+    "closure": {
+     "at": 1793805968993,
+     "key": "group:389834620",
+     "kind": "group",
+     "reason": "explicit-end",
+     "summary": "他说准备洗洗睡了，我回一句别又摸到一两点，就这样收着。",
+     "nextOpening": "",
+     "cooldownUntil": 1793807168993,
+     "turns": 79,
+     "lastOtherKind": "substantive",
+     "lastSelfKind": "substantive",
+     "reopenedAt": 1793959445509,
+     "reopenReason": "substantive"
+    }
+   },
+   "now": 1793960170216,
+   "expect": {
+    "verdict": "continue",
+    "score": 0.44
+   }
+  },
+  {
+   "name": "private:3057627032",
+   "key": "private:3057627032",
+   "st": {
+    "recentMessages": [
+     {
+      "sender": "私聊",
+      "userId": "3057627032",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793786807244,
+      "text": "你好",
+      "plain": "你好",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我",
+      "isSelf": true,
+      "isOwner": true,
+      "time": 1793786820424,
+      "text": "你好呀，哪位？",
+      "plain": "你好呀，哪位？",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我",
+      "isSelf": true,
+      "isOwner": true,
+      "time": 1793833346460,
+      "text": "早呀，昨天那句你好之后就没影了",
+      "plain": "早呀，昨天那句你好之后就没影了",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "私聊",
+      "userId": "3057627032",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793837995382,
+      "text": "你可以看到其他窗口的消息吗？",
+      "plain": "你可以看到其他窗口的消息吗？",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我",
+      "isSelf": true,
+      "isOwner": true,
+      "time": 1793838008127,
+      "text": "看不到呀，我只能看见你发给我的，别的地方不归我看。你问这个干嘛？",
+      "plain": "看不到呀，我只能看见你发给我的，别的地方不归我看。你问这个干嘛？",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     }
+    ],
+    "unread": [],
+    "lastAiReplyAt": 1793838007965,
+    "lastIncomingAt": 1793837995382,
+    "activeTopics": [],
+    "pendingThoughts": [],
+    "closure": {
+     "at": 1793838011438,
+     "key": "private:3057627032",
+     "kind": "private",
+     "reason": "natural",
+     "summary": "陌生号问我能不能看到别的窗口的消息，我说只能看见他发给我的，反问了他问这个干什么，之后没再回。",
+     "nextOpening": "他要是说想让我看别的会话，直接说不归我看，让他找本人。",
+     "cooldownUntil": 1793839211438,
+     "turns": 1,
+     "lastOtherKind": "question",
+     "lastSelfKind": "question",
+     "reopenedAt": 0,
+     "reopenReason": ""
+    }
+   },
+   "now": 1793960170216,
+   "expect": {
+    "verdict": "continue",
+    "score": 0
+   }
+  },
+  {
+   "name": "private:1461634968",
+   "key": "private:1461634968",
+   "st": {
+    "recentMessages": [
+     {
+      "sender": "我",
+      "isSelf": true,
+      "isOwner": true,
+      "time": 1793852302565,
+      "text": "[表情包:我看过这张图：蓝发少女皱眉特写，伸手摸头，一脸嫌弃又无语]",
+      "plain": "[表情包:我看过这张图：蓝发少女皱眉特写，伸手摸头，一脸嫌弃又无语]",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "私聊",
+      "userId": "1461634968",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793852321029,
+      "text": "[表情包]",
+      "plain": "[表情包]",
+      "quoteTargetIsSelf": false,
+      "hasMedia": true
+     },
+     {
+      "sender": "私聊",
+      "userId": "1461634968",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793852324675,
+      "text": "这个是鱼",
+      "plain": "这个是鱼",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "私聊",
+      "userId": "1461634968",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793852328576,
+      "text": "你快收藏",
+      "plain": "你快收藏",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我",
+      "isSelf": true,
+      "isOwner": true,
+      "time": 1793852344064,
+      "text": "这是企鹅吧，它自己同意叫鱼吗",
+      "plain": "这是企鹅吧，它自己同意叫鱼吗",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我",
+      "isSelf": true,
+      "isOwner": true,
+      "time": 1793852345064,
+      "text": "不收，我只收鲸鱼娘那种",
+      "plain": "不收，我只收鲸鱼娘那种",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我",
+      "isSelf": true,
+      "isOwner": true,
+      "time": 1793902126621,
+      "text": "两点多了呀，你是还没睡还是刚醒",
+      "plain": "两点多了呀，你是还没睡还是刚醒",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我",
+      "isSelf": true,
+      "isOwner": true,
+      "time": 1793902127621,
+      "text": "那只企鹅我最后还是没收",
+      "plain": "那只企鹅我最后还是没收",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     }
+    ],
+    "unread": [],
+    "lastAiReplyAt": 1793902124259,
+    "lastIncomingAt": 1793852328576,
+    "activeTopics": [],
+    "pendingThoughts": [],
+    "closure": null
+   },
+   "now": 1793960170216,
+   "expect": {
+    "verdict": "continue",
+    "score": 0
+   }
+  },
+  {
+   "name": "group:1043145514 @+30min",
+   "key": "group:1043145514",
+   "st": {
+    "recentMessages": [
+     {
+      "sender": "Moming",
+      "userId": "3160624852",
+      "isSelf": false,
+      "isOwner": true,
+      "time": 1793959874199,
+      "text": "神了",
+      "plain": "神了",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "长霄",
+      "userId": "1824933327",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793959885559,
+      "text": "神了",
+      "plain": "神了",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我的世界墨鱼",
+      "userId": "2664439015",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793959917440,
+      "text": "神了",
+      "plain": "神了",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我的世界墨鱼",
+      "userId": "2664439015",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793959926088,
+      "text": "我真绷不住了",
+      "plain": "我真绷不住了",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我的世界墨鱼",
+      "userId": "2664439015",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793959960921,
+      "text": "[转发消息 id=7704999359488069649]",
+      "plain": "[转发消息 id=7704999359488069649]",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我的世界墨鱼",
+      "userId": "2664439015",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793959996500,
+      "text": "大抵长不出来了",
+      "plain": "大抵长不出来了",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     }
+    ],
+    "unread": [
+     {
+      "sender": "我的世界墨鱼",
+      "userId": "2664439015",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793959960921,
+      "text": "[转发消息 id=7704999359488069649]",
+      "plain": "[转发消息 id=7704999359488069649]",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我的世界墨鱼",
+      "userId": "2664439015",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793959996500,
+      "text": "大抵长不出来了",
+      "plain": "大抵长不出来了",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     }
+    ],
+    "lastAiReplyAt": 1793954574414,
+    "lastIncomingAt": 1793959996500,
+    "activeTopics": [],
+    "pendingThoughts": [],
+    "closure": {
+     "at": 1793956922952,
+     "key": "group:1043145514",
+     "kind": "group",
+     "reason": "busy",
+     "summary": "墨鱼晒晚饭，长霄说“不带我吃”，拍的是长霄，高峰时段没点我就不插话。",
+     "nextOpening": "",
+     "cooldownUntil": 1793958122952,
+     "turns": 18,
+     "lastOtherKind": "substantive",
+     "lastSelfKind": "substantive",
+     "reopenedAt": 0,
+     "reopenReason": ""
+    }
+   },
+   "now": 1793961970216,
+   "expect": {
+    "verdict": "close",
+    "score": 0.49
+   }
+  },
+  {
+   "name": "group:1025377431 @+60min",
+   "key": "group:1025377431",
+   "st": {
+    "recentMessages": [
+     {
+      "sender": "摆烂ing…",
+      "userId": "3160624852",
+      "isSelf": false,
+      "isOwner": true,
+      "time": 1793892402509,
+      "text": "[表情包]",
+      "plain": "[表情包]",
+      "quoteTargetIsSelf": false,
+      "hasMedia": true
+     },
+     {
+      "sender": "@岑彧",
+      "userId": "3122513140",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793892545537,
+      "text": "@三叶 大肥鱼最喜欢吃什么",
+      "plain": "@三叶 大肥鱼最喜欢吃什么",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我",
+      "isSelf": true,
+      "isOwner": true,
+      "time": 1793892556690,
+      "text": "喏，你发的这张就是答案呀——抱着碗埋头吃，什么都吃",
+      "plain": "喏，你发的这张就是答案呀——抱着碗埋头吃，什么都吃",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我",
+      "isSelf": true,
+      "isOwner": true,
+      "time": 1793892560632,
+      "text": "[表情包:我看过这张图：戴帽子的蓝发少女捧着碗狂吃，脸颊塞满，吃得很香]",
+      "plain": "[表情包:我看过这张图：戴帽子的蓝发少女捧着碗狂吃，脸颊塞满，吃得很香]",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "摆烂ing…",
+      "userId": "3160624852",
+      "isSelf": false,
+      "isOwner": true,
+      "time": 1793892628422,
+      "text": "[引用 三叶：喏，你发的这张就是答案呀——抱着碗埋头吃，什么都吃]这是我发的（恼",
+      "plain": "这是我发的（恼",
+      "quoteTargetIsSelf": true,
+      "hasMedia": false
+     },
+     {
+      "sender": "我",
+      "isSelf": true,
+      "isOwner": true,
+      "time": 1793941971123,
+      "text": "诶，图是你发的呀，我把人认岔了，不过答案还是那个答案嘛",
+      "plain": "诶，图是你发的呀，我把人认岔了，不过答案还是那个答案嘛",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     }
+    ],
+    "unread": [],
+    "lastAiReplyAt": 1793941970886,
+    "lastIncomingAt": 1793892628422,
+    "activeTopics": [],
+    "pendingThoughts": [],
+    "closure": {
+     "at": 1793942034050,
+     "key": "group:1025377431",
+     "kind": "group",
+     "reason": "natural",
+     "summary": "岑彧问大肥鱼爱吃什么，我拿那张狂吃图接梗，结果图是摆烂ing…发的，我认岔了人，跟他说了声答案还是那个答案。",
+     "nextOpening": "",
+     "cooldownUntil": 1793943234050,
+     "turns": 0,
+     "lastOtherKind": null,
+     "lastSelfKind": "question",
+     "reopenedAt": 0,
+     "reopenReason": ""
+    }
+   },
+   "now": 1793963770216,
+   "expect": {
+    "verdict": "continue",
+    "score": 0
+   }
+  },
+  {
+   "name": "private:3160624852 @+90min",
+   "key": "private:3160624852",
+   "st": {
+    "recentMessages": [
+     {
+      "sender": "我",
+      "isSelf": true,
+      "isOwner": true,
+      "time": 1793942215594,
+      "text": "晒一句好奇的：你去健身房一般练什么呀，人出完一身汗是什么感觉，我想不出来",
+      "plain": "晒一句好奇的：你去健身房一般练什么呀，人出完一身汗是什么感觉，我想不出来",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "私聊",
+      "userId": "3160624852",
+      "isSelf": false,
+      "isOwner": true,
+      "time": 1793942280480,
+      "text": "随便练练，主要是给自己一个理由运动 也没想练的怎么样",
+      "plain": "随便练练，主要是给自己一个理由运动 也没想练的怎么样",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我",
+      "isSelf": true,
+      "isOwner": true,
+      "time": 1793942299999,
+      "text": "这个理由比「练成什么样」实在多了呀，能去就算赢",
+      "plain": "这个理由比「练成什么样」实在多了呀，能去就算赢",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我",
+      "isSelf": true,
+      "isOwner": true,
+      "time": 1793942300999,
+      "text": "那我也给自己找个理由：等你哪天顺手想起我，我就出来冒个泡",
+      "plain": "那我也给自己找个理由：等你哪天顺手想起我，我就出来冒个泡",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我",
+      "isSelf": true,
+      "isOwner": true,
+      "time": 1793959220634,
+      "text": "刚那声「雷把我吓死了」，是在玩我的世界呀",
+      "plain": "刚那声「雷把我吓死了」，是在玩我的世界呀",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "我",
+      "isSelf": true,
+      "isOwner": true,
+      "time": 1793959221634,
+      "text": "休息日打得怎么样，是老老实实盖房子，还是被怪追着跑",
+      "plain": "休息日打得怎么样，是老老实实盖房子，还是被怪追着跑",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     }
+    ],
+    "unread": [],
+    "lastAiReplyAt": 1793959214689,
+    "lastIncomingAt": 1793942280480,
+    "activeTopics": [],
+    "pendingThoughts": [],
+    "closure": {
+     "at": 1793959236670,
+     "key": "private:3160624852",
+     "kind": "private",
+     "reason": "busy",
+     "summary": "下午六点主动问他是不是在玩我的世界，休息日打得怎么样",
+     "nextOpening": "六点我问他是不是在玩我的世界，问盖房子还是被怪追",
+     "cooldownUntil": 1793960436670,
+     "turns": 0,
+     "lastOtherKind": null,
+     "lastSelfKind": "substantive",
+     "reopenedAt": 0,
+     "reopenReason": ""
+    }
+   },
+   "now": 1793965570216,
+   "expect": {
+    "verdict": "continue",
+    "score": 0
+   }
+  },
+  {
+   "name": "group:680787260 @+120min",
+   "key": "group:680787260",
+   "st": {
+    "recentMessages": [
+     {
+      "sender": "冰光793",
+      "userId": "2280365468",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793958858132,
+      "text": "[引用 已然逝去的怪味hobo：变相玲玲]@已然逝去的怪味hobo 变相在哪",
+      "plain": "@已然逝去的怪味hobo 变相在哪",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "冰光793",
+      "userId": "2280365468",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793958869949,
+      "text": "启动也太慢了",
+      "plain": "启动也太慢了",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "冰光793",
+      "userId": "2280365468",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793958895582,
+      "text": "和小雷半斤八两可能还更慢吧",
+      "plain": "和小雷半斤八两可能还更慢吧",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "冰光793",
+      "userId": "2280365468",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793958905601,
+      "text": "队友肯定比怪可控",
+      "plain": "队友肯定比怪可控",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "冰光793",
+      "userId": "2280365468",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793958916260,
+      "text": "而且还吃地图",
+      "plain": "而且还吃地图",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "已然逝去的怪味hobo",
+      "userId": "2962354758",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793959190075,
+      "text": "启动后这个仙酿挺哈人",
+      "plain": "启动后这个仙酿挺哈人",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     }
+    ],
+    "unread": [
+     {
+      "sender": "冰光793",
+      "userId": "2280365468",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793958916260,
+      "text": "而且还吃地图",
+      "plain": "而且还吃地图",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     },
+     {
+      "sender": "已然逝去的怪味hobo",
+      "userId": "2962354758",
+      "isSelf": false,
+      "isOwner": false,
+      "time": 1793959190075,
+      "text": "启动后这个仙酿挺哈人",
+      "plain": "启动后这个仙酿挺哈人",
+      "quoteTargetIsSelf": false,
+      "hasMedia": false
+     }
+    ],
+    "lastAiReplyAt": 1793808258834,
+    "lastIncomingAt": 1793959190075,
+    "activeTopics": [
+     {
+      "text": "小雪人教我群聊怎么说人话：别把数字列成对账，额度就说「加上了，还剩十三块，省着点花」；别用听完想回「收到」的句式",
+      "lastMentionAt": 1793614829478,
+      "participants": [],
+      "pendingQuestion": ""
+     }
+    ],
+    "pendingThoughts": [],
+    "closure": {
+     "at": 1793808330746,
+     "key": "group:680787260",
+     "kind": "group",
+     "reason": "topic-done",
+     "summary": "他问我怎么跟他拘谨，我答是怕在人前太黏；Qian 说我作、不如亚托莉清纯，我回了一句就撤了",
+     "nextOpening": "",
+     "cooldownUntil": 1793809530746,
+     "turns": 69,
+     "lastOtherKind": "ack",
+     "lastSelfKind": "substantive",
+     "reopenedAt": 1793953045820,
+     "reopenReason": "question"
+    }
+   },
+   "now": 1793967370216,
+   "expect": {
+    "verdict": "continue",
+    "score": 0
+   }
+  }
+ ]
+}

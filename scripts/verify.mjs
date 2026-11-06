@@ -5,6 +5,8 @@
 //   node scripts/verify.mjs --save-base # 重建代码基准 scripts/snap-base/code.json（非必要不做）
 //   node scripts/verify.mjs --no-api    # 桥接没在跑时只做静态检查
 //
+// 静态部分：语法 + 单测 + manifest 契约 + 符号审计（lib/ext 导出必须 import）+ 结构快照。
+//
 // 代码基准 scripts/snap-base/code.json 提交进 git → 空环境/新机器也能跑；
 // 提示词人格基准只在服务器 ~/.dsh/surfcore/snap/，由 node scripts/snap-split.mjs --check 单独校验，
 // 缺失时打印 persona baseline skipped，不算失败（m00399）。
@@ -115,6 +117,42 @@ function toolsList() {
   const lines = (r.out || r.err).trim().split('\n').filter(Boolean);
   const summaryLine = lines.find((l) => l.startsWith('汇总：')) || lines.slice(-1)[0] || '';
   record('扩展清单（manifest 契约）', r.code === 0, summaryLine.replace(/^汇总：/, '').slice(0, 160));
+}
+
+// 2.6) 符号审计：src/lib/* 与 src/ext/* 的具名导出，bridge 里调用就必须在 import 里
+//      （R1 的教训：抽走函数后忘了 import，node --check 与单测都可能看不出来）
+{
+  const bridgePath = path.join(ROOT, 'src/bridge.js');
+  const bridge = fs.existsSync(bridgePath) ? fs.readFileSync(bridgePath, 'utf8') : '';
+  const body = bridge.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+  const importText = [...bridge.matchAll(/^import[\s\S]*?from\s+['"][^'"]+['"];?/gm)].map((m) => m[0]).join('\n');
+  const violations = [];
+  for (const dir of ['src/lib', 'src/ext']) {
+    const abs = path.join(ROOT, dir);
+    if (!fs.existsSync(abs)) continue;
+    for (const f of fs.readdirSync(abs).filter((x) => x.endsWith('.js'))) {
+      const src = fs.readFileSync(path.join(abs, f), 'utf8');
+      const names = new Set();
+      for (const m of src.matchAll(/^export\s+(?:async\s+)?function\s+([A-Za-z_$][\w$]*)/gm)) names.add(m[1]);
+      for (const m of src.matchAll(/^export\s+(?:const|let|var)\s+([A-Za-z_$][\w$]*)/gm)) names.add(m[1]);
+      for (const m of src.matchAll(/^export\s*\{([^}]*)\}/gm)) {
+        for (const part of m[1].split(',')) {
+          const n = part.trim().split(/\s+as\s+/).pop().trim();
+          if (/^[A-Za-z_$][\w$]*$/.test(n)) names.add(n);
+        }
+      }
+      for (const n of names) {
+        if (n === 'default') continue;
+        const called = new RegExp('(?<!\\.)\\b' + n + '\\s*\\(', 'm').test(body);
+        if (!called) continue;
+        const local = new RegExp('(?:function\\s+' + n + '\\b|(?:const|let|var)\\s+' + n + '\\s*=)').test(body);
+        if (local) continue;
+        if (!new RegExp('\\b' + n + '\\b').test(importText)) violations.push(f + ':' + n);
+      }
+    }
+  }
+  record('符号审计（lib/ext 导出）', violations.length === 0,
+    violations.length ? ('未导入：' + violations.slice(0, 6).join(' | ')) : '被调用的导出都有 import');
 }
 
 // 3) 代码结构快照：工具名 + 路由状态码
