@@ -20,6 +20,7 @@ const PAGES = [
   { id: 'entry', title: '入口', render: pageEntry }, // P2G
   { id: 'decisions', title: '决策记录', render: pageDecisions }, // P1
   { id: 'plugins', title: '插件', render: pagePlugins }, // P3-1：清单来自 /api/plugins
+  { id: 'map', title: '功能地图', render: pageFeatureMap }, // P2-H3
 ];
 
 // NAV_GROUPS（W4）：按 5 层体系分组（感知/判断/表达/记忆/运维）+ 诊断
@@ -29,7 +30,7 @@ const PAGES = [
 const NAV_GROUPS = [
   { title: '现在', ids: ['overview', 'entry', 'decisions', 'cost', 'health'] },
   { title: '她', ids: ['personality', 'talk', 'memory', 'group-rules', 'people'] },
-  { title: '系统', ids: ['settings', 'commands', 'maintenance'] },
+  { title: '系统', ids: ['settings', 'commands', 'map', 'maintenance'] },
 ];
 function navGroups() {
   return NAV_GROUPS; // A3：导航定稿 12 项，回滚开关已删除
@@ -41,6 +42,7 @@ const PAGE_ADJUST = {
   health: '只读：自检、诊断、媒体与通道健康。',
   personality: '只读：当前角色与人格文件大小。',
   maintenance: '旧页面入口都在这里，只是没放进主导航。',
+  map: '一张表：每个功能点现在在哪一页；新功能上线记得加一行。',
 
   'group-rules': '一屏看完每个群：在不在白名单、怎么回、发言量、只回谁、抽样多少；改完 60 秒内生效，白名单增删建议重启一次。',
   decisions: '每一条「要不要回」的判决都在这里：哪层拦的、分数多少、最后回没回。只读，不改任何判断。',
@@ -684,7 +686,7 @@ function pageCost() {
           h('td', { class: 'muted' }, r.turn + '/' + r.step)));
         return h('table', {},
           h('thead', {}, h('tr', {}, h('th', {}, '花费'), h('th', {}, '会话'), h('th', {}, '新内容'), h('th', {}, '命中'), h('th', {}, '轮/步'))),
-          h('tbody', {}, ...rows));
+          h('tbody', {}, ...rows.flat()));
       })(),
       h('div', { class: 'muted', style: 'font-size:12px;margin:8px 0 4px' }, '按会话'),
       (() => {
@@ -1066,27 +1068,94 @@ function pageHealth() {
 
 function pageMaintenance() {
   const links = [
-    ['入口（通道状态）', 'entry'],
-    ['白名单（旧页直接编辑）', 'access'],
-    ['安全（敏感词守门）', 'safe'],
-    ['记忆与情绪（旧）', 'memory-old'],
-    ['记忆体检（旧）', 'memhealth'],
-    ['记忆星海（旧）', 'starmap'],
-    ['学说话（旧）', 'style'],
-    ['她的看法（旧）', 'impr'],
-    ['她说的话（旧）', 'utter'],
+    ['入口', 'entry', ''],
+    ['白名单', 'group-rules', '已合并到「群规则」页'],
+    ['安全', 'safe', ''],
+    ['记忆与情绪', 'memory', '已合并到「记忆」页第一个 Tab'],
+    ['记忆体检', 'memory', '已合并到「记忆」页第二个 Tab'],
+    ['记忆星海', 'memory', '已合并到「记忆」页第三个 Tab'],
+    ['学说话', 'style', ''],
+    ['她的看法', 'talk', '已合并到「说话」页'],
+    ['她说的话', 'talk', '已合并到「说话」页'],
+    ['插件', 'plugins', ''],
+    ['诊断', 'health', '已合并到「健康」页第二个 Tab'],
+    ['功能开关', 'settings', '已合并到「设置」页'],
+    ['群规则', 'group-rules', ''],
   ];
   return h('div', {},
     h('div', { class: 'card' },
       h('h3', {}, '旧页面入口'),
       h('div', { class: 'muted', style: 'margin-bottom:10px;font-size:12.5px' },
-        '这些页面没有删除，只是收进了维护区；点进去可以照常使用。'),
+        '这里只放兜底入口，日常用左侧导航。旧页已经合并的，点进去会到新位置。'),
       h('div', { style: 'display:flex;gap:10px;flex-wrap:wrap' },
-        ...links.map(([t, id]) => h('a', { class: 'chip', href: '#' + id, style: 'text-decoration:none' }, t)))),
+        ...links.map(([t, id, note]) => h('a', { class: 'chip', href: '#' + id, style: 'text-decoration:none' }, t + (note ? '（' + note + '）' : ''))))),
     h('div', { class: 'card', style: 'margin-top:14px' },
       h('h3', {}, '回滚'),
       h('div', { class: 'muted', style: 'font-size:12.5px' },
         '想看旧版导航：在浏览器控制台执行 localStorage.setItem("her.legacyNav","1") 后刷新；删除该键恢复。）')));
+}
+
+
+// P2-H3：功能地图（40 个功能点；数据写在前端常量里）
+const FEATURE_MAP = [
+    ['群白名单', 'group-rules', '谁能拉她进群、要不要回'],
+    ['私聊白名单', 'group-rules', '谁能私聊她'],
+    ['静音（只回我叫）', 'group-rules', '开了之后只认主人直呼'],
+    ['学习模式（只看不说）', 'group-rules', '只看不插话，主人 @ 例外'],
+    ['群频率 / 间隔', 'group-rules', '每群最小间隔分钟'],
+    ['每日次数上限', 'group-rules', '每群每天自动发言上限'],
+    ['抽样比例', 'group-rules', '低分消息按百分比放行'],
+    ['只回谁', 'group-rules', '限定只回某些人'],
+    ['活跃期', 'group-rules', '叫醒后 10 分钟内继续聊'],
+    ['省钱模式', 'cost', '自动/一直省/不省'],
+    ['日花费上限', 'settings', '超过就停聊'],
+    ['敏感话题守门', 'safe', '碰到敏感词怎么处理'],
+    ['情绪（只读）', 'memory', '她的心情分数'],
+    ['记忆体检', 'memory', '重复/过期/孤儿'],
+    ['记忆星海', 'memory', '记忆的 3D 分布'],
+    ['人群档案 / 标记', 'people', '谁在说话、谁被标过'],
+    ['她说的话', 'talk', '她最近发过的'],
+    ['学到的说法', 'talk', '从聊天里学到的说法'],
+    ['她的看法', 'talk', '她对人的印象'],
+    ['人味指标', 'talk', '句长/标点/总结句'],
+    ['决策记录', 'decisions', '每一条回不回的判决'],
+    ['误判分析', 'decisions', '按来源统计误判率'],
+    ['花费趋势', 'cost', '每天花了多少'],
+    ['健康自检', 'health', '服务/端口/配置'],
+    ['通道健康', 'health', 'DSH/桥接/OneBot/看门狗'],
+    ['媒体看图率', 'health', '有图/看了/失败'],
+    ['插件清单', 'plugins', '34 个扩展与钩子'],
+    ['功能开关', 'settings', '全站开关键在'],
+    ['待生效与重启', 'settings', '哪些改动等重启'],
+    ['工具档', 'settings', 'balanced/core-min 等'],
+    ['命令大全', 'commands', '可用命令与前缀'],
+    ['群规则总表', 'group-rules', '一屏看全每群规则'],
+    ['性格 / 人格文件', 'personality', '当前角色与文件大小'],
+    ['概览', 'overview', '今天最重要的四块'],
+    ['入口 / 本机花费', 'entry', '7788 会话花费'],
+    ['维护', 'maintenance', '旧页面兜底入口'],
+    ['决策导出', 'decisions', 'CSV 导出'],
+    ['学说话风格', 'style', '说话框架'],
+    ['记忆与情绪（旧）', 'memory', '旧版入口'],
+    ['诊断', 'health', '日志与为什么不回'],
+];
+
+function pageFeatureMap() {
+  const wrap = h('div', {});
+  wrap.append(h('div', { class: 'card' },
+    h('h3', {}, '功能地图'),
+    h('div', { class: 'muted', style: 'font-size:12.5px;margin-bottom:10px' },
+      '找不到功能时看这里；新功能上线要在这张表里加一行。')));
+  const byPage = {};
+  PAGES.forEach((p) => { byPage[p.id] = p.title; });
+  wrap.append(h('div', { class: 'card', style: 'margin-top:14px' },
+    h('table', { class: 'tbl' },
+      h('thead', {}, h('tr', {}, ['功能点', '现在在哪', '一句话说明'].map((t) => h('th', {}, t)))),
+      h('tbody', {}, ...FEATURE_MAP.map(([name, id, desc]) => h('tr', {},
+        h('td', { style: 'font-size:12.5px' }, name),
+        h('td', {}, h('a', { href: '#' + id, style: 'color:var(--accent);font-size:12.5px' }, (byPage[id] || id) + ' →')),
+        h('td', { class: 'muted', style: 'font-size:12px' }, desc)))))));
+  return wrap;
 }
 
 function pageSettingsHub() {
@@ -1301,7 +1370,7 @@ function pagePlugins() {
       h('div', { class: 'card-h', style: 'margin:6px 2px 6px' }, `${layer} · ${list.length} 个`),
       h('table', { class: 'tbl-fit nowrap-tbl', style: 'width:100%;font-size:13px' },
         h('thead', {}, h('tr', {}, ['扩展', 'kind', '钩子', '热生效', '配置'].map((t) => h('th', {}, t)))),
-        h('tbody', {}, ...rows)),
+        h('tbody', {}, ...rows.flat())),
     ]));
   }
   return wrap;
@@ -3214,7 +3283,7 @@ function pageDecisions() {
   ]));
   const rows = (d.items || []).filter((x) => !f.conv || String(x.key || '').startsWith(f.conv)).map((x) => {
     const mark = (d.marks || {})[x.id] || '';
-    return h('tr', {}, [
+    const _mainRow = h('tr', {}, [
       h('td', { class: 'mono', style: 'font-size:11.5px' }, new Date(x.ts).toLocaleTimeString('zh-CN')),
       h('td', { style: 'font-size:12px' }, decisionConvName(x)),
       h('td', { style: 'font-size:12.5px;max-width:340px' }, x.text || ''),
@@ -3225,9 +3294,20 @@ function pageDecisions() {
       h('td', {}, h('div', { class: 'toolbar', style: 'gap:4px;flex-wrap:wrap' }, DECISION_MARKS.map((m) =>
         h('button', { class: 'btn ' + (mark === m ? 'primary' : ''), style: 'padding:2px 6px;font-size:11.5px', onclick: () => decisionMark(x.id, mark === m ? '' : m) }, m)))),
     ]);
+    const _say = String(x.reply || '').trim();
+    let _fallback = '';
+    if (!_say && x.replied === true) {
+      const _u = Array.isArray(state.utter) ? state.utter : (state.utter?.items || []);
+      const _hit = _u.find((u) => u && u.key === x.key && Math.abs(Number(u.at || u.ts || 0) - x.ts) <= 60000);
+      if (_hit) _fallback = String(_hit.text || '').slice(0, 80);
+    }
+    const _line = _say || _fallback;
+    const _resultRow = h('tr', {}, h('td', { colspan: 8, style: 'font-size:12px;color:' + (_line ? '#9fb0c2' : '#6b7684') + ';padding:2px 12px 8px 12px;border-top:none' },
+      _line ? ('→ 她：' + _line) : (x.replied === false || !x.allow ? '（没回）' : (x.replied === true ? '（回了，正文没记录）' : ''))));
+    return [_mainRow, _resultRow];
   });
   wrap.append(h('div', { class: 'card', style: 'overflow:auto' }, rows.length
-    ? h('table', { class: 'tbl' }, h('thead', {}, h('tr', {}, ['时间', '会话', '消息摘要', '分数', '最终', '来源', '结果', '标注'].map((t) => h('th', {}, t)))), h('tbody', {}, ...rows))
+    ? h('table', { class: 'tbl' }, h('thead', {}, h('tr', {}, ['时间', '会话', '消息摘要', '分数', '最终', '来源', '结果', '标注'].map((t) => h('th', {}, t)))), h('tbody', {}, ...rows.flat()))
     : h('div', { class: 'muted' }, '这一天没有记录。判决书要等 bridge 重启后才会开始写。')));
   return wrap;
 }

@@ -1105,7 +1105,7 @@ const server = http.createServer(async (req, res) => {
       const byId = new Map();
       for (const line of lines) {
         let r; try { r = JSON.parse(line); } catch { continue; }
-        if (r.type === 'outcome') { const b = byId.get(r.id); if (b) { b.replied = r.replied; b.outbound = r.outbound; b.latencyMs = r.latencyMs; } continue; }
+        if (r.type === 'outcome') { const b = byId.get(r.id); if (b) { b.replied = r.replied; b.outbound = r.outbound; b.latencyMs = r.latencyMs; if (r.reply) b.reply = r.reply; } continue; }
         byId.set(r.id, r);
       }
       let items = [...byId.values()];
@@ -1151,7 +1151,7 @@ const server = http.createServer(async (req, res) => {
       try {
         for (const line of fs.readFileSync(file, 'utf8').split('\n').filter(Boolean)) {
           let r; try { r = JSON.parse(line); } catch { continue; }
-          if (r.type === 'outcome') { const b = byId.get(r.id); if (b) { b.replied = r.replied; b.latencyMs = r.latencyMs; } continue; }
+          if (r.type === 'outcome') { const b = byId.get(r.id); if (b) { b.replied = r.replied; b.latencyMs = r.latencyMs; if (r.reply) b.reply = r.reply; } continue; }
           byId.set(r.id, r);
         }
       } catch {}

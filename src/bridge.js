@@ -4275,9 +4275,9 @@ async function main() {
     }
   }
 
-  function noteSendSuccess(key) {
-    // DECISION_LOG（P1）：发送成功 → 给这次判决补「回了」。
-    try { decisionMarkOutcome(key, { replied: true, outbound: 1 }); } catch {}
+  function noteSendSuccess(key, reply = '') {
+    // DECISION_LOG（P1）：发送成功 → 给这次判决补「回了」+ 回复正文（P2-H：前 80 字）。
+    try { decisionMarkOutcome(key, { replied: true, outbound: 1, reply: String(reply || '').slice(0, 80) }); } catch {}
     snowlumaHealth.lastSendOkAt = Date.now();
     snowlumaHealth.lastSendError = '';
     try {
@@ -9617,7 +9617,7 @@ const fishGroupNames = new Map(); // groupId -> group_name（'' = 查不到）
           assertSendAllowed();
           if (kind === 'private') await withTimeout(bot.sendPrivateMessage(Number(id), text(escapeCqText(part))), SEND_TIMEOUT_MS, `QQ发送 ${kind}:${id}`);
           else await withTimeout(bot.sendGroupMessage(Number(id), text(escapeCqText(part))), SEND_TIMEOUT_MS, `QQ发送 ${kind}:${id}`);
-          noteSendSuccess(key);
+          noteSendSuccess(key, safeMsg);
         })
         .catch((error) => {
           lastSendFailed.set(key, true);

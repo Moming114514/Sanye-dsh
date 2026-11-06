@@ -115,6 +115,7 @@ export function createDecisionLog({ stateDir, log = () => {} } = {}) {
         ts,
         day: day || dayOf(ts),
         replied: info.replied === true,
+        reply: String(info.reply || '').slice(0, 80),
         outbound: Number(info.outbound) || 0,
         latencyMs: Number.isFinite(Number(info.latencyMs)) ? Math.max(0, Number(info.latencyMs)) : Math.max(0, ts - (hit?.ts || ts)),
       };
