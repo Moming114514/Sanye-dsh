@@ -9,6 +9,8 @@ import vm from 'node:vm';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as markdown from '../src/md-to-plain.js';
+import * as textLib from '../src/lib/text.js'; // R1
+import * as mediaSegments from '../src/lib/media-segments.js'; // R1
 import * as sensitive from '../src/sensitive.js';
 import * as wait from '../src/v2-wait.js';
 import * as safeFetch from '../src/safe-fetch.js';
@@ -51,6 +53,83 @@ import * as stateAcl from '../src/state-acl.mjs';
 import { createBiliMemory } from '../src/bili-memory.js';
 import { isLoopbackBaseUrl } from '../src/dsh-port.js';
 import { unwrap, createTurnCollector } from '../src/dsh-client.js';
+import * as extIndexMod from '../src/ext/index.js';
+import * as botDetectMod from '../src/ext/bot-detect.js';
+import * as memoryScopeMod from '../src/ext/memory-scope.js';
+import * as sidecarMod from '../src/ext/sidecar-task.js';
+import * as groupPolicyMod from '../src/ext/group-policy.js';
+import * as activeWindowMod from '../src/ext/active-window.js';
+import * as speakPolicyMod from '../src/ext/speak-policy.js';
+import * as muteMod from '../src/ext/mute.js';
+import * as learnModeMod from '../src/ext/learnmode.js';
+import * as economyMod from '../src/ext/economy.js';
+import * as groupRateMod from '../src/ext/group-rate.js';
+import * as safeTalkMod from '../src/ext/safe-talk.js';
+import * as ownerOnlyMod from '../src/ext/owner-only.js';
+import * as qzoneWatchMod from '../src/ext/qzone-watch.js';
+import * as channelMod from '../src/ext/channel.js';
+import * as qzoneMod from '../src/ext/qzone.js';
+import * as stickerFramesMod from '../src/ext/sticker-frames.js';
+import * as profileMod from '../src/ext/profile.js';
+import * as remindersMod from '../src/ext/reminders.js';
+import * as relatedMemoryMod from '../src/ext/related-memory.js';
+import * as stickersMod from '../src/ext/stickers.js';
+import * as memoryCardMod from '../src/ext/memory-card.js';
+import * as blackboxMod from '../src/ext/blackbox.js';
+import * as promisesMod from '../src/ext/promises.js';
+import * as styleLearnMod from '../src/ext/style-learn.js';
+import * as githubLearnMod from '../src/ext/github-learn.js';
+
+const __autoSkip = new Set(['bridge.js', 'self-test.js', 'mcp-snowluma-safe.js', 'mcp-snowluma.js', 'mcp-servers.js']);
+const autoBindings = {};
+for (const dir of ['../src/', '../src/ext/']) {
+  const base = new URL(dir, import.meta.url);
+  for (const f of fs.readdirSync(base)) {
+    if (!f.endsWith('.js') || __autoSkip.has(f)) continue;
+    try { Object.assign(autoBindings, await import(new URL(f, base).href)); } catch { /* 个别模块有副作用就跳过 */ }
+  }
+}
+
+const extBindings = {
+  observe: botDetectMod.observe, isKnownBot: botDetectMod.isKnownBot,
+  getPeople: botDetectMod.getPeople, setMark: botDetectMod.setMark,
+  scopedMemoryText: memoryScopeMod.scopedMemoryText,
+  isSidecarTask: sidecarMod.isSidecarTask, buildSidecarPrompt: sidecarMod.buildSidecarPrompt,
+  extDispatchRoute: extIndexMod.extDispatchRoute, extPromptBlocks: extIndexMod.extPromptBlocks,
+  extStateKey: extIndexMod.extStateKey, extWakeGate: extIndexMod.extWakeGate,
+  extAfterSend: extIndexMod.extAfterSend, extOnGroupMessage: extIndexMod.extOnGroupMessage,
+  extOnPrivateMessage: extIndexMod.extOnPrivateMessage, extList: extIndexMod.extList,
+  extManifests: extIndexMod.extManifests, decisionMarkOutcome: extIndexMod.decisionMarkOutcome,
+  groupPolicyWrite: groupPolicyMod.handleWrite, groupPolicyEnabled: groupPolicyMod.isEnabled,
+  groupPolicySet: groupPolicyMod.set, groupPolicyProject: groupPolicyMod.project,
+  touchActiveWindow: activeWindowMod.touchActiveWindow, clearActiveWindow: activeWindowMod.clearActiveWindow,
+  isActiveWindowExit: activeWindowMod.isActiveWindowExit,
+  evaluateSpeakPolicy: speakPolicyMod.evaluate,
+  isMuted: muteMod.isMuted,
+  isLearnGroup: learnModeMod.isLearnGroup, lastSpeakerAt: learnModeMod.lastSpeakerAt,
+  ecoForGroup: economyMod.ecoForGroup, ecoState: economyMod.ecoState,
+  groupRates: groupRateMod.groupRates,
+  safeCoolUntil: safeTalkMod.coolUntil,
+  ownerOnlyGroupAllowed: ownerOnlyMod.ownerOnlyGroupAllowed,
+  createQzoneWatch: qzoneWatchMod.default, createChannel: channelMod.createChannel,
+  fetchQzoneFeed: qzoneMod.fetchQzoneFeed, commentQzone: qzoneMod.commentQzone,
+  sendQzone: qzoneMod.sendQzone, deleteQzone: qzoneMod.deleteQzone,
+  qzoneEnabledOf: qzoneMod.qzoneEnabled,
+  pickLastMedia: stickerFramesMod.pickLastMedia, stickerFrames: stickerFramesMod.stickerFrames,
+  createProfile: profileMod.createProfile, createReminders: remindersMod.createReminders,
+  relatedMemoryBlock: relatedMemoryMod.relatedMemoryBlock,
+  relatedMemorySuffix: relatedMemoryMod.relatedMemorySuffix,
+  stickerTodoLine: stickersMod.stickerTodoLine,
+  MEMV2_CARD_MAX: memoryCardMod.MEMV2_CARD_MAX,
+  MEMV2_SELF_MAX: memoryCardMod.MEMV2_SELF_MAX,
+  MEMV2_DIARY_MAX: memoryCardMod.MEMV2_DIARY_MAX,
+  isSilent: blackboxMod.isSilent, markSilent: blackboxMod.markSilent,
+  consumeSilent: blackboxMod.consumeSilent, clearSilent: blackboxMod.clearSilent,
+  analyzePromise: promisesMod.analyzePromise,
+  createStyleLearn: styleLearnMod.createStyleLearn,
+  createGithubLearn: githubLearnMod.default,
+};
+
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
@@ -175,11 +254,11 @@ export async function bridgeHarness({ config = {}, savedState, files = {}, globa
   // 整段吞掉，导致语音相关断言在虚拟环境里悄悄失真）。
   source = source.split(/\r?\n/).reduce((acc, line) => {
     if (acc.droppingImport) {
-      if (/;\s*$/.test(line)) acc.droppingImport = false;
+      if (/;\s*(?:\/\/.*)?$/.test(line)) acc.droppingImport = false;
       return acc;
     }
     if (/^import[\s{*]/.test(line) || /^import\s+['"]/.test(line)) {
-      if (!/;\s*$/.test(line)) acc.droppingImport = true;
+      if (!/;\s*(?:\/\/.*)?$/.test(line)) acc.droppingImport = true;
       return acc;
     }
     acc.out.push(line);
@@ -250,7 +329,9 @@ export async function bridgeHarness({ config = {}, savedState, files = {}, globa
     isLoopbackBaseUrl,
     probeDshBaseUrl: async () => true,
     discoverDshBaseUrl: async () => null,
-    ...markdown, ...sensitive, ...wait, ...safeFetch, ...forward, ...selfIdentity, ...slang, ...sticker,
+    ...autoBindings,
+    ...extBindings,
+    ...markdown, ...textLib, ...mediaSegments, ...sensitive, ...wait, ...safeFetch, ...forward, ...selfIdentity, ...slang, ...sticker,
     ...modelPrices, ...tokenLedger, ...voiceLib, ...stateAcl, ...presetPrompt, ...fishGuard, ...tokenGuard,
     ...voiceDiagnostics,
     ...allowlist,
