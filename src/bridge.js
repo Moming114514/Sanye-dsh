@@ -88,6 +88,7 @@ import { handleWrite as groupPolicyWrite } from './ext/group-policy.js'; // P2-1
 import { isEnabled as groupPolicyEnabled, set as groupPolicySet, project as groupPolicyProject } from './ext/group-policy.js'; // ATTNSET_PATCH
 import { touchActiveWindow, clearActiveWindow, isActiveWindowExit } from './ext/active-window.js'; // D-3 ACTIVE_WINDOW
 import { evaluate as evaluateSpeakPolicy } from './ext/speak-policy.js'; // SPEAK_POLICY_PATCH
+import { decideReplyTarget } from './ext/reply-target.js'; // G2_REPLY_TARGET_PATCH
 import { isMuted } from './ext/mute.js'; // SPEAK_POLICY_PATCH
 import { isLearnGroup, lastSpeakerAt } from './ext/learnmode.js'; // SPEAK_POLICY_PATCH
 import { ecoForGroup, ecoState } from './ext/economy.js'; // SPEAK_POLICY_PATCH
@@ -13410,6 +13411,24 @@ function logSpeakPredict(key, reason) {
       rng: Math.random,
     });
     log(`[策略·预测] key=${key} allow=${r.allow} source=${r.source} reason=${r.reason}${r.note ? ' note=' + r.note : ''}${r.maxSentences ? ' maxSentences=' + r.maxSentences : ''}`);
+    // G2：shadow 观测「回谁」，只记录、不改变发送逻辑
+    try {
+      const st2 = getSocialV2State(key);
+      const unread = Array.isArray(st2?.unread) ? st2.unread : [];
+      const lastMsg = unread.length ? unread[unread.length - 1] : null;
+      const rt = decideReplyTarget({
+        key: String(key || ''),
+        last: lastMsg,
+        recent: unread.slice(-6),
+        reason: String(reason || ''),
+        now: Date.now(),
+        policy: { allow: r.allow, source: r.source },
+      });
+      const who = rt.target ? rt.target : '—';
+      log(`[回谁] ${key} 决定回 ${who}（rule=${rt.rule}）候选=${rt.candidates.length ? rt.candidates.join('|') : '—'}`);
+    } catch (e) {
+      log(`[回谁] 计算失败：${e?.message || e}`);
+    }
   } catch (e) {
     log(`[策略] 计算失败：${e?.message || e}`);
   }
