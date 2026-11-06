@@ -3749,18 +3749,29 @@ function pageUtter() {
   }
   const MARK = [['ok', '正常'], ['odd', '怪'], ['ai', '人机味'], ['offtopic', '答非所问'], ['fake', '像编的']];
   const table = h('div', { class: 'card' }, [
+    h('div', { class: 'card-h' }, ['她说的话',
+      h('span', { id: 'utts-count', class: 'muted', style: 'margin-left:8px;font-size:12px' },
+        '已标 ' + rows.filter((x) => x.tag).length + ' / ' + rows.length),
+    ]),
     h('div', { class: 'tbl-fit nowrap-tbl' }, h('table', { class: 'tbl' }, [
       h('thead', {}, h('tr', {}, [h('th', { style: 'width:118px' }, '时间'), h('th', { style: 'width:150px' }, '会话'), h('th', {}, '她说的'), ])),
-      h('tbody', {}, rows.map((r) => h('tr', {}, [
-        h('td', { class: 'muted' }, fmtHm(r.at)),
+      h('tbody', {}, rows.map((r) => h('tr', { 'data-utts-row': r.id }, [
+        h('td', { class: 'muted' }, [
+          h('span', { 'data-utts-dot': r.id, style: 'display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:6px;background:' + (r.tag ? 'var(--accent)' : 'transparent') }),
+          fmtHm(r.at),
+        ]),
         h('td', { class: 'muted' }, r.key),
-        h('td', {}, [
-          r.text,
+        h('td', {}, [ // UTTS_TRIGGER_UI
+          r.trigger && r.trigger.text
+            ? h('div', { style: 'color:#8fa6c8;font-size:12px;margin-bottom:4px' }, '← ' + (r.trigger.from || '对方') + '：' + r.trigger.text)
+            : h('div', { style: 'color:#8fa6c8;font-size:12px;margin-bottom:4px' }, '← （没有前置消息）'),
+          h('div', {}, r.text),
           r.note ? h('div', { class: 'muted', style: 'margin-top:4px' }, '备注：' + r.note) : null,
           h('div', { style: 'margin-top:6px' }, MARK.map(([k, label]) => h('button', {
             class: 'btn' + (r.tag === k ? ' primary' : ''),
+            'data-utts-tag': k,
             style: 'font-size:12px;padding:2px 8px;margin:0 6px 4px 0',
-            onclick: () => markUtter(r.id, r.tag === k ? '' : k),
+            onclick: (ev) => markUtter(r.id, r.tag === k ? '' : k, ev.currentTarget),
           }, label))),
         ]),
 
@@ -3779,11 +3790,34 @@ async function loadUtter() {
   state.utterTags = r.tags || {};
 }
 
-async function markUtter(id, tag) {
-  await api('/api/utts-mark', { method: 'POST', body: { id, tag } });
+async function markUtter(id, tag, btn) {
+  const LABELS = { ok: '正常', odd: '怪', ai: '人机味', offtopic: '答非所问', fake: '像编的' };
   const row = (state.utterRows || []).find((x) => x.id === id);
-  if (row) row.tag = tag;
-  rerender();
+  const prev = row ? row.tag : '';
+  const apply = (t) => {
+    if (row) row.tag = t;
+    const tr = btn && btn.closest ? btn.closest('tr') : null;
+    if (tr) {
+      for (const b of tr.querySelectorAll('button[data-utts-tag]')) {
+        b.classList.toggle('primary', b.dataset.uttsTag === t);
+      }
+      const dot = tr.querySelector('[data-utts-dot]');
+      if (dot) dot.style.background = t ? 'var(--accent)' : 'transparent';
+    }
+    const c = document.querySelector('#utts-count');
+    if (c) {
+      const all = state.utterRows || [];
+      c.textContent = '已标 ' + all.filter((x) => x.tag).length + ' / ' + all.length;
+    }
+  };
+  apply(tag); // 乐观更新：不等网络
+  try {
+    await api('/api/utts-mark', { method: 'POST', body: { id, tag } });
+    toast('已标：' + (LABELS[tag] || '未标'));
+  } catch (e) {
+    apply(prev);
+    toast('保存失败：' + (e && e.message ? e.message : e));
+  }
 }
 
 function fmtHm(ms) {
