@@ -2922,6 +2922,16 @@ async function decisionExport() {
     setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   } catch (e) { toast('导出失败：' + e.message, 3600); }
 }
+// P2-I2：判决分类（按设置 / 判断 / 放行）
+function decisionKind(x) {
+  if (x.allow && x.replied !== false) return 'pass';
+  const s = String(x.source || '').toLowerCase();
+  if (/mute|learn|replyonly|economy|group-?rate|rate/.test(s)) return 'config';
+  return 'judge';
+}
+const DEC_KIND_LABEL = { config: '按设置', judge: '判断', pass: '放行' };
+const DEC_KIND_CLASS = { config: 'muted', judge: 'warn', pass: 'ok' };
+
 function decisionConvName(x) {
   const m = /^(group|private):(\d+)$/.exec(String(x.key || ''));
   if (!m) return x.key || '';
@@ -3171,7 +3181,8 @@ function decisionStatsCard() {
   (async () => {
     try {
       const r = await api('/api/decision-stats');
-      const rows = (r && r.sources) || [];
+      // P2-I2：误判统计只算「判断」和「放行」，按设置拦的不算误判
+      const rows = ((r && r.sources) || []).filter((x) => !/^(mute|learnmode|replyonly|economy|group-?rate|rate)$/i.test(String(x.source || '')));
       box.textContent = '';
       if (!rows.length) { box.append(h('div', { class: 'muted' }, '还没有判决记录；等桥接写出 decision/*.jsonl 后再看。')); return; }
       if (r.marked < 10) { box.append(h('div', { class: 'muted', style: 'margin-bottom:6px' }, '先标 10 条再回来看，样本太少统计没意义（现在 ' + r.marked + ' 条）')); }
@@ -3253,6 +3264,7 @@ function pageDecisions() {
   const wrap = h('div', {});
   wrap.append(decisionStatsCard()); // P2-D 误判分析
   if (!state.decFilter) state.decFilter = { day: new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10) };
+  if (!Array.isArray(state.decKinds)) state.decKinds = ['judge', 'pass'];
   const f = state.decFilter;
   if (!state.decisions) { loadDecisions().catch(() => {}).finally(rerender); wrap.append(h('div', { class: 'card muted' }, '正在读判决书…')); }
   const upd = (k, v) => { f[k] = v; loadDecisions().catch(() => {}).finally(rerender); };
@@ -3275,15 +3287,32 @@ function pageDecisions() {
       h('button', { class: 'btn', onclick: decisionExport }, '导出 CSV'),
     ]),
   ]));
+  wrap.append(h('div', { class: 'card', style: 'padding:8px 12px' },
+    h('div', { class: 'toolbar', style: 'gap:6px;align-items:center;flex-wrap:wrap' },
+      h('span', { class: 'muted', style: 'font-size:12.5px' }, '看哪类：'),
+      ...['all', 'judge', 'pass', 'config'].map((k) => {
+        const on = k === 'all' ? state.decKinds.length === 3 : state.decKinds.includes(k);
+        const label = k === 'all' ? '全部' : DEC_KIND_LABEL[k];
+        return h('button', { class: 'btn sm ' + (on ? 'primary' : ''), onclick: () => {
+          if (k === 'all') state.decKinds = ['config', 'judge', 'pass'];
+          else if (state.decKinds.includes(k)) state.decKinds = state.decKinds.filter((z) => z !== k);
+          else state.decKinds = [...state.decKinds, k];
+          rerender();
+        } }, label);
+      }))));
   const d = state.decisions || { items: [], stats: {} };
   const st = d.stats || {};
   wrap.append(h('div', { class: 'card' }, [
     h('div', { class: 'big', style: 'font-size:15px' }, `今日判断 ${st.total || 0} · 放行 ${st.allow || 0} · 拦截 ${st.block || 0} · 回了 ${st.replied || 0} · 已标 ${st.marked || 0}`),
     h('div', { class: 'muted', style: 'font-size:12.5px;margin-top:6px' }, (st.topSources || []).length ? ('拦截来源 top：' + st.topSources.map(([k, v]) => k + ' ' + v).join(' · ')) : '今天还没有拦截记录。'),
+    h('div', { class: 'muted', style: 'font-size:12.5px;margin-top:2px' }, '按设置拦 ' + (d.items || []).filter((x) => decisionKind(x) === 'config').length + ' 条（不计入误判）'),
   ]));
-  const rows = (d.items || []).filter((x) => !f.conv || String(x.key || '').startsWith(f.conv)).map((x) => {
+  const _allowKinds = state.decKinds;
+  const rows = (d.items || []).filter((x) => _allowKinds.includes(decisionKind(x))).filter((x) => !f.conv || String(x.key || '').startsWith(f.conv)).map((x) => {
     const mark = (d.marks || {})[x.id] || '';
+    const _k = decisionKind(x);
     const _mainRow = h('tr', {}, [
+      h('td', {}, h('span', { class: 'tag ' + DEC_KIND_CLASS[_k], style: 'font-size:11px' }, DEC_KIND_LABEL[_k])),
       h('td', { class: 'mono', style: 'font-size:11.5px' }, new Date(x.ts).toLocaleTimeString('zh-CN')),
       h('td', { style: 'font-size:12px' }, decisionConvName(x)),
       h('td', { style: 'font-size:12.5px;max-width:340px' }, x.text || ''),
@@ -3302,12 +3331,12 @@ function pageDecisions() {
       if (_hit) _fallback = String(_hit.text || '').slice(0, 80);
     }
     const _line = _say || _fallback;
-    const _resultRow = h('tr', {}, h('td', { colspan: 8, style: 'font-size:12px;color:' + (_line ? '#9fb0c2' : '#6b7684') + ';padding:2px 12px 8px 12px;border-top:none' },
+    const _resultRow = h('tr', {}, h('td', { colspan: 9, style: 'font-size:12px;color:' + (_line ? '#9fb0c2' : '#6b7684') + ';padding:2px 12px 8px 12px;border-top:none' },
       _line ? ('→ 她：' + _line) : (x.replied === false || !x.allow ? '（没回）' : (x.replied === true ? '（回了，正文没记录）' : ''))));
     return [_mainRow, _resultRow];
   });
   wrap.append(h('div', { class: 'card', style: 'overflow:auto' }, rows.length
-    ? h('table', { class: 'tbl' }, h('thead', {}, h('tr', {}, ['时间', '会话', '消息摘要', '分数', '最终', '来源', '结果', '标注'].map((t) => h('th', {}, t)))), h('tbody', {}, ...rows.flat()))
+    ? h('table', { class: 'tbl' }, h('thead', {}, h('tr', {}, ['类', '时间', '会话', '消息摘要', '分数', '最终', '来源', '结果', '标注'].map((t) => h('th', {}, t)))), h('tbody', {}, ...rows.flat()))
     : h('div', { class: 'muted' }, '这一天没有记录。判决书要等 bridge 重启后才会开始写。')));
   return wrap;
 }

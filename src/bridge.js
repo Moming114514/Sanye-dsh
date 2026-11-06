@@ -4277,7 +4277,7 @@ async function main() {
 
   function noteSendSuccess(key, reply = '') {
     // DECISION_LOG（P1）：发送成功 → 给这次判决补「回了」+ 回复正文（P2-H：前 80 字）。
-    try { decisionMarkOutcome(key, { replied: true, outbound: 1, reply: String(reply || '').slice(0, 80) }); } catch {}
+    try { decisionMarkOutcome(key, { replied: true, outbound: 1, reply: String(reply || '') }); } catch {}
     snowlumaHealth.lastSendOkAt = Date.now();
     snowlumaHealth.lastSendError = '';
     try {
@@ -9876,7 +9876,14 @@ const fishGroupNames = new Map(); // groupId -> group_name（'' = 查不到）
       noteSendFailure(sendKey, error);
       throw error;
     }
-    noteSendSuccess(sendKey);
+    try {
+      const _segText = (Array.isArray(segments) ? segments : [])
+        .filter((s) => s && s.type === 'text')
+        .map((s) => String(s?.data?.text || ''))
+        .join('')
+        .replace(/\[CQ:[^\]]*\]/g, '');
+      noteSendSuccess(sendKey, _segText);
+    } catch { noteSendSuccess(sendKey); }
     return body.data;
   }
 
@@ -9900,6 +9907,10 @@ const fishGroupNames = new Map(); // groupId -> group_name（'' = 查不到）
     if (!res.ok || body.status !== 'ok' || body.retcode !== 0) {
       throw new Error(`OneBot ${action} 失败: ${body.wording || body.retcode || res.status}`);
     }
+    try {
+      const _segText = segments.filter((s) => s && s.type === 'text').map((s) => String(s?.data?.text || '')).join('');
+      noteSendSuccess(`${kind}:${id}`, _segText);
+    } catch {}
     return body.data;
   }
 
