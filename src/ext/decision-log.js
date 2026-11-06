@@ -14,6 +14,50 @@ export function createDecisionLog({ stateDir, log = () => {} } = {}) {
 
   const dayOf = (t = Date.now()) => new Date(t + DAY_MS).toISOString().slice(0, 10);
   const fileOf = (day) => path.join(dir, `${day}.jsonl`);
+  // P2-J1：日志上限——保留最近 7 个日文件；单文件超 5MB 就写 -2/-3…；清理每天最多一次
+  const KEEP_DAYS = 7;
+  const MAX_BYTES = 5 * 1024 * 1024;
+  const CLEANUP_MARK = path.join(dir, '.last-cleanup');
+  const DAY_FILE_RE = /^(\d{4}-\d{2}-\d{2})(?:-(\d+))?\.jsonl$/;
+
+  function fileFor(day) {
+    let n = 1;
+    while (true) {
+      const f = path.join(dir, n === 1 ? `${day}.jsonl` : `${day}-${n}.jsonl`);
+      try {
+        const st = fs.statSync(f);
+        if (st.size < MAX_BYTES) return f;
+      } catch {
+        return f; // 不存在：就用这个
+      }
+      n += 1;
+      if (n > 99) return path.join(dir, `${day}-99.jsonl`);
+    }
+  }
+
+  function cleanupOnce() {
+    const today = dayOf(Date.now());
+    try { if (fs.readFileSync(CLEANUP_MARK, 'utf8').trim() === today) return; } catch {}
+    try {
+      const days = new Set();
+      for (const name of fs.readdirSync(dir)) {
+        const m = DAY_FILE_RE.exec(name);
+        if (m) days.add(m[1]);
+      }
+      const sorted = [...days].sort().reverse();
+      for (const d of sorted.slice(KEEP_DAYS)) {
+        for (const name of fs.readdirSync(dir)) {
+          const m = DAY_FILE_RE.exec(name);
+          if (m && m[1] === d) {
+            try { fs.unlinkSync(path.join(dir, name)); log('[decision] 清理过期日志：' + name); } catch {}
+          }
+        }
+      }
+    } catch (e) {
+      log('[decision] 清理失败：' + (e?.message || e));
+    }
+    try { fs.writeFileSync(CLEANUP_MARK, today + '\n'); } catch {}
+  }
   const sha1 = (text) => crypto.createHash('sha1').update(String(text)).digest('hex');
 
   function ensureDir() {
@@ -46,7 +90,8 @@ export function createDecisionLog({ stateDir, log = () => {} } = {}) {
   function append(rec) {
     try {
       ensureDir();
-      fs.appendFileSync(fileOf(rec.day), JSON.stringify(rec) + '\n');
+      fs.appendFileSync(fileFor(rec.day), JSON.stringify(rec) + '\n');
+      cleanupOnce();
       return true;
     } catch (e) {
       log('[decision] 写入失败：' + (e?.message || e));
