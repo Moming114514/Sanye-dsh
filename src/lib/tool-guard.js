@@ -8,6 +8,32 @@
 import { z } from 'zod';
 
 export const RETRIES = 2;
+
+// P2：红级工具——只允许「主人私聊」会话调用。名单与 docs/PERMISSIONS.md 一致。
+export const RED_TOOLS = new Set([
+  'qq_send_message', 'qq_reply', 'qq_send_group_message', 'qq_send_private_message',
+  'qq_send_burst', 'qq_send_poke', 'qq_send_sticker', 'qq_send_qzone_msg',
+  'qq_qzone_comment', 'qq_delete_qzone_msg', 'qq_set_profile', 'qq_set_avatar',
+  'qq_handle_friend_request', 'qq_memory_clear',
+]);
+
+// resolveKey(token) 由调用方注入（MCP 侧用 /api/status 反查会话 key）。
+export function createPermGuard({ resolveKey, ownerQQ, log = console.error } = {}) {
+  const ownerPrivate = ownerQQ ? `private:${ownerQQ}` : '';
+  return async function permCheck(name, args) {
+    const tool = String(name || '');
+    if (!RED_TOOLS.has(tool)) return null;
+    const token = String(args?.token || '');
+    let key = '';
+    try { key = String((await resolveKey(token)) || ''); } catch { key = ''; }
+    if (ownerPrivate && key === ownerPrivate) return null;
+    log(`[权限] 拒绝 ${tool} key=${key || '-'}（红工具）`);
+    return {
+      content: [{ type: 'text', text: JSON.stringify({ ok: false, error: 'forbidden', detail: '该工具仅主人私聊可用', tool }) }],
+      isError: true,
+    };
+  };
+}
 export const RETRY_DELAYS = [300, 800];
 
 export function isRetryableError(err) {
@@ -93,7 +119,7 @@ export function describeInvalid(schema, args) {
 }
 
 // 在 MCP server 构造完之后调用：包住 SDK 已注册的 tools/call 处理函数。
-export function installToolGuard(server, { log = console.error, schemas = new Map() } = {}) {
+export function installToolGuard(server, { log = console.error, schemas = new Map(), perm = null } = {}) {
   const handlers = server?.server?._requestHandlers;
   if (!handlers || typeof handlers.get !== 'function' || !handlers.has('tools/call')) {
     return { schemas, installed: false };
@@ -118,6 +144,10 @@ export function installToolGuard(server, { log = console.error, schemas = new Ma
   }
 
   handlers.set('tools/call', async (request, extra) => {
+    if (perm) {
+      const denied = await perm(request?.params?.name, request?.params?.arguments);
+      if (denied) return denied;
+    }
     let result;
     try {
       result = await prev(request, extra);

@@ -23,7 +23,10 @@ export function registerTokens(router, deps) {
     const rs = S.readRoleState();
     // 带 agent token 的调用来自 QQ 群里的 AI：只能拿到它自己该知道的运行状态。
     if (req.headers['x-agent-token'] || req.headers['x-agent-call'] !== undefined) {
+      const agentToken = String(req.headers['x-agent-token'] || '');
+      const agentKey = agentToken && typeof S.keyByAgentToken === 'function' ? S.keyByAgentToken(agentToken) : null;
       send(res, {
+        key: agentKey,
         mode: S.getMode(),
         role: rs.role ?? null,
         roleMode: rs.mode ?? 'active',

@@ -3823,6 +3823,14 @@ async function main() {
     };
     // 二代会话工具必须仍命中当前模式的白名单/准入；避免白名单移除后旧 agentToken 继续读状态。
     const v2SessionAllowed = isSessionAllowedInCurrentMode;
+    // token→会话 key（P2 权限分级：红工具只允许主人私聊）。只返回令牌自己的会话，不泄露映射表。
+    const keyByAgentToken = (token) => {
+      if (typeof token !== 'string' || !token) return null;
+      for (const [key, st] of socialV2.conversations) {
+        if (st?.agentToken && tokenEq(token, st.agentToken)) return key;
+      }
+      return null;
+    };
     // 语音包服务实例：按 config.json 的 mtime 缓存（既热生效，又保住安装进度）。
     // 必须放在请求回调**外面**：每次请求新建实例会把 activeInstalls（进度）随实例丢掉，
     // 前端就只看到"开始安装…"、永远没有进度条（2026-10-28 用户反馈）。
@@ -4127,6 +4135,7 @@ async function main() {
               closureConfigV2,
               assessClosureV2,
               getSocialV2State,
+              keyByAgentToken,
               closureStatus,
               snowlumaHealthSnapshot,
               readActivityTail,

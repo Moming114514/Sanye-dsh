@@ -64,3 +64,10 @@
 - 本文不动 `captureSendGuard`、`fishGuardSendBlock`、模式闸门（它们继续先拦）；
 - 分级只在「已经通过模式与 token 校验之后」再加一层，不替代现有判断；
 - 落地顺序建议：先给 18 个红级工具加「无确认即拒绝 + 审计」（不改变正常聊天路径），再给面板加确认入口。
+
+## 七、落地（P2，2026-11-07）
+
+- 拦截点：MCP `tools/call`（`installToolGuard`）新增 `permGuard`，红名单工具只允许 `private:<ownerQQ>`。
+- 会话 key 怎么拿：工具参数带 `agent token` → 桥接 `/api/status` 的 agent 视图返回该 token 自己的会话 `key`（`keyByAgentToken`，只反查、不列映射）→ MCP `resolveSessionKeyByToken` 使用。
+- 拒绝：`{ok:false,error:"forbidden",detail:"该工具仅主人私聊可用",tool}`，并打 `[权限] 拒绝 <tool> key=<key>（红工具）`。
+- 口径修正：本文写「红 18 个」，实际列出的 MCP 工具是 **14 个**（另 4 个是 `/api` 写接口，不在 MCP 工具层）；P2 按这 14 个工具名落地，`/api` 写接口仍由模式 + 控制台令牌约束。

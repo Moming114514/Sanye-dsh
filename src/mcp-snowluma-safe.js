@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { installToolGuard, withRetry, buildToolSchema } from './lib/tool-guard.js'; // G4
+import { installToolGuard, withRetry, buildToolSchema, createPermGuard } from './lib/tool-guard.js'; // G4 / P2
 // 出站文本的敏感信息拦截**统一由桥接负责**（bridge.js 的 auditAndSend / 各发送端点的
 // SENSITIVE_RE 校验）：所有 QQ 发送都经由桥接 HTTP API，因此 MCP 侧不再重复实现一遍。
 // 这里 import 只用于「出站审计口径一致」的说明，不在 MCP 内做拦截——
@@ -1847,5 +1847,24 @@ if (cfg.socialV2?.tools?.getForwardMsg !== false) {
   );
 }
 
-installToolGuard(server, { schemas: toolGuard.schemas }); // G4：tools/call 处理器在首次注册工具后才存在，这里安装
+// P2：红工具只允许主人私聊。tools/call 不带会话上下文，用参数里的 agent token 反查会话 key。
+async function resolveSessionKeyByToken(token) {
+  const t = String(token || '');
+  if (!t) return '';
+  try {
+    const headers = { 'x-agent-token': t };
+    const ct = readConsoleToken();
+    if (ct) headers['x-console-token'] = ct;
+    const res = await fetch(`${agentApiBase()}/api/status`, { headers, signal: AbortSignal.timeout(4000) });
+    if (!res.ok) return '';
+    const body = await res.json();
+    return String(body?.key || '');
+  } catch { return ''; }
+}
+const permGuard = createPermGuard({
+  resolveKey: resolveSessionKeyByToken,
+  ownerQQ: getConfig()?.ownerQQ,
+  log: (line) => console.error(line),
+});
+installToolGuard(server, { schemas: toolGuard.schemas, perm: permGuard }); // G4 / P2
 await server.connect(new StdioServerTransport());

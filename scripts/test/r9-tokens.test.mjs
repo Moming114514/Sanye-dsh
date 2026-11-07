@@ -69,7 +69,8 @@ check('status closure.enabled', st.body?.closure?.enabled === false);
 const stAgent = await call('/api/status', { 'x-agent-token': 't' });
 check('agent status 200', stAgent.res.code === 200);
 check('agent status 无管理字段', stAgent.body && stAgent.body.root === undefined && stAgent.body.ownerQQ === undefined, stAgent.body);
-check('agent status 字段数=5', stAgent.body && Object.keys(stAgent.body).length === 5, stAgent.body && Object.keys(stAgent.body));
+check('agent status 字段数=6（P2 加 key）', stAgent.body && Object.keys(stAgent.body).length === 6, stAgent.body && Object.keys(stAgent.body));
+check('agent status 带 key 字段', stAgent.body && 'key' in stAgent.body, stAgent.body);
 
 const daily = await call('/api/tokens/daily');
 check('daily 200', daily.res.code === 200);
