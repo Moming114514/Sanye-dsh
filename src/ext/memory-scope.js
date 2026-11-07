@@ -4,6 +4,9 @@
 //   私聊 → 只给「这个人的记忆」+ 公开记忆；
 //   没带会话标记的老条目 → 视作主人的私事，只在主人私聊里出现；
 //   拿不到 key（内部用途/调试）→ 全量，保持旧行为。
+// ANCHOR_SCOPE（2026-11-07）：
+//   有 conversationKey 的 anchor/pinned → 只在该会话可见（防私聊里标重要的事泄漏到群里）；
+//   无 conversationKey 的 anchor/pinned → 所有会话可见（真正的人格底座）。
 import fs from 'node:fs';
 import { loadMemoryCard, renderMemoryCard, normalizeMemoryCardConfig } from '../memory-card.js';
 
@@ -30,8 +33,8 @@ export function filterCardForSession(card, key, { ownerQQ = '' } = {}) {
   const kept = records.filter((r) => {
     const ck = String(r?.conversationKey || '');
     const rg = String(r?.groupId || '');
-    // 「永远不会忘的」（anchor / pinned）对所有会话可见：这是她的人格底座，不该因为换个群就忘。
-    if (r?.anchor === true || r?.pinned === true) return true;
+    // ANCHOR_SCOPE：有归属的锚点只在该会话可见；无归属的锚点（人格底座）全局可见。
+    if ((r?.anchor === true || r?.pinned === true) && (!ck || ck === k)) return true;
     if (isGroup) return ck === k || (!ck && rg === gid) || isPublicRecord(r);
     // 私聊：本人的 + 公开的 + 没标记归属的老条目（默认算主人）
     if (ck === k || isPublicRecord(r)) return true;
