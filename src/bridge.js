@@ -13493,6 +13493,7 @@ function logSpeakActual(key, allow, source, reason) {
     if (cfg.socialV2?.enabled === false) { logSpeakActual(key, false, 'config', 'socialV2.enabled=false'); return; }
     if (currentMode !== 'reserved2' || socialV2.paused) { logSpeakActual(key, false, 'config', socialV2.paused ? 'paused' : 'mode=' + currentMode); return; }
     logSpeakPredict(key, reason); // SPEAK_POLICY_PATCH：入口预测（不改判断）
+    if (!wakeAllowsSilent(reason, opts && opts.allowSilent)) log(`[唤醒] reason=${reason} 必须回应`);
     // EXT_PATCH：唤醒闸门交给扩展（只听主人等规则在 src/ext/*.js 里）
     const __decisionText = (() => {
       try {
