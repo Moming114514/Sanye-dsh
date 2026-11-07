@@ -892,7 +892,8 @@ const server = http.createServer(async (req, res) => {
       for (const [ck, c] of Object.entries(convs)) {
         if (wantKey && ck !== wantKey) continue;
         const ms = (c && (c.recentMessages || c.messages)) || [];
-        for (const m of ms) {
+        for (let mi = 0; mi < ms.length; mi++) { // UTTS_TRIGGER
+          const m = ms[mi];
           if (!m) continue;
           const sname = typeof m.sender === 'string' ? m.sender : String((m.sender && (m.sender.name || m.sender.nickname)) || '');
           const isSelf2 = m.isSelf === true || sname === '我' || sname === '三叶' || Number(m.userId || 0) === 3042876599;
@@ -902,7 +903,19 @@ const server = http.createServer(async (req, res) => {
           const id = String(m.messageId || m.id || m.seq || (ck + ':' + t));
           const mk = marks[id] || {};
           if (wantTag && (mk.tag || '') !== wantTag) continue;
-          out.push({ id, key: ck, at: t, text: String(m.plain || m.text || ''), tag: mk.tag || '', note: mk.note || '' });
+          let trigFrom = '', trigText = '', trigAt = 0;
+          for (let k2 = mi - 1; k2 >= 0 && k2 >= mi - 6; k2--) {
+            const pv = ms[k2]; if (!pv) continue;
+            const pn = typeof pv.sender === 'string' ? pv.sender : String((pv.sender && (pv.sender.name || pv.sender.nickname)) || '');
+            const pSelf = pv.isSelf === true || pn === '我' || pn === '三叶' || Number(pv.userId || 0) === 3042876599;
+            if (pSelf) continue;
+            trigFrom = pn || String(pv.userId || '');
+            if (trigFrom === '私聊' || trigFrom === 'private') trigFrom = '他';
+            trigText = String(pv.plain || pv.text || '').slice(0, 200);
+            trigAt = Number(pv.time || pv.at || 0);
+            break;
+          }
+          out.push({ id, key: ck, at: t, text: String(m.plain || m.text || ''), trigger: { from: trigFrom, text: trigText, at: trigAt }, tag: mk.tag || '', note: mk.note || '' });
         }
       }
       out.sort((a, b) => b.at - a.at);
@@ -1047,6 +1060,11 @@ const server = http.createServer(async (req, res) => {
         return send(res, r?.ok ? 200 : 400, r || { ok: false });
       }
       const r = await api('/api/socialV2/grouprate', 'POST', { action: 'list' });
+      return send(res, 200, r || { ok: false });
+    }
+    if (p === '/api/states') { // 唤醒条件（只读，代理桥接）
+      if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
+      const r = await api('/api/socialV2/states');
       return send(res, 200, r || { ok: false });
     }
     if (p === '/api/active-window') { // D-3：活跃期（只读）

@@ -2697,7 +2697,7 @@ function pageSafe() {
       const lvDef = (gr.levels || {})[lv] || {};
       return h('div', { class: 'rg-row' },
         h('div', { class: 'rg-gid', title: gid }, gid,
-          h('div', { class: 'muted', style: 'font-size:11.5px;margin-top:2px' }, (typeof nameOf === 'function' ? nameOf('group', gid) : '') || '')),
+          h('div', { class: 'muted', style: 'font-size:11.5px;margin-top:2px' }, (typeof nameOf === 'function' ? nameOf('group', gid) : '') || ''),),
         h('div', { class: 'rg-seg' }, ...Object.entries(gr.levels || {}).map(([k, v]) =>
           h('button', {
             class: 'btn' + (lv === k ? '' : ' ghost'),
@@ -2977,16 +2977,26 @@ function grEffective(row) {
   };
 }
 
+function wakeLine(gid) {
+  const w = state.grWake && (state.grWake.get ? state.grWake.get(String(gid)) : state.grWake[String(gid)]);
+  const tr = w && w.triggers;
+  if (!w || !tr) return '叫醒条件：未知';
+  const m = (v) => v === true ? '\u2713' : v === false ? '\u2717' : '未知';
+  return '叫醒条件：@\u6211 ' + m(tr.atMention) + ' 叫名字 ' + m(tr.nameMention) + ' 拍一拍 ' + m(tr.poke)
+    + ' 任意消息 ' + m(tr.anyMessage) + ' 问句 ' + m(tr.question);
+}
+
 async function loadGroupRules(force) {
   if (state.groupRules && !force) return state.groupRules;
   const data = { rows: [], errors: [], levels: {}, at: 0 };
   const get = async (p, label) => {
     try { return await api(p); } catch (e) { data.errors.push(label + '（' + p + '）：' + (e.message || '读取失败')); return null; }
   };
-  const [acc, mute, learn, gr, attn] = await Promise.all([
+  const [acc, mute, learn, gr, attn, st] = await Promise.all([
     get('/api/access', '白名单'), get('/api/mute', '静音'), get('/api/learn', '学习模式'),
-    get('/api/gr', '发言频率'), get('/api/attn-get', '抽样/只回谁'),
+    get('/api/gr', '发言频率'), get('/api/attn-get', '抽样/只回谁'), get('/api/states', '唤醒条件'),
   ]);
+  state.grWake = new Map((((st && st.conversations) || [])).map((c) => [String(c.key || '').replace(/^group:/, ''), c.wakeConfig || null]));
   data.levels = (gr && gr.levels) || {};
   const allow = new Set(((acc && acc.groups) || []).map(String));
   const muted = new Set((((mute && mute.keys) || [])).filter((k) => String(k).startsWith('group:')).map((k) => String(k).slice(6)));
@@ -3150,7 +3160,8 @@ function pageGroupRules() {
     const sampleIn = h('input', { class: 'input', type: 'number', min: 0, max: 5, step: 0.1, value: String(row.sample || 0), style: 'width:64px',
       onchange: (e) => applyGroupRule(row.gid, 'sample', e.target.value) });
     return h('tr', { class: flash ? 'gr-flash' : null }, [
-      td([h('div', { class: 'mono' }, row.name || row.gid), h('div', { class: 'muted', style: 'font-size:11.5px' }, row.gid)]),
+      td([h('div', { class: 'mono' }, row.name || row.gid), h('div', { class: 'muted', style: 'font-size:11.5px' }, row.gid),
+        h('div', { class: 'muted', 'data-wake': row.gid, style: 'font-size:11px;margin-top:2px;line-height:1.5' }, wakeLine(row.gid))]),
       td(allowBox),
       td(modeSel),
       td(h('div', { style: 'display:flex;gap:6px;align-items:center;flex-wrap:wrap' }, [lvSel, gapIn, h('span', { class: 'muted' }, '/'), dayIn, h('span', { class: 'muted' }, '次')])),
