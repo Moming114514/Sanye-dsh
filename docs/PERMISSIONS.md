@@ -67,7 +67,9 @@
 
 ## 七、落地（P2，2026-11-07）
 
-- 拦截点：MCP `tools/call`（`installToolGuard`）新增 `permGuard`，红名单工具只允许 `private:<ownerQQ>`。
+- 拦截点：MCP `tools/call`（`installToolGuard`）新增 `permGuard`，**红名单 5 个**只允许 `private:<ownerQQ>`：
+  `qq_memory_clear`、`qq_set_profile`、`qq_set_avatar`、`qq_delete_qzone_msg`、`qq_handle_friend_request`。
+- **发送类不算红级**（`qq_send_message`/`qq_reply`/`qq_send_sticker`/`qq_send_burst`/`qq_send_poke`/`qq_send_qzone_msg`/`qq_qzone_comment` 等）：这是她的日常工作，对所有会话放行，由 `tokenGuard` 的频率/额度约束。
 - 会话 key 怎么拿：工具参数带 `agent token` → 桥接 `/api/status` 的 agent 视图返回该 token 自己的会话 `key`（`keyByAgentToken`，只反查、不列映射）→ MCP `resolveSessionKeyByToken` 使用。
 - 拒绝：`{ok:false,error:"forbidden",detail:"该工具仅主人私聊可用",tool}`，并打 `[权限] 拒绝 <tool> key=<key>（红工具）`。
-- 口径修正：本文写「红 18 个」，实际列出的 MCP 工具是 **14 个**（另 4 个是 `/api` 写接口，不在 MCP 工具层）；P2 按这 14 个工具名落地，`/api` 写接口仍由模式 + 控制台令牌约束。
+- 口径修正：本文前面「红 18 个」是初版设计口径；按可逆性与日常工作，P2 实际只拦 5 个不可逆/身份/关系类动作，其余仍由模式、白名单、`tokenGuard` 频率分层约束。

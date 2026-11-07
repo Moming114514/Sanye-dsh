@@ -11,10 +11,9 @@ export const RETRIES = 2;
 
 // P2：红级工具——只允许「主人私聊」会话调用。名单与 docs/PERMISSIONS.md 一致。
 export const RED_TOOLS = new Set([
-  'qq_send_message', 'qq_reply', 'qq_send_group_message', 'qq_send_private_message',
-  'qq_send_burst', 'qq_send_poke', 'qq_send_sticker', 'qq_send_qzone_msg',
-  'qq_qzone_comment', 'qq_delete_qzone_msg', 'qq_set_profile', 'qq_set_avatar',
-  'qq_handle_friend_request', 'qq_memory_clear',
+  // RED 只放「不可逆/身份/关系」类：发送与评论是她的日常工作，不属于红级（2026-11-07 修正）
+  'qq_memory_clear', 'qq_set_profile', 'qq_set_avatar',
+  'qq_delete_qzone_msg', 'qq_handle_friend_request',
 ]);
 
 // resolveKey(token) 由调用方注入（MCP 侧用 /api/status 反查会话 key）。
