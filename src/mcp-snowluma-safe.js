@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import { installToolGuard, withRetry, buildToolSchema } from './lib/tool-guard.js'; // G4
 // 出站文本的敏感信息拦截**统一由桥接负责**（bridge.js 的 auditAndSend / 各发送端点的
 // SENSITIVE_RE 校验）：所有 QQ 发送都经由桥接 HTTP API，因此 MCP 侧不再重复实现一遍。
 // 这里 import 只用于「出站审计口径一致」的说明，不在 MCP 内做拦截——
@@ -302,6 +303,7 @@ async function legacyReadToolAllowed() {
 }
 
 const server = new McpServer({ name: 'snowluma-safe', version: '0.2.0-r4' });
+const toolGuard = { schemas: new Map() }; // G4：工具参数 schema 表（注册时填）
 
 // ── 工具开关必须在**注册期**生效，而不是只在校验期 ──────────────────────────
 //
@@ -470,6 +472,20 @@ let toolSeen = 0;
     if (flag && cfg.socialV2?.tools?.[flag] === false) {
       disabledTools.push(`${name}(${flag})`);
       return undefined;
+    }
+    // G4：记住 inputSchema（用于把校验错误翻译成 missing/type 提示）
+    try {
+      if (rest.length >= 2) {
+        const shape = rest[rest.length - 2];
+        const schema = buildToolSchema(shape);
+        if (schema) toolGuard.schemas.set(name, schema);
+      }
+      const cb = rest[rest.length - 1];
+      if (typeof cb === 'function') {
+        rest[rest.length - 1] = (...a) => withRetry(() => cb(...a), { name }); // G4：只对可重试错误重试
+      }
+    } catch (err) {
+      console.error(`[tool] 守卫安装失败 ${name} ${String(err?.message ?? err)}`);
     }
     return registerTool(name, ...rest);
   };
@@ -1831,4 +1847,5 @@ if (cfg.socialV2?.tools?.getForwardMsg !== false) {
   );
 }
 
+installToolGuard(server, { schemas: toolGuard.schemas }); // G4：tools/call 处理器在首次注册工具后才存在，这里安装
 await server.connect(new StdioServerTransport());
