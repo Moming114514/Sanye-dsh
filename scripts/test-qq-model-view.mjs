@@ -153,8 +153,7 @@ test('MCP validates/forwards read watermarks and wait purposes against an isolat
     // live config or user runtime state are copied into this test fixture.
     fixture = await fs.mkdtemp(path.join(ROOT, '.tmp-model-view-test-'));
     await fs.mkdir(path.join(fixture, 'src'));
-    await Promise.all(['mcp-snowluma-safe.js', 'qq-model-view.js', 'sensitive.js', 'sticker-semantics.js'].map((name) =>
-      fs.copyFile(path.join(ROOT, 'src', name), path.join(fixture, 'src', name))));
+    await fs.cp(path.join(ROOT, 'src'), path.join(fixture, 'src'), { recursive: true });
     await fs.writeFile(path.join(fixture, 'config.json'), JSON.stringify({ consolePort: api.address().port, socialV2: { toolProfile: 'full' } }));
     const transport = new StdioClientTransport({
       command: process.execPath,
@@ -163,7 +162,8 @@ test('MCP validates/forwards read watermarks and wait purposes against an isolat
     client = new Client({ name: 'qq-model-view-test', version: '1.0.0' });
     await client.connect(transport);
     const listed = await client.listTools();
-    for (const name of ['qq_mark_read', 'qq_set_wake_config']) {
+    for (const [name, present] of [['qq_mark_read', true], ['qq_set_wake_config', false]]) assert.equal(listed.tools.some((tool) => tool.name === name), present, name);
+    for (const name of ['qq_mark_read']) {
       const schema = listed.tools.find((tool) => tool.name === name).inputSchema;
       assert.equal(schema.properties.throughSeq.type, 'integer');
       assert.equal(schema.properties.throughSeq.minimum, 0);
@@ -218,18 +218,10 @@ test('MCP validates/forwards read watermarks and wait purposes against an isolat
     assert.deepEqual(requests.at(-1).body, { key: common.key, throughSeq: 21 });
     assert.equal(requests.at(-1).token, common.token);
 
-    await client.callTool({ name: 'qq_set_wake_config', arguments: { ...common, config: { mode: 'diving' }, throughSeq: 0 } });
-    assert.equal(requests.at(-1).url, '/api/socialV2/wake-config');
-    assert.deepEqual(requests.at(-1).body, { key: common.key, config: { mode: 'diving' }, throughSeq: 0 });
-    await client.callTool({ name: 'qq_set_wake_config', arguments: { ...common, config: { mode: 'active' } } });
-    assert.deepEqual(requests.at(-1).body, { key: common.key, config: { mode: 'active' } });
-
     for (const value of [-1, 1.5, Number.MAX_SAFE_INTEGER + 1, '21']) {
       const before = requests.length;
-      for (const name of ['qq_mark_read', 'qq_set_wake_config']) {
-        const invalid = await client.callTool({ name, arguments: { ...common, throughSeq: value, ...(name === 'qq_set_wake_config' ? { config: {} } : {}) } });
-        assert.equal(invalid.isError, true);
-      }
+      const invalid = await client.callTool({ name: 'qq_mark_read', arguments: { ...common, throughSeq: value } });
+      assert.equal(invalid.isError, true);
       assert.equal(requests.length, before, `invalid throughSeq ${value} must not reach the API`);
     }
   } finally {

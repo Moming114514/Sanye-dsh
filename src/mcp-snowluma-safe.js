@@ -325,7 +325,6 @@ const TOOL_CONFIG_FLAGS = {
   qq_social_state: 'socialState',
   qq_mark_read: 'markRead',
   qq_close_conversation: 'closeConversation',
-  qq_set_wake_config: 'setWakeConfig',
   qq_send_burst: 'sendBurst',
   qq_send_message: 'sendMessage',
   qq_wait_for_messages: 'waitMessages',
@@ -402,7 +401,7 @@ const PROFILE_HIDDEN = {
 // 注意：preset 文案里点名过的工具若不在清单里，模型可能仍然会去调 → 开档前先对齐文案。
 const CORE_TOOL_NAMES = new Set([
   'qq_send_message', 'qq_reply', 'qq_wait_for_messages', 'qq_mark_read',
-  'qq_get_prompt', 'qq_get_context_snapshot', 'qq_status', 'qq_set_wake_config',
+  'qq_get_prompt', 'qq_get_context_snapshot', 'qq_status',
   'qq_get_message_images', 'qq_get_forward_msg', 'qq_get_message_detail',
   'qq_list_stickers', 'qq_send_sticker', 'qq_get_sticker_image', 'qq_get_self_image',
   'qq_slang_query', 'qq_slang_submit',
@@ -439,7 +438,7 @@ const CORE_MIN_TOOL_NAMES = new Set([
   'qq_send_message', 'qq_reply', 'qq_wait_for_messages', 'qq_get_prompt',
   'qq_mark_read', 'qq_close_conversation',
   // 高频
-  'qq_set_wake_config', 'qq_get_message_images', 'qq_get_unread_messages',
+  'qq_get_message_images', 'qq_get_unread_messages',
   'qq_read_group_recent', 'qq_get_context_snapshot', 'qq_style_note',
   'qq_collect_sticker', 'qq_send_poke', 'qq_get_sticker_image',
   // 其它
@@ -989,40 +988,7 @@ server.tool(
   }
 );
 
-server.tool(
-  'qq_set_wake_config',
-  '设置指定会话的二代唤醒配置：mode/无限期或有限时间/提前唤醒条件（@、名字、关键词、提问、拍一拍、概率、anyMessage、指定成员）。triggers.speakerIds 是可选的“指定群友发言唤醒”：填一个或多个群友 QQ 号后，只要其中任意一位在群里发言就会唤醒你；不设置则不启用。适合在等某个人回复、或某人反应慢怕错过时使用。triggers.poke 开启后，群里有人拍一拍（包括拍你或拍别人）会唤醒你。注意：每次设置潜水/下一次唤醒前需先用 qq_wait_for_messages(timeoutMs=300000) 完成一次沉睡前观察：5 分钟内没人说话可设置并沉睡；期间有人发新消息则先查看 newMessages，判断不需要你参与可直接设置并沉睡；若你参与了回复，则下次想睡需重新等待观察窗口。',
-  {
-    key: z.string().describe('会话 key，格式 group:群号 或 private:QQ号'),
-    token: z.string().describe('会话令牌（见唤醒提示中的【会话令牌】）'),
-    throughSeq: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional().describe('可同时确认已读：使用已查看结果中的 readThroughSeq，省去额外 qq_mark_read；不传则只设置唤醒配置。若 markRead 工具被关闭，该水位会被忽略，本工具只设置唤醒配置'),
-    config: z.object({
-      mode: z.enum(['diving', 'active']).optional().describe('diving=潜水，active=活跃（anyMessage 开启）'),
-      infinite: z.boolean().optional().describe('true=无限期，只有条件命中才唤醒；false=有限时间'),
-      sleepMs: z.number().optional().describe('有限潜水毫秒数（从当前时间起算）'),
-      sleepUntil: z.string().optional().describe('有限潜水截止时间 ISO 字符串，优先级高于 sleepMs'),
-      triggers: z.object({
-        atMention: z.boolean().optional().describe('被 @ 或引用自己时唤醒'),
-        nameMention: z.boolean().optional().describe('被叫名字/昵称时唤醒'),
-        speakerIds: z.array(z.union([z.number(), z.string()])).max(20).optional().describe('指定群友 QQ 号数组：这些群友中任意一位发言时唤醒（可选，最多 20 个，不设置则不启用；私聊不适用，设置会被桥接清除；可从 qq_get_active_members / qq_get_group_members / qq_get_message_detail 的 userId/user_id 获取）'),
-        keywords: z.array(z.string()).optional().describe('出现任意关键词时唤醒'),
-        question: z.boolean().optional().describe('被直接提问/点名挑战时唤醒'),
-        poke: z.boolean().optional().describe('有人拍一拍时唤醒（群聊包括拍你和拍别人，私聊为对方拍你）'),
-        anyMessage: z.boolean().optional().describe('任意新消息都唤醒（活跃模式）'),
-        probability: z.number().optional().describe('普通消息按该概率随机唤醒（0~1）')
-      }).optional(),
-      batchWindowMs: z.number().optional().describe('多条消息合并唤醒窗口（毫秒，>=1000）')
-    }).describe('要设置的唤醒配置，缺省字段保留原值')
-  },
-  async ({ key, token, config, throughSeq }) => {
-    try {
-      const data = await agentApi('/api/socialV2/wake-config', { method: 'POST', body: JSON.stringify({ key, config, throughSeq }), headers: { 'x-agent-token': token } });
-      return { content: [{ type: 'text', text: serializeModelData(data) }] };
-    } catch (error) {
-      return { content: [{ type: 'text', text: `设置唤醒配置失败：${error?.message ?? error}` }], isError: true };
-    }
-  }
-);
+// 唤醒配置只能由主人通过面板/HTTP API 修改：不再注册该 MCP 工具。
 
 server.tool(
   'qq_send_burst',

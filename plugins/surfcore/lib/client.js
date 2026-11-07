@@ -1049,7 +1049,7 @@ F("sessionCwd", "会话工作目录", "留空用 surfcore 根目录", "text", { 
         F("socialV2.tokenGuard.directBypassGap", "被 @/叫到时越过间隔", "默认开；@、引用、叫名字、提问、拍一拍可立即唤醒；每日次数/额度上限仍生效", "switch"),
         F("socialV2.tokenGuard.maxOutboundPerTurn", "每次醒来最多发", "默认 8 条；连续回 10 条仍会被硬拦", "number", { min: 1, max: 20 }),
       ]},
-      { group: "二代 · 唤醒与潜水", note: "qq_set_wake_config 的边界", fields: [
+      { group: "二代 · 唤醒与潜水", note: "唤醒配置只能由主人改；这里是默认值与等待边界", fields: [
         F("socialV2.wake.defaultMode", "默认状态", "diving / active", "select", { options: [["diving", "潜水"], ["active", "活跃"]] }),
         F("socialV2.wake.preSleepWaitEnabled", "沉睡前必须观察", "", "switch"),
         F("socialV2.wake.preSleepWaitMs", "沉睡前观察时长（ms）", "默认 300000", "number", { min: 10000 }),

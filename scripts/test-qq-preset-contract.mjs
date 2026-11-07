@@ -46,8 +46,8 @@ test('snapshots are optional, partial snapshots require reading, and watermarks 
 
 test('one closing action can acknowledge the read watermark after the full observation', () => {
   assert.match(prefix, /qq_mark_read\(throughSeq=/);
-  assert.match(prefix, /qq_set_wake_config\(config=[^)]*throughSeq=/);
-  assert.match(prefix, /不需先 mark_read/);
+  assert.equal(/qq_set_wake_config/.test(prefix), false);
+  assert.match(prefix, /收尾用 qq_mark_read/);
   assert.match(prefix, /qq_wait_for_messages\(timeoutMs=300000\)/);
   assert.match(prefix, /短等待不能代替/);
   assert.match(prefix, /preSleepWaitRemainingMs[^。]*继续等待/);

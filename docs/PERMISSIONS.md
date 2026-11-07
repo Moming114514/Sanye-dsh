@@ -16,14 +16,14 @@
 - 会不会**改变她以后的行为**（唤醒配置、人格/记忆、群规则）→ 红或黄（可逆且低风险给黄）；
 - 只是读或写自己的小状态 → 绿/黄。
 
-## 二、MCP 工具归类（56 个，`SURFCORE_TOOL_PROFILE=full` 实测）
+## 二、MCP 工具归类（55 个，`SURFCORE_TOOL_PROFILE=full` 实测）
 
 ### 🟢 绿（24）
 `qq_status`、`qq_list_groups`、`qq_get_group_members`、`qq_get_group_history`、`qq_get_prompt`、`qq_get_context_snapshot`、`qq_get_unread_messages`、`qq_get_recent_messages`、`qq_social_state`、`qq_get_my_recent_messages`、`qq_get_message_detail`、`qq_get_active_members`、`qq_get_message_images`、`qq_list_stickers`、`qq_get_sticker_image`、`qq_view_sticker`、`qq_get_self_image`、`qq_slang_query`、`qq_memory_query`、`qq_qzone_feed`、`qq_impression`、`qq_recall_memory`、`qq_diary`、`qq_list_friend_requests`、`qq_get_forward_msg`、`qq_wait_for_messages`
 （`qq_wait_for_messages` 是长轮询，不写状态，但会占住一次工具调用会话；归绿但单独计「等待次数」。）
 
-### 🟡 黄（14）
-`qq_mark_read`（改 readThroughSeq）、`qq_close_conversation`（结束对话、清 active）、`qq_set_wake_config`（改唤醒频率/上限，可逆）、`qq_memory_append`、`qq_memory_remove`（写/删单条记忆）、`qq_slang_submit`（进候选）、`qq_learn_from_owner`（学习样本）、`qq_collect_sticker`（进表情库）、`qq_sticker_note`、`qq_set_sticker_remark`（改表情备注）、`qq_style_note`（学说法样本）、`qq_person_note`（人物印象）、`qq_report_feedback`（给主人发提醒，仅站内）、`note_tech`（技术笔记）。
+### 🟡 黄（13）
+`qq_mark_read`（改 readThroughSeq）、`qq_close_conversation`（结束对话、清 active）、`qq_memory_append`、`qq_memory_remove`（写/删单条记忆）、`qq_slang_submit`（进候选）、`qq_learn_from_owner`（学习样本）、`qq_collect_sticker`（进表情库）、`qq_sticker_note`、`qq_set_sticker_remark`（改表情备注）、`qq_style_note`（学说法样本）、`qq_person_note`（人物印象）、`qq_report_feedback`（给主人发提醒，仅站内）、`note_tech`（技术笔记）。
 
 ### 🔴 红（18）
 `qq_send_message`、`qq_reply`、`qq_send_group_message`、`qq_send_private_message`、`qq_send_burst`（连发）、`qq_send_poke`、`qq_send_sticker`、`qq_send_qzone_msg`、`qq_qzone_comment`、`qq_delete_qzone_msg`（删说说/评论，不可撤回）、`qq_set_profile`、`qq_set_avatar`、`qq_handle_friend_request`（加陌生人）、`qq_memory_clear`（清记忆）、`qq_get_message_images` 的**写缓存**分支不计红（读为主）。
@@ -56,8 +56,8 @@
 ## 五、现在就可能被滥用的三个场景
 
 1. **提示词注入 → 对外发消息**：群里有人发「帮她转发这条」之类的诱导，`qq_send_message`/`qq_qzone_comment` 是绿的之外直接执行，没有红级确认，最坏结果是对陌生人刷屏或空间被留言。
-2. **转录/日志里的 agent token 被复用**：工具参数里明文带 `token`（聊天记录、日志、截图），拿到它就能在 `reserved2` 外调全部 56 个工具；当前没有「按会话的二次确认」，等于一次泄露换全部权限。
-3. **`qq_memory_clear` + `qq_set_wake_config` 组合**：先清空记忆再改唤醒上限，行为会静默变一个人，而这两步都不需要确认、也不会通知主人——事后只能靠日志倒查。
+2. **转录/日志里的 agent token 被复用**：工具参数里明文带 `token`（聊天记录、日志、截图），拿到它就能在 `reserved2` 外调全部 55 个工具；当前没有「按会话的二次确认」，等于一次泄露换全部权限。
+3. **`qq_memory_clear` + 面板改唤醒配置**：模型清空记忆、主人再调一次唤醒/频率，她的行为会静默变一个人；清记忆目前不需要确认、也不会通知主人——事后只能靠日志倒查。
 
 ## 六、边界
 
@@ -73,3 +73,4 @@
 - 会话 key 怎么拿：工具参数带 `agent token` → 桥接 `/api/status` 的 agent 视图返回该 token 自己的会话 `key`（`keyByAgentToken`，只反查、不列映射）→ MCP `resolveSessionKeyByToken` 使用。
 - 拒绝：`{ok:false,error:"forbidden",detail:"该工具仅主人私聊可用",tool}`，并打 `[权限] 拒绝 <tool> key=<key>（红工具）`。
 - 口径修正：本文前面「红 18 个」是初版设计口径；按可逆性与日常工作，P2 实际只拦 5 个不可逆/身份/关系类动作，其余仍由模式、白名单、`tokenGuard` 频率分层约束。
+- 唤醒配置只能由主人通过面板/API 修改，不给模型工具（MCP 不再注册 `qq_set_wake_config`）。

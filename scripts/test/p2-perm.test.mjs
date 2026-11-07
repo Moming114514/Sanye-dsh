@@ -38,7 +38,7 @@ test('发送类在任何会话都放行（由 tokenGuard 频率管，不由红�
 test('黄 / 绿工具不受影响', async () => {
   const g = guard('group:1');
   assert.equal(await g('qq_mark_read', { token: 't' }), null);
-  assert.equal(await g('qq_set_wake_config', { token: 't' }), null);
+  assert.equal(await g('qq_close_conversation', { token: 't' }), null);
   assert.equal(await g('qq_status', {}), null);
 });
 
