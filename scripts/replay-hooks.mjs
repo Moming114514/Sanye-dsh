@@ -20,7 +20,8 @@ function makeFixtures() {
   fs.rmSync(TMP, { recursive: true, force: true });
   fs.mkdirSync(STATE, { recursive: true });
   const write = (name, data) => fs.writeFileSync(path.join(STATE, name), JSON.stringify(data, null, 1));
-  const day = new Date().toISOString().slice(0, 10);
+  // 与 group-rate.today() 同口径（东八区），否则 UTC 跨日会让 fixture 得失配
+  const day = new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);
   write('muted-keys.json', { items: { 'group:999999999': { at: '2026-01-01T00:00:00.000Z' } } });
   write('learn-mode.json', { groups: { '888888888': { at: '2026-01-01T00:00:00.000Z' } } });
   write('group-rate.json', { day, groups: { '777777777': { level: 'normal', count: 40, lastAt: 0 } } });
