@@ -11,3 +11,17 @@ export function applyModeDefaults(next, triggersInput = {}) {
   }
   return next;
 }
+
+// 沉默白名单（2026-11-07）：只有 timeout 唤醒允许 [SILENT]/安静收尾。
+// poke / sample / 直呼必须说；其它唤醒（bootstrap/history/replyCheck 等）保持原行为。
+export const SILENT_ALLOWED_REASONS = Object.freeze(new Set(['timeout']));
+export const MUST_REPLY_REASONS = Object.freeze(new Set(['poke', 'sample', 'atMention', 'nameMention', 'ownerMention', 'ownerCall']));
+
+export function wakeAllowsSilent(reason, explicit) {
+  if (explicit === true) return true;
+  if (explicit === false) return false;
+  const r = String(reason ?? '');
+  if (SILENT_ALLOWED_REASONS.has(r)) return true;
+  if (MUST_REPLY_REASONS.has(r)) return false;
+  return true;
+}

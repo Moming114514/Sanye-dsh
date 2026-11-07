@@ -22,7 +22,8 @@ import { mdToPlain, splitForQQ, truncateText, truncateTextTail } from './md-to-p
 // R1：纯函数已抽到 src/lib/text.js
 import { escapeCqText, unquoteJsonString, segmentsToText, contextLines } from './lib/text.js';
 import { createDiveLimiter } from './lib/dive-limit.js';
-import { applyModeDefaults } from './lib/wake-mode.js';
+import { applyModeDefaults, wakeAllowsSilent } from './lib/wake-mode.js';
+import { createPokeMerger } from './lib/poke-merge.js';
 // R1：媒体段解析已抽到 src/lib/media-segments.js
 import { extractMediaFromSegments, sanitizeMediaSummary } from './lib/media-segments.js';
 import { SENSITIVE_RE } from './sensitive.js';
@@ -294,6 +295,9 @@ const MEMORY_CARD_PATHS = resolveMemoryCardPaths(activeMemoryPaths().dir);
 const PLATFORM_STATE_DIR = activePlatformStateDir(STATE_DIR);
 // 同一群 1 小时内最多 2 次切潜水（用户 2026-11-07 需求）
 const diveLimiter = createDiveLimiter({ stateDir: PLATFORM_STATE_DIR });
+const pokeMerger = createPokeMerger({ stateDir: PLATFORM_STATE_DIR });
+// 待发唤醒是否允许沉默：只存在内存里，不写进 socialV2 状态。
+const pendingWakeNoSilent = new Map();
 // 容量告警私聊节流（同一档 10 分钟内最多一条；插件侧还有 12 小时的同档节流）。
 const memoryCardNotifyAt = new Map();
 
@@ -13171,7 +13175,9 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
     }
   }
 
-  function buildWakePromptV2(key, reason) {
+  function buildWakePromptV2(key, reason, opts = {}) {
+    // 沉默白名单：只有 timeout 允许 [SILENT]/安静收尾；poke/sample/直呼必须说。
+    const mustReply = !wakeAllowsSilent(reason, opts && opts.allowSilent);
     // SIDECAR_PATCH：后台学习类任务不注入人格/记忆，只给工具 + 最小输出要求
     if (isSidecarTask(reason, cfg)) {
       const st0 = getSocialV2State(key);
@@ -13364,9 +13370,9 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
 先调用 qq_get_context_snapshot(include=["unread"]) 看一遍，判断是否还需要回应；如果只是旧话题，用 qq_mark_read 清掉即可，不用逐条回应。`;
     }
     if (reason === 'poke') {
-      return `${base}【唤醒】${key}\n原因：有人拍了一拍（可能拍了你，也可能拍了别人）。\n先看未读/最近消息里的 [拍一拍] 事件：如果是拍你，可以自然回应一句，也可以用 qq_send_poke 回一个拍一拍；如果是拍别人，觉得有趣也可以接梗。除了回应，偶尔也可以主动戳一下正在聊的人/熟人，像真人手贱/提醒/逗一下，但别频繁。不想接就安静收尾（qq_mark_read 或 qq_close_conversation）。`;
+      return `${base}【唤醒】${key}\n原因：有人拍了一拍（可能拍了你，也可能拍了别人）。\n先看未读/最近消息里的 [拍一拍] 事件：如果是拍你，可以自然回应一句，也可以用 qq_send_poke 回一个拍一拍；如果是拍别人，觉得有趣也可以接梗。除了回应，偶尔也可以主动戳一下正在聊的人/熟人，像真人手贱/提醒/逗一下，但别频繁。${mustReply ? '这次是明确的拍一拍唤醒，必须回应：可以自然回应一句，也可以用 qq_send_poke 回一个拍一拍；不要用 qq_mark_read / qq_close_conversation 收尾。' : '不想接就安静收尾（qq_mark_read 或 qq_close_conversation）。'}`;
     }
-    return `${base}【唤醒】${key}\n原因：${reason}\n【行动前】先判断：群里在聊什么？热闹还是冷清？有没有人直接找你？对方说完了吗？你有没有真正想说的？\n如果群聊正热但没人叫你，可以插一句有趣的/相关的，插不上再看情况潜水；不要一上来就划走。\n【引用：只在必要时用】只有你这条消息指向的人或消息并非最新一条别人的消息，或者你连续的几句话中不同消息指代的是不同的消息或人时，才用 qq_reply 或 qq_send_message 的 replyToMessageId 指向具体那条；其他情况不要引用，别让对方猜。\n你可以调用工具查看未读消息、人设、状态，自行决定是否发言；决定潜水前必须按上面的【沉睡前强制等待】先等够观察窗口。开口前先看【对话收尾判断】：判断这段已自然结束时，不用再补一句，直接 qq_close_conversation 收尾。`;
+    return `${base}【唤醒】${key}\n原因：${reason}\n【行动前】先判断：群里在聊什么？热闹还是冷清？有没有人直接找你？对方说完了吗？你有没有真正想说的？\n如果群聊正热但没人叫你，可以插一句有趣的/相关的，插不上再看情况潜水；不要一上来就划走。\n【引用：只在必要时用】只有你这条消息指向的人或消息并非最新一条别人的消息，或者你连续的几句话中不同消息指代的是不同的消息或人时，才用 qq_reply 或 qq_send_message 的 replyToMessageId 指向具体那条；其他情况不要引用，别让对方猜。\n${mustReply ? '这次唤醒必须回应：不要用 qq_mark_read / qq_close_conversation 收尾，至少说一句（可以很短）。即使判断这段该收尾，也用一句话收，而不是静默。' : '你可以调用工具查看未读消息、人设、状态，自行决定是否发言；决定潜水前必须按上面的【沉睡前强制等待】先等够观察窗口。开口前先看【对话收尾判断】：判断这段已自然结束时，不用再补一句，直接 qq_close_conversation 收尾。'}`;
   }
 
   function buildWakeReminderPromptV2(key) {
@@ -13483,7 +13489,7 @@ function logSpeakActual(key, allow, source, reason) {
   } catch {}
 }
 
-  async function sendWakePromptV2(key, reason) {
+  async function sendWakePromptV2(key, reason, opts = {}) {
     if (cfg.socialV2?.enabled === false) { logSpeakActual(key, false, 'config', 'socialV2.enabled=false'); return; }
     if (currentMode !== 'reserved2' || socialV2.paused) { logSpeakActual(key, false, 'config', socialV2.paused ? 'paused' : 'mode=' + currentMode); return; }
     logSpeakPredict(key, reason); // SPEAK_POLICY_PATCH：入口预测（不改判断）
@@ -13573,7 +13579,7 @@ function logSpeakActual(key, allow, source, reason) {
       if (!Array.isArray(st.pendingWakeReasons)) st.pendingWakeReasons = [];
       const seq = st.lastUnreadSeq || 0;
       if (!st.pendingWakeReasons.some((r) => r && r.reason === reason && r.seq === seq)) {
-        st.pendingWakeReasons.push({ reason, seq });
+        st.pendingWakeReasons.push({ reason, seq, allowSilent: opts && opts.allowSilent });
         // 有界队列：最多保留 20 条，防止消息洪峰下无限增长。
         if (st.pendingWakeReasons.length > 20) st.pendingWakeReasons.splice(0, st.pendingWakeReasons.length - 20);
       }
@@ -13646,7 +13652,7 @@ function logSpeakActual(key, allow, source, reason) {
     st.wakeConfig.wakeCount = (st.wakeConfig.wakeCount || 0) + 1;
     st.lastWakeReason = reason;
     saveSocialV2State();
-    const promptText = buildWakePromptV2(key, reason);
+    const promptText = buildWakePromptV2(key, reason, opts);
     log(`[reserved2] 唤醒 ${key}（${reason}）`);
     const rollbackWakeTime = () => {
       const idx = st.wakeTimes.lastIndexOf(wakeTime);
@@ -13796,7 +13802,7 @@ function logSpeakActual(key, allow, source, reason) {
     return TIMER_WAKE_REASONS.has(String(reason ?? '').split(':')[0]);
   }
 
-  function scheduleWakeV2(key, reason) {
+  function scheduleWakeV2(key, reason, opts = {}) {
     if (cfg.socialV2?.enabled === false) return;
     if (socialV2.paused) return;
     if (!isSessionAllowedInCurrentMode(key)) {
@@ -13817,7 +13823,7 @@ function logSpeakActual(key, allow, source, reason) {
       if (!Array.isArray(st.pendingWakeReasons)) st.pendingWakeReasons = [];
       const seq = st.lastUnreadSeq || 0;
       if (!st.pendingWakeReasons.some((r) => r && r.reason === reason && r.seq === seq)) {
-        st.pendingWakeReasons.push({ reason, seq });
+        st.pendingWakeReasons.push({ reason, seq, allowSilent: opts && opts.allowSilent });
         // 有界队列：最多保留 20 条，防止消息洪峰下无限增长。
         if (st.pendingWakeReasons.length > 20) st.pendingWakeReasons.splice(0, st.pendingWakeReasons.length - 20);
       }
@@ -13830,12 +13836,15 @@ function logSpeakActual(key, allow, source, reason) {
       st.sleepTimer = null;
     }
     st.pendingWakeReason = reason;
+    if (opts && opts.allowSilent === false) pendingWakeNoSilent.set(key, true);
     const batchMs = Math.max(1000, Number(st.wakeConfig?.batchWindowMs) || 8000);
     st.pendingWakeTimer = setTimeout(() => {
       st.pendingWakeTimer = null;
       const finalReason = st.pendingWakeReason || reason;
       st.pendingWakeReason = null;
-      void sendWakePromptV2(key, finalReason).catch((error) => log(`[reserved2] 计划唤醒异常 ${key}:`, error?.message ?? error));
+      const noSilent = pendingWakeNoSilent.get(key) === true;
+      pendingWakeNoSilent.delete(key);
+      void sendWakePromptV2(key, finalReason, { allowSilent: noSilent ? false : undefined }).catch((error) => log(`[reserved2] 计划唤醒异常 ${key}:`, error?.message ?? error));
     }, batchMs);
     // 与其它 per-conversation 定时器保持一致：别让一个待唤醒定时器把进程钉住不退出。
     st.pendingWakeTimer.unref?.();
@@ -13869,14 +13878,14 @@ function logSpeakActual(key, allow, source, reason) {
         log(`[reserved2] ${key} 繁忙期间的主动机会已过期，跳过补发`);
       } else {
         log(`[reserved2] ${key} 补发繁忙期间积压的唤醒：${item.reason}`);
-        scheduleWakeV2(key, item.reason);
+        scheduleWakeV2(key, item.reason, { allowSilent: item.allowSilent });
       }
       return { reason: item.reason, action: 'timer' };
     }
     const stillRelevant = Array.isArray(st.unread) && st.unread.some((m) => m && Number(m.seq) >= Number(item.seq));
     if (stillRelevant) {
       log(`[reserved2] ${key} 补发繁忙期间积压的唤醒：${item.reason}@seq${item.seq}`);
-      scheduleWakeV2(key, item.reason);
+      scheduleWakeV2(key, item.reason, { allowSilent: item.allowSilent });
       return { reason: item.reason, action: 'replayed' };
     }
     log(`[reserved2] ${key} 繁忙期间唤醒 ${item.reason}@seq${item.seq} 已被当前回合处理，跳过补发`);
@@ -15350,7 +15359,14 @@ function logSpeakActual(key, allow, source, reason) {
       saveSocialV2State();
       scheduleWakeV2(key, 'bootstrap');
     } else if (st.wakeConfig?.triggers?.poke) {
-      scheduleWakeV2(key, 'poke');
+      if (kind === 'group') {
+        const merged = pokeMerger.tryMerge(key);
+        if (merged.merged) {
+          log(`[poke] 合并，跳过唤醒 ${key}（距上次 ${merged.sinceSec} 秒）`);
+          return;
+        }
+      }
+      scheduleWakeV2(key, 'poke', { allowSilent: false });
     } else if (kind === 'private' && targetIsSelf && cfg?.socialV2?.pokeLite !== false) {
       // POKE_LITE_PATCH：私聊被戳一下，给个轻反馈（不调模型、不花钱）
       const pool = ['？', '在的在的', '戳我干嘛', '嗯？', '怎么啦'];
