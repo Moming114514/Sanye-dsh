@@ -22,6 +22,7 @@ import { mdToPlain, splitForQQ, truncateText, truncateTextTail } from './md-to-p
 // R1：纯函数已抽到 src/lib/text.js
 import { escapeCqText, unquoteJsonString, segmentsToText, contextLines } from './lib/text.js';
 import { createDiveLimiter } from './lib/dive-limit.js';
+import { applyModeDefaults } from './lib/wake-mode.js';
 // R1：媒体段解析已抽到 src/lib/media-segments.js
 import { extractMediaFromSegments, sanitizeMediaSummary } from './lib/media-segments.js';
 import { SENSITIVE_RE } from './sensitive.js';
@@ -5671,11 +5672,8 @@ async function main() {
           if (next.mode === 'diving' && !('anyMessage' in inputTriggers)) {
             next.triggers.anyMessage = false;
           }
-          if (next.mode === 'active') {
-            next.infinite = true;
-            next.sleepUntil = null;
-            next.triggers.anyMessage = true;
-          }
+          // active：默认 anyMessage=true；调用方显式给 false 时保留（2026-11-07）
+          applyModeDefaults(next, inputTriggers);
           // DIVE_CAP：潜水必须限时（用户 2026-11-07 需求：鱼群被设成永久 diving 导致只回 @）
           // 模型若要求无限潜水，强制改成有限，最长 30 分钟，到期自动回 active。
           if (next.mode === 'diving') {
