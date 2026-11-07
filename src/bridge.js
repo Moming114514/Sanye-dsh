@@ -21,6 +21,7 @@ import { NodeApiClient, unwrap, createTurnCollector, discoverDshLaunchToken } fr
 import { mdToPlain, splitForQQ, truncateText, truncateTextTail } from './md-to-plain.js';
 // R1：纯函数已抽到 src/lib/text.js
 import { escapeCqText, unquoteJsonString, segmentsToText, contextLines } from './lib/text.js';
+import { createDiveLimiter } from './lib/dive-limit.js';
 // R1：媒体段解析已抽到 src/lib/media-segments.js
 import { extractMediaFromSegments, sanitizeMediaSummary } from './lib/media-segments.js';
 import { SENSITIVE_RE } from './sensitive.js';
@@ -290,6 +291,8 @@ const CHARACTER_ID = ACTIVE_CHARACTER?.id ?? '';
 const CHARACTER_EPOCH = Number(ACTIVE_CHARACTER?.epoch ?? 0);
 const MEMORY_CARD_PATHS = resolveMemoryCardPaths(activeMemoryPaths().dir);
 const PLATFORM_STATE_DIR = activePlatformStateDir(STATE_DIR);
+// 同一群 1 小时内最多 2 次切潜水（用户 2026-11-07 需求）
+const diveLimiter = createDiveLimiter({ stateDir: PLATFORM_STATE_DIR });
 // 容量告警私聊节流（同一档 10 分钟内最多一条；插件侧还有 12 小时的同档节流）。
 const memoryCardNotifyAt = new Map();
 
@@ -5673,7 +5676,30 @@ async function main() {
             next.sleepUntil = null;
             next.triggers.anyMessage = true;
           }
-          if (typeof input.infinite === 'boolean' && next.mode !== 'active') next.infinite = input.infinite;
+          // DIVE_CAP：潜水必须限时（用户 2026-11-07 需求：鱼群被设成永久 diving 导致只回 @）
+          // 模型若要求无限潜水，强制改成有限，最长 30 分钟，到期自动回 active。
+          if (next.mode === 'diving') {
+            next.infinite = false;
+            const _cap0 = 30 * 60 * 1000;
+            const _until0 = next.sleepUntil ? Date.parse(next.sleepUntil) : 0;
+            const _want0 = Number.isFinite(_until0) && _until0 > Date.now() ? _until0 : Date.now() + 15 * 60 * 1000;
+            next.sleepUntil = new Date(Math.min(_want0, Date.now() + _cap0)).toISOString();
+          }
+          if (typeof input.infinite === 'boolean' && next.mode !== 'active' && next.mode !== 'diving') next.infinite = input.infinite; // DIVE_CAP2：diving 不允许无限
+
+          // DIVE_LIMIT：同一群 1 小时内最多 2 次切潜水；超限保持当前 mode，不写状态。
+          if (next.mode === 'diving' && current.mode !== 'diving' && !diveLimiter.trySwitch(key)) {
+            log(`[wake] 潜水次数超限，保持 ${current.mode} ${key}`);
+            sendJson({
+              ok: true,
+              key,
+              diveLimited: true,
+              note: '同一群 1 小时内最多 2 次切潜水，本次未生效',
+              wakeConfig: current,
+              wakeSafety: computeWakeSafetyV2(current),
+            });
+            return;
+          }
           if (next.infinite) {
             next.sleepUntil = null;
           } else if (input.sleepUntil) {
