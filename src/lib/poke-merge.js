@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-export const POKE_MERGE_WINDOW_MS = 60_000;
+export const POKE_MERGE_WINDOW_MS = 180_000;
 
 export function createPokeMerger({ stateDir, now = () => Date.now(), windowMs = POKE_MERGE_WINDOW_MS }) {
   const file = path.join(stateDir, 'poke-merge.json');

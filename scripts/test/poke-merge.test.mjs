@@ -1,4 +1,4 @@
-// 拍一拍合并：同一群 60 秒内只唤醒一次。
+// 拍一拍合并：同一群 180 秒内只唤醒一次。
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -16,22 +16,26 @@ assert.equal(a.sinceSec, 0);
 
 now += 25_000;
 const b = merger.tryMerge(key);
-assert.equal(b.merged, true, '60 秒内第二次应合并');
+assert.equal(b.merged, true, '窗口内第二次应合并');
 assert.equal(b.sinceSec, 25);
 
-now += 10_000;
+// 179 秒：仍在窗口内（边界内合并）
+now += 179_000 - 25_000;
 const c = merger.tryMerge(key);
-assert.equal(c.merged, true, '60 秒内第三次仍合并');
-assert.equal(c.sinceSec, 35);
+assert.equal(c.merged, true, '179 秒仍应合并');
+assert.equal(c.sinceSec, 179);
+
+// 181 秒：超出窗口，放行
+now += 181_000 - 179_000;
+const d = merger.tryMerge(key);
+assert.equal(d.merged, false, '181 秒应重新放行');
 
 // 不同群互不影响
 const other = merger.tryMerge('group:1043145514');
 assert.equal(other.merged, false, '另一个群应独立放行');
 
-// 窗口过后恢复
-now += POKE_MERGE_WINDOW_MS;
-const d = merger.tryMerge(key);
-assert.equal(d.merged, false, '超过 60 秒应重新放行');
+// 窗口常量
+assert.equal(POKE_MERGE_WINDOW_MS, 180_000, '窗口应为 180 秒');
 
 // 落盘形状：{ "<key>": timestamp }
 const raw = JSON.parse(fs.readFileSync(path.join(dir, 'poke-merge.json'), 'utf8'));

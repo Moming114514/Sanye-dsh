@@ -24,6 +24,7 @@ import { escapeCqText, unquoteJsonString, segmentsToText, contextLines } from '.
 import { createDiveLimiter } from './lib/dive-limit.js';
 import { applyModeDefaults, wakeAllowsSilent } from './lib/wake-mode.js';
 import { createPokeMerger } from './lib/poke-merge.js';
+import { createLargeSampler } from './lib/large-sample.js';
 // R1：媒体段解析已抽到 src/lib/media-segments.js
 import { extractMediaFromSegments, sanitizeMediaSummary } from './lib/media-segments.js';
 import { SENSITIVE_RE } from './sensitive.js';
@@ -296,6 +297,7 @@ const PLATFORM_STATE_DIR = activePlatformStateDir(STATE_DIR);
 // 同一群 1 小时内最多 2 次切潜水（用户 2026-11-07 需求）
 const diveLimiter = createDiveLimiter({ stateDir: PLATFORM_STATE_DIR });
 const pokeMerger = createPokeMerger({ stateDir: PLATFORM_STATE_DIR });
+const largeSampler = createLargeSampler({ stateDir: PLATFORM_STATE_DIR, log });
 // 待发唤醒是否允许沉默：只存在内存里，不写进 socialV2 状态。
 const pendingWakeNoSilent = new Map();
 // 容量告警私聊节流（同一档 10 分钟内最多一条；插件侧还有 12 小时的同档节流）。
@@ -12976,7 +12978,7 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
       const lower = String(plainContent ?? '').toLowerCase();
       if (lower.includes('@' + selfNickname.toLowerCase()) || lower.includes(selfNickname.toLowerCase())) return _byOwner ? 'ownerMention' : 'nameMention';
     }
-    if (!large && Array.isArray(tr.keywords) && tr.keywords.length) {
+    if (Array.isArray(tr.keywords) && tr.keywords.length) {
       const lower = String(plainContent ?? '').toLowerCase();
       for (const kw of tr.keywords) {
         const kwStr = String(kw ?? '').toLowerCase();
@@ -12989,7 +12991,7 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
         }
       }
     }
-    if (!large && tr.question && isDirectedAtAi(plainContent)) return 'question';
+    if (tr.question && isDirectedAtAi(plainContent)) return 'question';
     if (Array.isArray(tr.speakerIds) && tr.speakerIds.length) {
       const speakerId = String(event?.user_id ?? event?.sender?.user_id ?? '');
       if (speakerId && tr.speakerIds.some((id) => String(id) === speakerId)) {
@@ -12998,6 +13000,11 @@ const toolJsonRetry = new Map(); // TOOLJSON_RETRY_PATCH // key -> { qq, at }
       }
     }
     if (!large && Number(tr.probability) > 0 && Math.random() < Number(tr.probability)) return 'probability';
+    // 大群不再无条件跳过「任意消息」：按概率抽样接话，带 3 分钟冷却 + 每日 60 次上限。
+    if (large) {
+      const p = Number(tr.probability ?? 0.03);
+      if (p > 0 && largeSampler.trySample(key, p)) return 'sample';
+    }
     return null;
   }
 
