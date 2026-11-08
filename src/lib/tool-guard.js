@@ -98,6 +98,67 @@ export function createToolLimiter({ stateDir, getCfg = () => ({}), now = () => D
   };
 }
 
+// D：主动收藏表情的硬护栏（每会话每天 2 个、全局每天 10 个）。
+export const STICKER_SESSION_LIMIT = 2;
+export const STICKER_GLOBAL_LIMIT = 10;
+
+export function createStickerCollectGuard({
+  stateDir, resolveKey, now = () => Date.now(), log = console.error,
+  sessionLimit = STICKER_SESSION_LIMIT, globalLimit = STICKER_GLOBAL_LIMIT,
+} = {}) {
+  const file = path.join(stateDir, 'sticker-collect.json');
+  const dayKey = (ms) => new Date(ms + 8 * 3600 * 1000).toISOString().slice(0, 10);
+  const load = (day) => {
+    try {
+      const raw = JSON.parse(fs.readFileSync(file, 'utf8') || '{}');
+      if (raw && raw.day === day) return { day, global: Number(raw.global) || 0, sessions: raw.sessions || {} };
+    } catch {}
+    return { day, global: 0, sessions: {} };
+  };
+  const save = (st) => {
+    try {
+      fs.mkdirSync(stateDir, { recursive: true });
+      const tmp = file + '.tmp-' + process.pid;
+      fs.writeFileSync(tmp, JSON.stringify(st));
+      fs.renameSync(tmp, file);
+    } catch (err) { log(`[收藏] 计数写盘失败 ${err?.message ?? err}`); }
+  };
+  const stickerId = (args) => String(args?.id ?? args?.emojiId ?? args?.stickerId ?? args?.file ?? '-');
+
+  // 检查阶段：只判断、不计数（失败调用不该吃掉额度）
+  async function check(name, args) {
+    if (String(name) !== 'qq_collect_sticker') return null;
+    let key = '';
+    try { key = String((await resolveKey?.(args?.token)) || ''); } catch { key = ''; }
+    const day = dayKey(now());
+    const st = load(day);
+    const used = Number(st.sessions[key || '-'] || 0);
+    if (st.global >= globalLimit || used >= sessionLimit) {
+      const detail = st.global >= globalLimit ? `今日全局已达上限 ${globalLimit} 次` : `今日该会话已达上限 ${sessionLimit} 次`;
+      log(`[收藏] 拒绝 ${name} key=${key || '-'} ${st.global}/${globalLimit} session=${used}/${sessionLimit}`);
+      return {
+        content: [{ type: 'text', text: JSON.stringify({ ok: false, error: 'rate_limited', detail }) }],
+        isError: true,
+      };
+    }
+    return null;
+  }
+
+  // 成功阶段：真正收藏成功后计数并打日志
+  check.after = async (name, args, result) => {
+    if (String(name) !== 'qq_collect_sticker' || result?.isError) return;
+    let key = '';
+    try { key = String((await resolveKey?.(args?.token)) || ''); } catch { key = ''; }
+    const day = dayKey(now());
+    const st = load(day);
+    st.global = Number(st.global) + 1;
+    if (key) st.sessions[key] = Number(st.sessions[key] || 0) + 1;
+    save(st);
+    log(`[收藏] 主动收 ${stickerId(args)}（今日 ${st.global}/${globalLimit}）`);
+  };
+  return check;
+}
+
 export const RETRY_DELAYS = [300, 800];
 
 export function isRetryableError(err) {
@@ -183,7 +244,7 @@ export function describeInvalid(schema, args) {
 }
 
 // 在 MCP server 构造完之后调用：包住 SDK 已注册的 tools/call 处理函数。
-export function installToolGuard(server, { log = console.error, schemas = new Map(), perm = null, limit = null } = {}) {
+export function installToolGuard(server, { log = console.error, schemas = new Map(), perm = null, limit = null, sticker = null } = {}) {
   const handlers = server?.server?._requestHandlers;
   if (!handlers || typeof handlers.get !== 'function' || !handlers.has('tools/call')) {
     return { schemas, installed: false };
@@ -216,6 +277,10 @@ export function installToolGuard(server, { log = console.error, schemas = new Ma
       const limited = limit(request?.params?.name, request?.params?.arguments);
       if (limited) return limited;
     }
+    if (sticker) {
+      const denied = await sticker(request?.params?.name, request?.params?.arguments);
+      if (denied) return denied;
+    }
     let result;
     try {
       result = await prev(request, extra);
@@ -230,6 +295,9 @@ export function installToolGuard(server, { log = console.error, schemas = new Ma
     const text = String(result?.content?.find?.((c) => c?.type === 'text')?.text ?? '');
     if (result?.isError && /MCP error -32602|Input validation error/i.test(text)) {
       return structuredInvalid(String(request?.params?.name ?? ''), request?.params?.arguments);
+    }
+    if (sticker && typeof sticker.after === 'function') {
+      try { await sticker.after(String(request?.params?.name ?? ''), request?.params?.arguments, result); } catch {}
     }
     return result;
   });

@@ -11259,6 +11259,7 @@ const fishGroupNames = new Map(); // groupId -> group_name（'' = 查不到）
       wakeState = getSocialV2State(key);
       wakeToken = wakeState.agentToken;
       promptText = buildWakePromptV2(key, opts.wakeReason);
+      promptText += '\n\n【表情收藏】看到好笑或贴合的表情包（[表情包] 标记），如果你觉得以后会用，可以调 qq_collect_sticker 收进收藏；同一个群/人每天最多收 2 个，别乱收。';
       wakeSnapshot = buildWakeSnapshotV2(key);
       if (wakeSnapshot) {
         promptText += `\n\n【本次消息快照】\n${JSON.stringify(wakeSnapshot)}\n以上消息已提供，无需重复查询；partial=true 时用 qq_get_context_snapshot(afterSeq=readThroughSeq, include=["unread"]) 继续读取。先处理当前消息；回复前如需确认后续补充，用 qq_wait_for_messages(purpose="reply") 补足短静默，已安静够久会立即返回，不要先长等。收尾只确认你已处理的 readThroughSeq（本地 seq，非 QQ messageId），传给 qq_mark_read 的 throughSeq；新到消息留待处理。`;
@@ -13672,7 +13673,9 @@ function logSpeakActual(key, allow, source, reason) {
     st.wakeConfig.wakeCount = (st.wakeConfig.wakeCount || 0) + 1;
     st.lastWakeReason = reason;
     saveSocialV2State();
-    const promptText = buildWakePromptV2(key, reason, opts);
+    let promptText = buildWakePromptV2(key, reason, opts);
+    // D：主动收藏表情的引导（写在提示词里，不写进人格卡）
+    promptText += '\n\n【表情收藏】看到好笑或贴合的表情包（[表情包] 标记），如果你觉得以后会用，可以调 qq_collect_sticker 收进收藏；同一个群/人每天最多收 2 个，别乱收。';
     log(`[reserved2] 唤醒 ${key}（${reason}）`);
     const rollbackWakeTime = () => {
       const idx = st.wakeTimes.lastIndexOf(wakeTime);
