@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { installToolGuard, withRetry, buildToolSchema, createPermGuard } from './lib/tool-guard.js'; // G4 / P2
+import { installToolGuard, withRetry, buildToolSchema, createPermGuard, createToolLimiter } from './lib/tool-guard.js'; // G4 / P2
 // 出站文本的敏感信息拦截**统一由桥接负责**（bridge.js 的 auditAndSend / 各发送端点的
 // SENSITIVE_RE 校验）：所有 QQ 发送都经由桥接 HTTP API，因此 MCP 侧不再重复实现一遍。
 // 这里 import 只用于「出站审计口径一致」的说明，不在 MCP 内做拦截——
@@ -1827,10 +1827,12 @@ async function resolveSessionKeyByToken(token) {
     return String(body?.key || '');
   } catch { return ''; }
 }
+const MCP_STATE_DIR = process.env.SURFCORE_STATE_DIR || path.join(process.env.HOME || '/home/dsh', '.dsh', 'surfcore', 'state');
+const toolLimiter = createToolLimiter({ stateDir: MCP_STATE_DIR, getCfg: () => getConfig(), log: (line) => console.error(line) });
 const permGuard = createPermGuard({
   resolveKey: resolveSessionKeyByToken,
   ownerQQ: getConfig()?.ownerQQ,
   log: (line) => console.error(line),
 });
-installToolGuard(server, { schemas: toolGuard.schemas, perm: permGuard }); // G4 / P2
+installToolGuard(server, { schemas: toolGuard.schemas, perm: permGuard, limit: toolLimiter }); // G4 / P2
 await server.connect(new StdioServerTransport());

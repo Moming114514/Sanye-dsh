@@ -193,6 +193,8 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const STATE_DIR = path.join(ROOT, 'state');
+// 任务/面板约定的共享状态目录（与面板 server.mjs 的 STATE 一致）
+const DSH_STATE_DIR = process.env.SURFCORE_STATE_DIR || path.join(process.env.HOME || '/home/dsh', '.dsh', 'surfcore', 'state');
 
 // QUIET_PATCH：夜间 / 主动重启时，不把「断线自愈」发到 QQ（只记日志）
 const QUIET_MARK_FILE = path.join(STATE_DIR, 'restart-quiet.json');
@@ -295,9 +297,9 @@ const CHARACTER_EPOCH = Number(ACTIVE_CHARACTER?.epoch ?? 0);
 const MEMORY_CARD_PATHS = resolveMemoryCardPaths(activeMemoryPaths().dir);
 const PLATFORM_STATE_DIR = activePlatformStateDir(STATE_DIR);
 // 同一群 1 小时内最多 2 次切潜水（用户 2026-11-07 需求）
-const diveLimiter = createDiveLimiter({ stateDir: PLATFORM_STATE_DIR });
-const pokeMerger = createPokeMerger({ stateDir: PLATFORM_STATE_DIR });
-const largeSampler = createLargeSampler({ stateDir: PLATFORM_STATE_DIR, log });
+const diveLimiter = createDiveLimiter({ stateDir: DSH_STATE_DIR });
+const pokeMerger = createPokeMerger({ stateDir: DSH_STATE_DIR });
+const largeSampler = createLargeSampler({ stateDir: DSH_STATE_DIR, log });
 // 待发唤醒是否允许沉默：只存在内存里，不写进 socialV2 状态。
 const pendingWakeNoSilent = new Map();
 // 容量告警私聊节流（同一档 10 分钟内最多一条；插件侧还有 12 小时的同档节流）。

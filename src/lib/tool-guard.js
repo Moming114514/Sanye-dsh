@@ -5,6 +5,8 @@
 //   这里把它翻译成模型看得懂的结构化 JSON（invalid_arguments + schema_hint）。
 // - 重试：只对网络超时 / 5xx / ECONNRESET 之类可重试错误重试，最多 2 次，间隔 300/800ms。
 // - 日志写 stderr（MCP stdio 的 stdout 是协议通道，不能污染）。
+import fs from 'node:fs';
+import path from 'node:path';
 import { z } from 'zod';
 
 export const RETRIES = 2;
@@ -33,6 +35,69 @@ export function createPermGuard({ resolveKey, ownerQQ, log = console.error } = {
     };
   };
 }
+export const YELLOW_TOOLS = new Set([
+  'qq_mark_read', 'qq_close_conversation', 'qq_memory_append', 'qq_memory_remove',
+  'qq_slang_submit', 'qq_learn_from_owner', 'qq_collect_sticker', 'qq_sticker_note',
+  'qq_set_sticker_remark', 'qq_style_note', 'qq_person_note', 'qq_report_feedback', 'note_tech',
+]);
+
+export const DEFAULT_TOOL_LIMITS = {
+  qq_send_poke: 50,
+  qq_like_message: 30,
+  qq_set_group_card: 10,
+};
+
+// 黄级工具日限额：~/.dsh/surfcore/state/tool-calls.json { day, counts:{tool:n} }，东八区日切。
+export function createToolLimiter({ stateDir, getCfg = () => ({}), now = () => Date.now(), log = console.error } = {}) {
+  const file = path.join(stateDir, 'tool-calls.json');
+  const dayKey = (ms) => new Date(ms + 8 * 3600 * 1000).toISOString().slice(0, 10);
+  const load = (day) => {
+    try {
+      const raw = JSON.parse(fs.readFileSync(file, 'utf8') || '{}');
+      if (raw && raw.day === day && raw.counts && typeof raw.counts === 'object') return raw;
+    } catch {}
+    return { day, counts: {} };
+  };
+  const save = (obj) => {
+    try {
+      fs.mkdirSync(stateDir, { recursive: true });
+      const tmp = file + '.tmp-' + process.pid;
+      fs.writeFileSync(tmp, JSON.stringify(obj));
+      fs.renameSync(tmp, file);
+    } catch (err) { log(`[权限] 计数写盘失败 ${err?.message ?? err}`); }
+  };
+  const limitOf = (name) => {
+    const cfg = getCfg() || {};
+    const custom = cfg?.socialV2?.toolLimits;
+    if (custom && Number(custom[name]) > 0) return Number(custom[name]);
+    if (DEFAULT_TOOL_LIMITS[name]) return DEFAULT_TOOL_LIMITS[name];
+    if (YELLOW_TOOLS.has(name)) return 100;
+    return 0;
+  };
+  return function toolLimit(name) {
+    const tool = String(name || '');
+    if (RED_TOOLS.has(tool)) return null; // 红级走 perm 原逻辑，不叠加限额
+    const limit = limitOf(tool);
+    if (!limit) return null;
+    const day = dayKey(now());
+    const st = load(day);
+    const n = Number(st.counts[tool] || 0);
+    if (n >= limit) {
+      log(`[权限] 限额 ${tool} ${n}/${limit}`);
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({ ok: false, error: 'rate_limited', detail: `今日已达上限 ${limit} 次`, tool }),
+        }],
+        isError: true,
+      };
+    }
+    st.counts[tool] = n + 1;
+    save(st);
+    return null;
+  };
+}
+
 export const RETRY_DELAYS = [300, 800];
 
 export function isRetryableError(err) {
@@ -118,7 +183,7 @@ export function describeInvalid(schema, args) {
 }
 
 // 在 MCP server 构造完之后调用：包住 SDK 已注册的 tools/call 处理函数。
-export function installToolGuard(server, { log = console.error, schemas = new Map(), perm = null } = {}) {
+export function installToolGuard(server, { log = console.error, schemas = new Map(), perm = null, limit = null } = {}) {
   const handlers = server?.server?._requestHandlers;
   if (!handlers || typeof handlers.get !== 'function' || !handlers.has('tools/call')) {
     return { schemas, installed: false };
@@ -146,6 +211,10 @@ export function installToolGuard(server, { log = console.error, schemas = new Ma
     if (perm) {
       const denied = await perm(request?.params?.name, request?.params?.arguments);
       if (denied) return denied;
+    }
+    if (limit) {
+      const limited = limit(request?.params?.name, request?.params?.arguments);
+      if (limited) return limited;
     }
     let result;
     try {
