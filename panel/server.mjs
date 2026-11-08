@@ -1062,6 +1062,16 @@ const server = http.createServer(async (req, res) => {
       const r = await api('/api/socialV2/grouprate', 'POST', { action: 'list' });
       return send(res, 200, r || { ok: false });
     }
+    if (p === '/api/large-sample') { // A：大群抽样计数（只读，读本地状态）
+      if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
+      const raw = readJSON(path.join(STATE, 'large-sample.json'), {}) || {};
+      const groups = {};
+      for (const [k, v] of Object.entries(raw)) {
+        if (!k.startsWith('group:') || !v || typeof v !== 'object') continue;
+        groups[k.slice(6)] = { count: Number(v.count) || 0, lastAt: Number(v.lastAt) || 0, day: String(v.day || '') };
+      }
+      return send(res, 200, { ok: true, cap: 60, groups });
+    }
     if (p === '/api/states') { // 唤醒条件（只读，代理桥接）
       if (!tokOk(req.headers['x-her-token'])) return send(res, 401, { ok: false, error: '需要口令' });
       const r = await api('/api/socialV2/states');

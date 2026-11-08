@@ -2982,8 +2982,13 @@ function wakeLine(gid) {
   const tr = w && w.triggers;
   if (!w || !tr) return '叫醒条件：未知';
   const m = (v) => v === true ? '\u2713' : v === false ? '\u2717' : '未知';
+  const sm = state.grSample && (state.grSample.get ? state.grSample.get(String(gid)) : state.grSample[String(gid)]);
+  const n = sm && Number(sm.count || 0);
+  const cap = Number(state.grSampleCap || 60);
+  const sampleTxt = sm ? ('今日抽样 ' + n + '/' + cap) : '今日抽样 \u2014';
   return '叫醒条件：@\u6211 ' + m(tr.atMention) + ' 叫名字 ' + m(tr.nameMention) + ' 拍一拍 ' + m(tr.poke)
-    + ' 任意消息 ' + m(tr.anyMessage) + ' 问句 ' + m(tr.question);
+    + ' 任意消息 ' + m(tr.anyMessage) + ' 问句 ' + m(tr.question)
+    + ' \u00b7 ' + sampleTxt + '\uff083 分钟内不重复\uff09';
 }
 
 async function loadGroupRules(force) {
@@ -2992,11 +2997,14 @@ async function loadGroupRules(force) {
   const get = async (p, label) => {
     try { return await api(p); } catch (e) { data.errors.push(label + '（' + p + '）：' + (e.message || '读取失败')); return null; }
   };
-  const [acc, mute, learn, gr, attn, st] = await Promise.all([
+  const [acc, mute, learn, gr, attn, st, ls] = await Promise.all([
     get('/api/access', '白名单'), get('/api/mute', '静音'), get('/api/learn', '学习模式'),
     get('/api/gr', '发言频率'), get('/api/attn-get', '抽样/只回谁'), get('/api/states', '唤醒条件'),
+    get('/api/large-sample', '今日抽样'),
   ]);
   state.grWake = new Map((((st && st.conversations) || [])).map((c) => [String(c.key || '').replace(/^group:/, ''), c.wakeConfig || null]));
+  state.grSample = new Map(Object.entries((ls && ls.groups) || {}));
+  state.grSampleCap = Number((ls && ls.cap) || 60);
   data.levels = (gr && gr.levels) || {};
   const allow = new Set(((acc && acc.groups) || []).map(String));
   const muted = new Set((((mute && mute.keys) || [])).filter((k) => String(k).startsWith('group:')).map((k) => String(k).slice(6)));
