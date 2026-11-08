@@ -25,6 +25,8 @@
 ### 🟡 黄（13）
 `qq_mark_read`（改 readThroughSeq）、`qq_close_conversation`（结束对话、清 active）、`qq_memory_append`、`qq_memory_remove`（写/删单条记忆）、`qq_slang_submit`（进候选）、`qq_learn_from_owner`（学习样本）、`qq_collect_sticker`（进表情库）、`qq_sticker_note`、`qq_set_sticker_remark`（改表情备注）、`qq_style_note`（学说法样本）、`qq_person_note`（人物印象）、`qq_report_feedback`（给主人发提醒，仅站内）、`note_tech`（技术笔记）。
 
+黄级限额（`state/tool-calls.json`，东八区日切）按**成功调用**计数：失败的调用不占额度；超限返回 `rate_limited`。
+
 ### 🔴 红（18）
 `qq_send_message`、`qq_reply`、`qq_send_group_message`、`qq_send_private_message`、`qq_send_burst`（连发）、`qq_send_poke`、`qq_send_sticker`、`qq_send_qzone_msg`、`qq_qzone_comment`、`qq_delete_qzone_msg`（删说说/评论，不可撤回）、`qq_set_profile`、`qq_set_avatar`、`qq_handle_friend_request`（加陌生人）、`qq_memory_clear`（清记忆）、`qq_get_message_images` 的**写缓存**分支不计红（读为主）。
 （`qq_handle_friend_request` 的拒绝也是外部动作，同样走红。）

@@ -74,7 +74,8 @@ export function createToolLimiter({ stateDir, getCfg = () => ({}), now = () => D
     if (YELLOW_TOOLS.has(name)) return 100;
     return 0;
   };
-  return function toolLimit(name) {
+  function toolLimit(name) {
+    // 只判额度，不计数：失败/超时不占额度，成功后由 after 记一次。
     const tool = String(name || '');
     if (RED_TOOLS.has(tool)) return null; // 红级走 perm 原逻辑，不叠加限额
     const limit = limitOf(tool);
@@ -92,10 +93,22 @@ export function createToolLimiter({ stateDir, getCfg = () => ({}), now = () => D
         isError: true,
       };
     }
-    st.counts[tool] = n + 1;
-    save(st);
     return null;
+  }
+
+  toolLimit.after = (name, args, result) => {
+    if (result?.isError) return; // 失败不计数
+    const tool = String(name || '');
+    if (RED_TOOLS.has(tool)) return;
+    const limit = limitOf(tool);
+    if (!limit) return;
+    const day = dayKey(now());
+    const st = load(day);
+    st.counts[tool] = Number(st.counts[tool] || 0) + 1;
+    save(st);
   };
+
+  return toolLimit;
 }
 
 // D：主动收藏表情的硬护栏（每会话每天 2 个、全局每天 10 个）。
@@ -295,6 +308,9 @@ export function installToolGuard(server, { log = console.error, schemas = new Ma
     const text = String(result?.content?.find?.((c) => c?.type === 'text')?.text ?? '');
     if (result?.isError && /MCP error -32602|Input validation error/i.test(text)) {
       return structuredInvalid(String(request?.params?.name ?? ''), request?.params?.arguments);
+    }
+    if (limit && typeof limit.after === 'function') {
+      try { await limit.after(String(request?.params?.name ?? ''), request?.params?.arguments, result); } catch {}
     }
     if (sticker && typeof sticker.after === 'function') {
       try { await sticker.after(String(request?.params?.name ?? ''), request?.params?.arguments, result); } catch {}
