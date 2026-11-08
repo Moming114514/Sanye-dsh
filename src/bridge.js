@@ -25,6 +25,7 @@ import { createDiveLimiter } from './lib/dive-limit.js';
 import { applyModeDefaults, wakeAllowsSilent } from './lib/wake-mode.js';
 import { createPokeMerger } from './lib/poke-merge.js';
 import { createLargeSampler } from './lib/large-sample.js';
+import { createGroupDigest } from './lib/group-digest.js';
 // R1：媒体段解析已抽到 src/lib/media-segments.js
 import { extractMediaFromSegments, sanitizeMediaSummary } from './lib/media-segments.js';
 import { SENSITIVE_RE } from './sensitive.js';
@@ -300,6 +301,7 @@ const PLATFORM_STATE_DIR = activePlatformStateDir(STATE_DIR);
 const diveLimiter = createDiveLimiter({ stateDir: DSH_STATE_DIR });
 const pokeMerger = createPokeMerger({ stateDir: DSH_STATE_DIR });
 const largeSampler = createLargeSampler({ stateDir: DSH_STATE_DIR, log });
+const groupDigest = createGroupDigest({ stateDir: DSH_STATE_DIR, log });
 // 待发唤醒是否允许沉默：只存在内存里，不写进 socialV2 状态。
 const pendingWakeNoSilent = new Map();
 // 容量告警私聊节流（同一档 10 分钟内最多一条；插件侧还有 12 小时的同档节流）。
@@ -13499,6 +13501,14 @@ function logSpeakActual(key, allow, source, reason) {
 }
 
   async function sendWakePromptV2(key, reason, opts = {}) {
+  // C（G5 shadow）：只在群聊唤醒时试算一次压缩效果，不接入提示词。
+  try {
+    if (String(key).startsWith('group:')) {
+      const _gd = getSocialV2State(key);
+      groupDigest.digest(key, _gd && Array.isArray(_gd.recentMessages) ? _gd.recentMessages : []);
+    }
+  } catch { /* shadow 失败不影响主流程 */ }
+
     if (cfg.socialV2?.enabled === false) { logSpeakActual(key, false, 'config', 'socialV2.enabled=false'); return; }
     if (currentMode !== 'reserved2' || socialV2.paused) { logSpeakActual(key, false, 'config', socialV2.paused ? 'paused' : 'mode=' + currentMode); return; }
     logSpeakPredict(key, reason); // SPEAK_POLICY_PATCH：入口预测（不改判断）
